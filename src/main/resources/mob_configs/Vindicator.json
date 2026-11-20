@@ -319,8 +319,6 @@
         { "level": 9,  "cost": 26, "durability": 0.90 },
         { "level": 10, "cost": 28, "durability": 1.00 }
       ]
-    },
-
-    "special_abilities": {}
+    }
   }
 }

@@ -71,17 +71,6 @@
     "helmet": {},
     "chestplate": {},
     "leggings": {},
-    "boots": {},
-
-    "special_abilities": {
-      "poison_mastery": [
-        { "level": 1, "cost": 0,  "poison_level": 1, "duration": 7 },
-        { "level": 2, "cost": 8,  "poison_level": 1, "duration": 14 },
-        { "level": 3, "cost": 12, "poison_level": 2, "duration": 10 },
-        { "level": 4, "cost": 16, "poison_level": 2, "duration": 15 },
-        { "level": 5, "cost": 20, "poison_level": 2, "duration": 20, "wither_level": 1, "wither_duration": 10 },
-        { "level": 6, "cost": 24, "poison_level": 2, "duration": 20, "wither_level": 1, "wither_duration": 10, "slowness_level": 2, "slowness_duration": 15 }
-      ]
-    }
+    "boots": {}
   }
 }
