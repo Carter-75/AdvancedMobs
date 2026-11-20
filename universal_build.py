@@ -2,7 +2,7 @@
 """
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                                                                           ║
-║          UNIVERSAL MOB WAR - ULTIMATE BUILD & DEPLOY SYSTEM               ║
+║          ADVANCED MOBS - ULTIMATE BUILD & DEPLOY SYSTEM               ║
 ║                    ONE SCRIPT TO RULE THEM ALL                            ║
 ║                                                                           ║
 ║  Features:                                                                ║
@@ -79,7 +79,7 @@ class UniversalBuildSystem:
         self.log_file = self.root / "universal_build.log"
         self.timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.latest_jar = None
-        self.test_instance_dir = Path.home() / ".universalmobwar-test-instance"
+        self.test_instance_dir = Path.home() / ".advancedmobs-test-instance"
         
         # System connection status - all 4 systems now have main files in system/ folder
         self.systems = {
@@ -114,7 +114,7 @@ class UniversalBuildSystem:
         info("Analyzing 4 independent mod systems (all in system/ folder)...")
         print()
         
-        base_path = self.root / "src/main/java/mod/universalmobwar"
+        base_path = self.root / "src/main/java/mod/advancedmobs"
         system_path = base_path / "system"
         
         # =======================================================================
@@ -230,7 +230,7 @@ class UniversalBuildSystem:
         scaling_system_file = system_path / "ScalingSystem.java"
         json_dir = self.root / "src/main/resources/mob_configs"
         config_file = base_path / "config/ModConfig.java"
-        mob_data_mixin = self.root / "src/main/java/mod/universalmobwar/mixin/MobDataMixin.java"
+        mob_data_mixin = self.root / "src/main/java/mod/advancedmobs/mixin/MobDataMixin.java"
         
         json_configs = list(json_dir.glob("*.json")) if json_dir.exists() else []
         
@@ -367,7 +367,7 @@ class UniversalBuildSystem:
             warlord_status.append("Entity file not found")
         
         # Check raid mixin for spawn integration
-        raid_mixin_file = self.root / "src/main/java/mod/universalmobwar/mixin/RaidSpawningMixin.java"
+        raid_mixin_file = self.root / "src/main/java/mod/advancedmobs/mixin/RaidSpawningMixin.java"
         if raid_mixin_file.exists():
             content = raid_mixin_file.read_text(encoding='utf-8', errors='ignore')
             if "isWarlordActive()" in content:
@@ -546,7 +546,7 @@ class UniversalBuildSystem:
         """Verify mixins exist"""
         info("Validating mixin implementations...")
         
-        mixin_dir = self.root / "src/main/java/mod/universalmobwar/mixin"
+        mixin_dir = self.root / "src/main/java/mod/advancedmobs/mixin"
         mob_mixin_dir = mixin_dir / "mob"
         
         # Check core mixins
@@ -821,18 +821,18 @@ class UniversalBuildSystem:
         json_dir = self.root / "src/main/resources/mob_configs"
         json_count = len(list(json_dir.glob("*.json"))) if json_dir.exists() else 0
         
-        mixin_dir = self.root / "src/main/java/mod/universalmobwar/mixin"
+        mixin_dir = self.root / "src/main/java/mod/advancedmobs/mixin"
         mob_mixin_dir = mixin_dir / "mob"
         mixin_count = len(list(mixin_dir.glob("*.java"))) if mixin_dir.exists() else 0
         if mob_mixin_dir.exists():
             mixin_count += len(list(mob_mixin_dir.glob("*.java")))
         
         # Check if ScalingSystem exists
-        scaling_system_exists = (self.root / "src/main/java/mod/universalmobwar/system/ScalingSystem.java").exists()
+        scaling_system_exists = (self.root / "src/main/java/mod/advancedmobs/system/ScalingSystem.java").exists()
         
         with open(self.log_file, 'w', encoding='utf-8') as f:
             f.write("=" * 80 + "\n")
-            f.write("UNIVERSAL MOB WAR - BUILD LOG\n")
+            f.write("ADVANCED MOBS - BUILD LOG\n")
             f.write("=" * 80 + "\n\n")
             f.write(f"Timestamp: {self.timestamp}\n")
             f.write(f"Minecraft Version: 1.21.1\n")
@@ -954,7 +954,7 @@ class UniversalBuildSystem:
         mods_dir.mkdir(parents=True, exist_ok=True)
         saves_dir.mkdir(parents=True, exist_ok=True)
         if self.latest_jar and self.latest_jar.exists():
-            for stray in mods_dir.glob("universalmobwar*.jar"):
+            for stray in mods_dir.glob("advancedmobs*.jar"):
                 try:
                     stray.unlink()
                 except OSError as exc:
@@ -985,7 +985,7 @@ class UniversalBuildSystem:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Universal Mob War - Ultimate Build & Deploy System"
+        description="Advanced Mobs - Ultimate Build & Deploy System"
     )
     parser.add_argument(
         "--check",
@@ -1036,7 +1036,7 @@ def main():
     print()
     log("╔" + "═" * 78 + "╗", Color.BLUE)
     log("║" + " " * 78 + "║", Color.BLUE)
-    log("║" + "UNIVERSAL MOB WAR - ULTIMATE BUILD SYSTEM".center(78) + "║", Color.CYAN)
+    log("║" + "ADVANCED MOBS - ULTIMATE BUILD SYSTEM".center(78) + "║", Color.CYAN)
     log("║" + "One Script To Rule Them All".center(78) + "║", Color.CYAN)
     log("║" + " " * 78 + "║", Color.BLUE)
     log("╚" + "═" * 78 + "╝", Color.BLUE)

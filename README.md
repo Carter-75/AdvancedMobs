@@ -1,4 +1,4 @@
-# Universal Mob War v1.0
+# Advanced Mobs v1.0
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue) ![Minecraft](https://img.shields.io/badge/minecraft-1.21.x-green) ![Loader](https://img.shields.io/badge/loader-Fabric-yellow)
 
@@ -6,9 +6,9 @@
 
 ---
 
-## 🎯 What is Universal Mob War?
+## 🎯 What is Advanced Mobs?
 
-Universal Mob War completely overhauls mob behavior, creating a dynamic battlefield where mobs evolve based on world age and combat, fight each other in massive wars, form temporary alliances, and can spawn as legendary bosses.
+Advanced Mobs completely overhauls mob behavior, creating a dynamic battlefield where mobs evolve based on world age and combat, fight each other in massive wars, form temporary alliances, and can spawn as legendary bosses.
 
 > ✅ **Targeted compatibility:** Built for Minecraft 1.21.x (tested on 1.21.1). Earlier versions and future 1.22+ updates need a dedicated port.
 
@@ -271,7 +271,7 @@ A legendary boss that spawns during raids:
 
 ## ⚙️ Configuration (Mod Menu)
 
-**Access**: Click gear icon next to "Universal Mob War" in Mod Menu
+**Access**: Click gear icon next to "Advanced Mobs" in Mod Menu
 
 **Scroll-Friendly Layout**: The in-game screen is now scrollable, so every option stays readable even on 720p installs. Widgets are spaced with consistent padding so you can breeze through the categories listed below.
 
@@ -312,9 +312,9 @@ A legendary boss that spawns during raids:
 - `alwaysSpawnWarlordOnFinalWave`, `warlordMinRaidLevel`, `warlordMinionCount`, `warlordHealthMultiplierPercent`, `warlordDamageMultiplierPercent` – Complete Warlord tuning without touching JSON.
 - `maxParticlesPerConnection`, `maxDrawnMinionConnections` – Cap how many connection effects render per mob/minion.
 - `debugUpgradeLog`, `debugLogging` – Toggle chat spam for upgrade decisions or ultra-verbose console logging.
-- `excludedMobs` list – Still lives in `config/universalmobwar.json`; edit it manually (plus `/mobwar reload`) if you want this system to ignore specific entities.
+- `excludedMobs` list – Still lives in `config/advancedmobs.json`; edit it manually (plus `/mobwar reload`) if you want this system to ignore specific entities.
 
-**Config File**: `config/universalmobwar.json` (auto-generates and syncs with Mod Menu). Only touch it for `excludedMobs` (plus `/mobwar reload`) or other future experimental flags.
+**Config File**: `config/advancedmobs.json` (auto-generates and syncs with Mod Menu). Only touch it for `excludedMobs` (plus `/mobwar reload`) or other future experimental flags.
 
 ---
 
@@ -322,7 +322,7 @@ A legendary boss that spawns during raids:
 
 ### 4 Independent Systems (system/ folder)
 
-All 4 core systems now have their main files in `src/main/java/mod/universalmobwar/system/`:
+All 4 core systems now have their main files in `src/main/java/mod/advancedmobs/system/`:
 
 ```
 system/
@@ -413,7 +413,7 @@ mixin/mob/
 
 1. Install [Fabric Loader](https://fabricmc.net/) for Minecraft 1.21.x (tested on 1.21.1)
 2. Install [Fabric API](https://modrinth.com/mod/fabric-api) v0.102.0+
-3. Download `universal-mob-war-1.0.0.jar`
+3. Download `advanced-mobs-1.0.0.jar`
 4. Place in `mods` folder
 5. Launch and enjoy!
 
@@ -432,8 +432,8 @@ mixin/mob/
 
 ```bash
 # Clone repository
-git clone https://github.com/Carter-75/UniversalMobWar.git
-cd UniversalMobWar
+git clone https://github.com/Carter-75/AdvancedMobs.git
+cd AdvancedMobs
 
 # Validate all 80 mob JSONs + code
 python universal_build.py --check
@@ -444,7 +444,7 @@ python universal_build.py --build
 # Build + push to GitHub
 python universal_build.py --deploy
 
-# Output: build/libs/universal-mob-war-1.0.0.jar
+# Output: build/libs/advanced-mobs-1.0.0.jar
 ```
 
 **Build Script Features**:
@@ -510,7 +510,7 @@ Result: EVERY mob attacks EVERY other mob at massive range!
 - Modifying or decompiling
 - Claiming as your own
 
-**Attribution**: "Universal Mob War by Carter"
+**Attribution**: "Advanced Mobs by Carter"
 
 ---
 
@@ -527,7 +527,7 @@ Report bugs on GitHub with:
 
 ## 🎉 Summary
 
-Universal Mob War transforms Minecraft into a dynamic battlefield:
+Advanced Mobs transforms Minecraft into a dynamic battlefield:
 
 - ✅ **80 individual mob configs** with complete upgrade paths (in progress)
 - ✅ **Progressive point economy** with 80%/20% buy/save system

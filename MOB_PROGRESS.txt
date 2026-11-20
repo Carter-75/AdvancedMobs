@@ -1,5 +1,5 @@
 ================================================================================
-                        UNIVERSAL MOB WAR - MOB PROGRESS TRACKER
+                        ADVANCED MOBS - MOB PROGRESS TRACKER
 ================================================================================
 
 - DO NOT CREATE EXTRA ABILITIES BESIDE THE ONES ALREADY LISTED, AND READ THE JSON FILE THAT WAS CREATED TO UNDERSTAND THE FORMAT AND REVIEW THE FULL SKILL TREE.
@@ -800,10 +800,10 @@ Each mob JSON must be COMPLETELY STANDALONE. Structure:
                            FILE LOCATIONS
 ================================================================================
 
-ScalingSystem: src/main/java/mod/universalmobwar/system/ScalingSystem.java
-Mixin hook:    src/main/java/mod/universalmobwar/mixin/MobDataMixin.java (handles every mob)
+ScalingSystem: src/main/java/mod/advancedmobs/system/ScalingSystem.java
+Mixin hook:    src/main/java/mod/advancedmobs/mixin/MobDataMixin.java (handles every mob)
 JSON configs:  src/main/resources/mob_configs/[mobname].json (lowercase)
-Mixin config:  src/main/resources/universalmobwar.mixins.json (already registers MobDataMixin)
+Mixin config:  src/main/resources/advancedmobs.mixins.json (already registers MobDataMixin)
 
 ================================================================================
                            ARCHITECTURE
@@ -839,10 +839,10 @@ STEP 1: Create JSON config file
 
 STEP 2: No mixin file needed
   MobDataMixin already injects into every MobEntity, persists MobWarData, and calls ScalingSystem.
-  Do NOT add files under src/main/java/mod/universalmobwar/mixin/mob anymore.
+  Do NOT add files under src/main/java/mod/advancedmobs/mixin/mob anymore.
 
 STEP 3: No mixin registration needed
-  src/main/resources/universalmobwar.mixins.json already lists MobDataMixin.
+  src/main/resources/advancedmobs.mixins.json already lists MobDataMixin.
   Leave it alone unless the universal hook itself changes.
 
 STEP 4: ScalingSystem loads mobs dynamically
