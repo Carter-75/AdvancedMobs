@@ -99,15 +99,24 @@ public class AllianceSystem {
         
         // SMART SCHEDULING: Only process if not overlapping with other operations
         if (!OperationScheduler.canExecuteAlliance(mobId)) {
-            // ANTI-STARVATION: Queue is either full or operation on cooldown
-            // Queue for later - schedule 300ms in the future (non-blocking)
+            // ANTI-STARVATION: If the queue is already full, drop the operation
+            // as documented (the mob retries naturally on a later tick). The old
+            // code queued anyway, so deferred updates piled up without bound in
+            // the scheduler whenever the queue stayed full.
+            if (OperationScheduler.isAllianceQueueFull()) {
+                return;
+            }
+            // Operation on cooldown - queue for later, 300ms in the future (non-blocking)
             OperationScheduler.incrementAllianceQueue(); // Track queue depth
             SCHEDULER.schedule(() -> {
                 world.getServer().execute(() -> {
-                    if (isEnabled(world)) { // Re-check before executing
-                        updateAlliancesInternal(mob, world);
+                    try {
+                        if (isEnabled(world)) { // Re-check before executing
+                            updateAlliancesInternal(mob, world);
+                        }
+                    } finally {
+                        OperationScheduler.decrementAllianceQueue(); // Done - free queue slot
                     }
-                    OperationScheduler.decrementAllianceQueue(); // Done - free queue slot
                 });
             }, 300, TimeUnit.MILLISECONDS);
             return;
@@ -290,9 +299,12 @@ public class AllianceSystem {
         double centerX = border.getCenterX();
         double centerZ = border.getCenterZ();
         double size = border.getSize() / 2.0;
+        // Use the world's real vertical bounds. The old box started at y=0,
+        // so mobs below y=0 (down to -64 in the overworld) were treated as
+        // dead and had their alliance entries purged on every cleanup pass.
         Box borderBox = new Box(
-            centerX - size, 0, centerZ - size,
-            centerX + size, world.getHeight(), centerZ + size
+            centerX - size, world.getBottomY(), centerZ - size,
+            centerX + size, world.getTopY(), centerZ + size
         );
         for (MobEntity mob : world.getEntitiesByClass(MobEntity.class, borderBox, m -> true)) {
             aliveMobs.add(mob.getUuid());

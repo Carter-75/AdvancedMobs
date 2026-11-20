@@ -18,6 +18,8 @@ import mod.universalmobwar.system.ScalingSystem;
 import mod.universalmobwar.util.TargetingUtil;
 import mod.universalmobwar.util.OperationScheduler;
 import mod.universalmobwar.util.TickScheduler;
+import mod.universalmobwar.util.SummonerTracker;
+import mod.universalmobwar.system.TargetingSystem;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
@@ -49,6 +51,7 @@ import org.slf4j.LoggerFactory;
 import me.shedaniel.autoconfig.AutoConfig;
 import me.shedaniel.autoconfig.serializer.GsonConfigSerializer;
 
+import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
@@ -251,6 +254,14 @@ public class UniversalMobWarMod implements ModInitializer {
 				() -> {
 					if (world instanceof ServerWorld serverWorld && entity instanceof MobEntity mob) {
 						NaturalSpawnLimiter.onMobUnloaded(serverWorld, mob.getCommandTags().contains("umw_natural_spawned"));
+						// Drop runtime-only per-mob state so the static maps keyed
+						// by mob UUID stop growing without bound as mobs come and
+						// go. The unregister and clear methods existed but had no
+						// callers before this.
+						UUID mobUuid = mob.getUuid();
+						ScalingSystem.cleanupMobState(mobUuid);
+						SummonerTracker.unregisterSummoned(mobUuid);
+						TargetingSystem.clearMobData(mobUuid);
 					}
 				}
 			);

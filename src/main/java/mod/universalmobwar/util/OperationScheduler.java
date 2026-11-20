@@ -237,6 +237,15 @@ public class OperationScheduler {
         return canExecute("alliance_" + entityId, dynamicDelay);
     }
     
+    /**
+     * Whether the alliance queue is at capacity. Callers that defer work when
+     * canExecuteAlliance returns false must check this first and drop the
+     * operation instead of queueing past the cap.
+     */
+    public static boolean isAllianceQueueFull() {
+        return allianceQueueDepth.get() >= MAX_QUEUE_DEPTH;
+    }
+
     public static void markAllianceExecuted(String entityId) {
         markExecuted("alliance_" + entityId);
     }

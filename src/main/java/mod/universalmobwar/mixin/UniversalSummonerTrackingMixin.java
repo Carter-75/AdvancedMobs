@@ -42,6 +42,15 @@ public abstract class UniversalSummonerTrackingMixin {
             // Only track if this mob was summoned AND we're in a ServerWorld
             if ((spawnReason == SpawnReason.MOB_SUMMONED || spawnReason == SpawnReason.EVENT) 
                 && world instanceof ServerWorld serverWorld) {
+                // Tag summoned mobs so NaturalMobSpawnBlockerMixin lets them
+                // through when natural spawns are disabled or capped. Its
+                // allowlist has always checked for "umw_summoned", but nothing
+                // ever set the tag, so warlord minions and other summoned mobs
+                // were blocked by the hard block mode. initialize() runs before
+                // spawnEntity in the standard spawn paths, so the tag is in
+                // place when the blocker checks it.
+                self.addCommandTag("umw_summoned");
+
                 // Try to find the summoner by looking for nearby mobs that could have summoned this one
                 // Common summoners: Evoker, Illusioner, Warlord, etc.
                 
