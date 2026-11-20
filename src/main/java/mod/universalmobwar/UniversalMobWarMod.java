@@ -17,6 +17,7 @@ import mod.universalmobwar.system.EntityCleanupSystem;
 import mod.universalmobwar.system.ScalingSystem;
 import mod.universalmobwar.util.TargetingUtil;
 import mod.universalmobwar.util.OperationScheduler;
+import mod.universalmobwar.util.TickScheduler;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
@@ -255,8 +256,11 @@ public class UniversalMobWarMod implements ModInitializer {
 			);
 		});
 
+		ServerLifecycleEvents.SERVER_STOPPED.register(server -> TickScheduler.clear());
+
 		// OPTIMIZATION: Register cache cleanup for entity query system (every 5 seconds)
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			runSafely("END_SERVER_TICK tick scheduler", () -> TickScheduler.tick(server));
 			runSafely("END_SERVER_TICK extra shot queue", () -> ScalingSystem.processExtraShotQueue(server));
 
 			if (server.getTicks() % 100 == 0) { // Every 5 seconds

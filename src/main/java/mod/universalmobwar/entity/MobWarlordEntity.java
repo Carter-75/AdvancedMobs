@@ -4,6 +4,7 @@ import mod.universalmobwar.UniversalMobWarMod;
 import mod.universalmobwar.mixin.MobEntityAccessor;
 import mod.universalmobwar.system.WarlordSystem;
 import mod.universalmobwar.util.SummonerTracker;
+import mod.universalmobwar.util.TickScheduler;
 import net.minecraft.entity.*;
 import net.minecraft.entity.ai.goal.*;
 import net.minecraft.entity.attribute.DefaultAttributeContainer;
@@ -312,8 +313,10 @@ public class MobWarlordEntity extends HostileEntity {
             }
         }
         
-        // DEBUG: Log if boss has no target but should be looking for one
-        if (this.age % 100 == 0 && this.age > 60) { // Every 5 seconds
+        // DEBUG: Log if boss has no target but should be looking for one.
+        // The 64-block entity scan below only feeds this debug line, so skip
+        // the scan entirely unless debug logging is actually enabled.
+        if (this.age % 100 == 0 && this.age > 60 && UniversalMobWarMod.LOGGER.isDebugEnabled()) { // Every 5 seconds
             LivingEntity currentTarget = this.getTarget();
             if (currentTarget == null && serverWorld != null) {
                 // Count nearby hostile entities
@@ -1243,9 +1246,15 @@ public class MobWarlordEntity extends HostileEntity {
         if (nbt.contains("Minions")) {
             long[] minionArray = nbt.getLongArray("Minions");
             minionUuids.clear();
-            for (int i = 0; i < minionArray.length; i += 2) {
+            // The i + 1 bound also guards against a corrupt odd-length array.
+            for (int i = 0; i + 1 < minionArray.length; i += 2) {
                 UUID uuid = new UUID(minionArray[i], minionArray[i + 1]);
                 minionUuids.add(uuid);
+                // Re-register in WarlordSystem: that map is runtime-only and
+                // is never saved, so without this a reloaded warlord's minions
+                // lose their minion protections (they could attack the warlord
+                // and each other, and targeting checks would not skip them).
+                WarlordSystem.registerMinion(uuid, this.getUuid());
             }
         }
         
@@ -1289,15 +1298,16 @@ public class MobWarlordEntity extends HostileEntity {
         if (!this.getWorld().isClient && this.getWorld() instanceof ServerWorld serverWorld) {
             List<UUID> minionList = new ArrayList<>(minionUuids);
             
-            // Schedule staggered minion deaths
+            // Schedule staggered minion deaths on the tick scheduler. The old
+            // code deferred with server.execute(...) and then slept on the
+            // server thread for delayTicks * 50ms per delayed minion, which
+            // froze the whole server for about 1.5 seconds when a warlord
+            // with 20 minions died. The visible cascade is unchanged.
             for (int i = 0; i < minionList.size(); i++) {
                 final UUID minionUuid = minionList.get(i);
                 final int delay = i / 5; // 5 minions per tick (0.25 seconds total for 20 minions)
-                
-                // Schedule death after delay ticks
-                serverWorld.getServer().execute(() -> {
-                    scheduleMinionDeath(serverWorld, minionUuid, delay);
-                });
+
+                TickScheduler.schedule(serverWorld.getServer(), delay, () -> killMinion(serverWorld, minionUuid));
             }
             
             minionUuids.clear();
@@ -1306,25 +1316,6 @@ public class MobWarlordEntity extends HostileEntity {
             serverWorld.getPlayers().forEach(player -> {
                 player.sendMessage(Text.literal("The Mob Warlord has been defeated! Their army crumbles!")
                     .styled(style -> style.withColor(Formatting.GOLD).withBold(true)), false);
-            });
-        }
-    }
-    
-    /**
-     * Helper method to schedule minion death after a delay.
-     */
-    private void scheduleMinionDeath(ServerWorld serverWorld, UUID minionUuid, int delayTicks) {
-        if (delayTicks == 0) {
-            killMinion(serverWorld, minionUuid);
-        } else {
-            // Schedule for later
-            serverWorld.getServer().execute(() -> {
-                try {
-                    Thread.sleep(delayTicks * 50L); // 50ms per tick
-                    killMinion(serverWorld, minionUuid);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
             });
         }
     }

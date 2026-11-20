@@ -202,7 +202,8 @@ public class MobWarData {
         if (nbt.contains("allies")) {
             long[] allyArray = nbt.getLongArray("allies");
             allies.clear();
-            for (int i = 0; i < allyArray.length; i += 2) {
+            // The i + 1 bound guards against a corrupt odd-length array.
+            for (int i = 0; i + 1 < allyArray.length; i += 2) {
                 UUID uuid = new UUID(allyArray[i], allyArray[i + 1]);
                 allies.add(uuid);
             }
