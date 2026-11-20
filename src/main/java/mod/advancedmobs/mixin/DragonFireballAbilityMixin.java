@@ -74,7 +74,7 @@ public abstract class DragonFireballAbilityMixin extends AbstractHurtingProjecti
                 directHit = living;
             }
 
-            Vec3 impactPos = hitResult.position();
+            Vec3 impactPos = hitResult.getLocation();
             ScalingSystem.applyVoidBombardmentEffects(owner, data, serverWorld, impactPos, directHit);
         });
     }

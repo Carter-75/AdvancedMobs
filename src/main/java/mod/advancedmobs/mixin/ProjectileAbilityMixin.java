@@ -109,13 +109,13 @@ public abstract class ProjectileAbilityMixin {
             int piercingLevel = Math.max(0, ScalingSystem.getPiercingLevel(mob, data));
 
             for (int i = 0; i < extraProjectiles; i++) {
-                Entity duplicate = original.getType().create(world);
+                Entity duplicate = original.getType().create(world, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
                 if (!(duplicate instanceof Projectile projectile)) {
                     continue;
                 }
 
                 projectile.setOwner(mob);
-                projectile.setPosition(original.getX(), original.getY(), original.getZ());
+                projectile.setPos(original.getX(), original.getY(), original.getZ());
                 projectile.addTag(ScalingSystem.MULTISHOT_CHILD_TAG);
 
                 if (original instanceof ThrowableItemProjectile thrown && projectile instanceof ThrowableItemProjectile thrownCopy) {
@@ -136,7 +136,7 @@ public abstract class ProjectileAbilityMixin {
                 }
 
                 if (projectile instanceof AbstractArrow persistentCopy) {
-                    persistentCopy.pickupType = AbstractArrow.PickupPermission.DISALLOWED;
+                    persistentCopy.pickup = AbstractArrow.Pickup.DISALLOWED;
                     if (piercingLevel > 0) {
                         ((PersistentProjectileEntityAccessor) (Object) persistentCopy).invokeSetPierceLevel((byte) Math.min(127, piercingLevel));
                     }

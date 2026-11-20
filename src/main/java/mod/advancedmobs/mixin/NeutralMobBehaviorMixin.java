@@ -35,10 +35,11 @@ public abstract class NeutralMobBehaviorMixin {
             if (!neutralAggressive) return;
             
             // Keep anger high when they have a target
-            if (angerable.getAngryAt() == null && self.getTarget() != null) {
-                // Set anger target to current target
-                angerable.setAngryAt(self.getTarget().getUUID());
-                angerable.setAngerTime(600); // 30 seconds
+            if (angerable.getPersistentAngerTarget() == null && self.getTarget() != null) {
+                // Set anger target to current target. 26.2 anger is an
+                // end time on the game clock, not a remaining tick count.
+                angerable.setPersistentAngerTarget(net.minecraft.world.entity.EntityReference.of(self.getTarget()));
+                angerable.setPersistentAngerEndTime(serverWorld.getGameTime() + 600); // 30 seconds
             }
         });
     }

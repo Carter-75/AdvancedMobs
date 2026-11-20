@@ -35,7 +35,7 @@ public abstract class MobDeathTrackerMixin {
 
             // Kill tracking hook - individual mob mixins handle their own progression
             // This provides a central point for future kill-based features
-            if (!(damageSource.getAttacker() instanceof Mob killer)) {
+            if (!(damageSource.getEntity() instanceof Mob killer)) {
                 return;
             }
 

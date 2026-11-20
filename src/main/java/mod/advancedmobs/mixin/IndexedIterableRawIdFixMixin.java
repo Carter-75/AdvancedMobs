@@ -59,7 +59,7 @@ public interface IndexedIterableRawIdFixMixin {
 
             ResourceKey<?> key;
             try {
-                key = reference.getKey().orElse(null);
+                key = reference.key();
             } catch (Exception ignored) {
                 key = null;
             }

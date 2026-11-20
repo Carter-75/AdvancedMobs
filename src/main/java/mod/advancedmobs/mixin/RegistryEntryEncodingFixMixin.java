@@ -39,7 +39,7 @@ public final class RegistryEntryEncodingFixMixin {
     @SuppressWarnings({"rawtypes", "unchecked"})
     private int umw$resolveRawIdOrThrow(IdMap iterable, Object value) {
         try {
-            return iterable.getRawIdOrThrow(value);
+            return iterable.getIdOrThrow(value);
         } catch (IllegalArgumentException original) {
             try {
                 if (!(value instanceof Holder.Reference<?> reference)) {
@@ -48,7 +48,7 @@ public final class RegistryEntryEncodingFixMixin {
 
                 ResourceKey<?> key;
                 try {
-                    key = reference.getKey().orElse(null);
+                    key = reference.key();
                 } catch (Exception ignored) {
                     key = null;
                 }
@@ -61,11 +61,11 @@ public final class RegistryEntryEncodingFixMixin {
                     throw original;
                 }
 
-                return iterable.getRawIdOrThrow(resolved);
+                return iterable.getIdOrThrow(resolved);
             } catch (Throwable t) {
                 AdvancedMobsMod.LOGGER.error("[RegistryEntryEncodingFixMixin] Raw id resolution failed", t);
                 try {
-                    return iterable.getRawIdOrThrow(value);
+                    return iterable.getIdOrThrow(value);
                 } catch (Throwable ignored) {
                     return 0;
                 }

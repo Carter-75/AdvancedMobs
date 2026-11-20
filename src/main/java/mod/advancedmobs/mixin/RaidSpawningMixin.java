@@ -87,23 +87,26 @@ public abstract class RaidSpawningMixin {
             if (spawned) {
                 // Broadcast to all players
                 this.world.players().forEach(player -> {
-                    player.sendMessage(
+                    player.sendSystemMessage(
                         net.minecraft.network.chat.Component.literal("")
                             .append(net.minecraft.network.chat.Component.literal("═══════════════════════════════════").withStyle(style -> style.withColor(net.minecraft.ChatFormatting.DARK_RED).withBold(true)))
                             .append(net.minecraft.network.chat.Component.literal("\n"))
                             .append(net.minecraft.network.chat.Component.literal("    💀 THE MOB WARLORD HAS JOINED THE RAID! 💀").withStyle(style -> style.withColor(net.minecraft.ChatFormatting.RED).withBold(true)))
                             .append(net.minecraft.network.chat.Component.literal("\n"))
-                            .append(net.minecraft.network.chat.Component.literal("═══════════════════════════════════").withStyle(style -> style.withColor(net.minecraft.ChatFormatting.DARK_RED).withBold(true))),
-                        false
+                            .append(net.minecraft.network.chat.Component.literal("═══════════════════════════════════").withStyle(style -> style.withColor(net.minecraft.ChatFormatting.DARK_RED).withBold(true)))
                     );
                     
-                    // Play dramatic sound (server-side)
-                    player.playNotifySound(
-                        net.minecraft.sounds.SoundEvents.WITHER_SPAWN,
+                    // Play dramatic sound for this player only. 26.2 has no
+                    // ServerPlayer.playNotifySound; send the sound packet
+                    // directly on the player's connection instead.
+                    player.connection.send(new net.minecraft.network.protocol.game.ClientboundSoundPacket(
+                        net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.wrapAsHolder(net.minecraft.sounds.SoundEvents.WITHER_SPAWN),
                         net.minecraft.sounds.SoundSource.HOSTILE,
+                        player.getX(), player.getY(), player.getZ(),
                         1.0f,
-                        0.5f
-                    );
+                        0.5f,
+                        player.getRandom().nextLong()
+                    ));
                 });
                 
                 AdvancedMobsMod.LOGGER.info("Mob Warlord spawned in raid at {}", spawnPos);
@@ -120,21 +123,21 @@ public abstract class RaidSpawningMixin {
             int offsetX = (int)((Math.random() - 0.5) * 64); // ±32 blocks
             int offsetZ = (int)((Math.random() - 0.5) * 64);
             
-            BlockPos testPos = center.add(offsetX, 0, offsetZ);
+            BlockPos testPos = center.offset(offsetX, 0, offsetZ);
             
             // Find ground level
-            BlockPos groundPos = this.world.getTopPosition(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, testPos);
+            BlockPos groundPos = new BlockPos(testPos.getX(), this.world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, testPos.getX(), testPos.getZ()), testPos.getZ());
             
             // Check if position is valid (solid ground, enough space above)
-            if (this.world.getBlockState(groundPos.down()).isSolidBlock(this.world, groundPos.down())) {
-                if (this.world.isEmptyBlock(groundPos) && this.world.isEmptyBlock(groundPos.up()) && this.world.isEmptyBlock(groundPos.up(2))) {
+            if (this.world.getBlockState(groundPos.below()).isSolid()) {
+                if (this.world.isEmptyBlock(groundPos) && this.world.isEmptyBlock(groundPos.above()) && this.world.isEmptyBlock(groundPos.above(2))) {
                     return groundPos;
                 }
             }
         }
         
         // Fallback to center if no valid position found
-        return this.world.getTopPosition(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, center);
+        return new BlockPos(center.getX(), this.world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, center.getX(), center.getZ()), center.getZ());
     }
 }
 

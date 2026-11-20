@@ -128,7 +128,7 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
             Mob self = (Mob)(Object)this;
             
             // Tag spawn eggs so they aren't blocked by natural spawn blocker
-            if (spawnReason == net.minecraft.world.entity.EntitySpawnReason.SPAWN_EGG) {
+            if (spawnReason == net.minecraft.world.entity.EntitySpawnReason.SPAWN_ITEM_USE) {
                 self.addTag("umw_player_spawned");
             }
 

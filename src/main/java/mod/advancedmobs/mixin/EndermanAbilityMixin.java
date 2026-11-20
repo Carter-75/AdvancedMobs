@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class EndermanAbilityMixin extends Monster {
 
     @Unique
-    private BlockPos advancedmobs$lastTeleportFrom = BlockPos.ORIGIN;
+    private BlockPos advancedmobs$lastTeleportFrom = BlockPos.ZERO;
 
     protected EndermanAbilityMixin(EntityType<? extends Monster> entityType, Level world) {
         super(entityType, world);
