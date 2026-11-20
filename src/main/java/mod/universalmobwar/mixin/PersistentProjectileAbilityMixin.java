@@ -6,14 +6,12 @@ import mod.universalmobwar.data.IMobWarDataHolder;
 import mod.universalmobwar.data.MobWarData;
 import mod.universalmobwar.system.ScalingSystem;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.projectile.PersistentProjectileEntity;
 import net.minecraft.entity.projectile.ProjectileEntity;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
 import net.minecraft.server.world.ServerWorld;
 
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,13 +25,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * to every persistent projectile fired by a mob.
  */
 @Mixin(PersistentProjectileEntity.class)
-public abstract class PersistentProjectileAbilityMixin extends ProjectileEntity implements ProjectileAbilityBridge {
+public abstract class PersistentProjectileAbilityMixin implements ProjectileAbilityBridge {
     @Unique
     private boolean universalmobwar$abilitiesApplied;
 
-    protected PersistentProjectileAbilityMixin(EntityType<? extends PersistentProjectileEntity> entityType, World world) {
-        super(entityType, world);
-    }
+    // This mixin used to extend ProjectileEntity with a constructor calling
+    // super(entityType, world), but in 1.21.1 ProjectileEntity's constructor
+    // is package-private in the shipped jar, so the class never compiled.
+    // It now follows the same cast pattern as ProjectileAbilityMixin; mixin
+    // constructors are never invoked at runtime, so behavior is unchanged.
 
     @Override
     public void universalmobwar$setAbilitiesApplied(boolean applied) {
@@ -43,11 +43,12 @@ public abstract class PersistentProjectileAbilityMixin extends ProjectileEntity 
     @Inject(method = "tick", at = @At("HEAD"))
     private void universalmobwar$applyProjectileAbilities(CallbackInfo ci) {
         UniversalMobWarMod.runSafely("PersistentProjectileAbilityMixin#applyProjectileAbilities", () -> {
-            if (this.getWorld().isClient() || universalmobwar$abilitiesApplied) {
+            ProjectileEntity self = (ProjectileEntity) (Object) this;
+            if (self.getWorld().isClient() || universalmobwar$abilitiesApplied) {
                 return;
             }
 
-            Entity owner = this.getOwner();
+            Entity owner = self.getOwner();
             if (!(owner instanceof MobEntity mob)) {
                 universalmobwar$abilitiesApplied = true;
                 return;
@@ -73,11 +74,12 @@ public abstract class PersistentProjectileAbilityMixin extends ProjectileEntity 
     @Inject(method = "onEntityHit", at = @At("TAIL"))
     private void universalmobwar$applyPotionMastery(EntityHitResult hitResult, CallbackInfo ci) {
         UniversalMobWarMod.runSafely("PersistentProjectileAbilityMixin#applyPotionMastery", () -> {
-            if (this.getWorld().isClient()) {
+            ProjectileEntity self = (ProjectileEntity) (Object) this;
+            if (self.getWorld().isClient()) {
                 return;
             }
 
-            Entity owner = this.getOwner();
+            Entity owner = self.getOwner();
             if (!(owner instanceof MobEntity mob)) {
                 return;
             }

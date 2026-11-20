@@ -39,6 +39,8 @@ import net.minecraft.item.ItemGroups;
 import net.minecraft.item.SpawnEggItem;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -111,7 +113,10 @@ public class UniversalMobWarMod implements ModInitializer {
 		EntityType.Builder.create(MobWarlordEntity::new, SpawnGroup.MONSTER)
 			.dimensions(1.2f, 3.6f) // Large boss size (1.2m wide x 3.6m tall)
 			.maxTrackingRange(64)
-			.build()
+			// Minecraft 1.21.1 requires the entity id here; the no-arg build()
+			// call only exists in 1.21.2 and later, so this never compiled
+			// against the mod's declared 1.21.1 target.
+			.build(MODID + ":mob_warlord")
 	);
 	
 	// Mob Warlord Spawn Egg (same colors as witch egg)
@@ -164,8 +169,10 @@ public class UniversalMobWarMod implements ModInitializer {
 		// Register Mob Warlord attributes
 		FabricDefaultAttributeRegistry.register(MOB_WARLORD, MobWarlordEntity.createMobWarlordAttributes());
 		
-		// Add spawn egg to creative inventory
-		ItemGroupEvents.modifyEntriesEvent(ItemGroups.SPAWN_EGGS).register(content -> {
+		// Add spawn egg to creative inventory. In 1.21.1 the ItemGroups key
+		// fields are private in the shipped jar, so the spawn eggs group key
+		// is built from its id instead of referencing ItemGroups.SPAWN_EGGS.
+		ItemGroupEvents.modifyEntriesEvent(RegistryKey.of(RegistryKeys.ITEM_GROUP, Identifier.ofVanilla("spawn_eggs"))).register(content -> {
 			content.add(MOB_WARLORD_SPAWN_EGG);
 		});
 		
