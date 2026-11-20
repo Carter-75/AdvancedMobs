@@ -3,7 +3,7 @@ plugins {
     id 'java'
 }
 
-group = "mod.universalmobwar"
+group = "mod.advancedmobs"
 version = "1.0.0"
 
 repositories {

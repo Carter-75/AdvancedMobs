@@ -8,5 +8,5 @@ pluginManagement {
 	}
 }
 
-rootProject.name = 'universal-mob-war'
+rootProject.name = 'advanced-mobs'
 

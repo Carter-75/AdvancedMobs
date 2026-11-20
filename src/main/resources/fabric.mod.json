@@ -1,8 +1,8 @@
 {
 	"schemaVersion": 1,
-	"id": "universalmobwar",
+	"id": "advancedmobs",
 	"version": "1.0.0",
-	"name": "Universal Mob War",
+	"name": "Advanced Mobs",
 	"description": "Mobs attack each other and evolve with 100% progressive costs! Features: alliance system, mob leveling (0→8000 pts), equipment progression (Wood→Netherite), 47 progressive skills, 22 mixins. Total chaos with TRUE RPG progression!",
 	"authors": ["Carter"],
 	"contact": {
@@ -11,12 +11,12 @@
 	"icon": "icon.png",
 	"environment": "*",
 	"entrypoints": {
-		"main": ["mod.universalmobwar.UniversalMobWarMod"],
-		"client": ["mod.universalmobwar.client.UniversalMobWarModClient"],
-		"modmenu": ["mod.universalmobwar.client.UniversalMobWarModMenu"]
+		"main": ["mod.advancedmobs.AdvancedMobsMod"],
+		"client": ["mod.advancedmobs.client.AdvancedMobsModClient"],
+		"modmenu": ["mod.advancedmobs.client.AdvancedMobsModMenu"]
 	},
 	"mixins": [
-		"universalmobwar.mixins.json"
+		"advancedmobs.mixins.json"
 	],
 	"depends": {
 		"fabricloader": ">=0.15.10",
