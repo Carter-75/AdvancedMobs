@@ -22,11 +22,11 @@ public class StalemateBreakerGoal extends Goal {
 
     public StalemateBreakerGoal(Mob mob) {
         this.mob = mob;
-        this.setControls(EnumSet.noneOf(Goal.Control.class)); // Runs in parallel with everything
+        this.setFlags(EnumSet.noneOf(Goal.Flag.class)); // Runs in parallel with everything
     }
 
     @Override
-    public boolean canStart() {
+    public boolean canUse() {
         LivingEntity target = mob.getTarget();
         return target instanceof Mob && target.isAlive();
     }

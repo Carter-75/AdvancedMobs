@@ -124,7 +124,7 @@ public class UniversalTargetGoal extends TargetGoal {
 	// ==========================================================================
 
 	@Override
-	public boolean canStart() {
+	public boolean canUse() {
 		// OPTIMIZATION: Stagger updates - not all mobs search every tick
 		if (updateCooldown > 0) {
 			updateCooldown--;
@@ -265,7 +265,7 @@ public class UniversalTargetGoal extends TargetGoal {
 			if (timeSinceLastCheck > (allianceCheckInterval + allianceCheckOffset)) {
 				if (mob.level() instanceof ServerLevel serverWorld) {
 					// Check if in active combat (recently attacked)
-					boolean inCombat = (currentTime - mob.getLastAttackTime() < 3000);
+					boolean inCombat = (currentTime - mob.getLastHurtMobTimestamp() < 3000);
 					// Adjust interval: 2s in combat, 4s when calm
 					allianceCheckInterval = inCombat ? 2000 : 4000;
 					AllianceSystem.updateAlliances(mob, serverWorld);
