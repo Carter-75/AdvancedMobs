@@ -740,9 +740,12 @@ public class ScalingSystem {
             } else {
                 String resolved = null;
                 for (String implemented : getImplementedMobs()) {
-                    if (registryName.contains(implemented)) {
+                    // Prefer the longest match so a specific name (for example
+                    // cave_spider) wins over a shorter substring (spider)
+                    // regardless of the order configs were scanned in.
+                    if (registryName.contains(implemented)
+                        && (resolved == null || implemented.length() > resolved.length())) {
                         resolved = implemented;
-                        break;
                     }
                 }
                 REGISTRY_NAME_LOOKUP_CACHE.put(registryName, resolved != null ? resolved : NO_CONFIG_MATCH);
@@ -2200,23 +2203,30 @@ public class ScalingSystem {
                 break;
             }
 
-            double roll = random.nextDouble();
-            logBuffer.logIteration(iterations, roll, affordable.size(), null);
-            if (roll < saveChance) {
-                exitReason = "Save roll triggered";
-                logBuffer.log(exitReason + " (carrying " + budget + " points)");
-                break;
-            }
-            if (roll >= saveChance + buyChance) {
-                logBuffer.log("Roll outside buy/save window; retrying next iteration");
-                continue;
-            }
-
             UpgradeOption chosen = chooseWeightedUpgrade(purchaseCandidates, random);
             if (chosen == null) {
                 exitReason = "No upgrade chosen";
                 logBuffer.log(exitReason);
                 break;
+            }
+
+            // Per the progression spec, a 0-cost upgrade is ALWAYS bought and is
+            // never blocked by the save roll. The upgrade is therefore chosen first
+            // and the save roll only happens when the chosen upgrade costs points.
+            if (chosen.cost > 0) {
+                double roll = random.nextDouble();
+                logBuffer.logIteration(iterations, roll, affordable.size(), null);
+                if (roll < saveChance) {
+                    exitReason = "Save roll triggered";
+                    logBuffer.log(exitReason + " (carrying " + budget + " points)");
+                    break;
+                }
+                if (roll >= saveChance + buyChance) {
+                    logBuffer.log("Roll outside buy/save window; retrying next iteration");
+                    continue;
+                }
+            } else {
+                logBuffer.logIteration(iterations, 0.0, affordable.size(), null);
             }
             int previousLevel = skillData.getInt(chosen.key);
             skillData.putInt(chosen.key, chosen.newLevel);
@@ -4376,9 +4386,13 @@ public class ScalingSystem {
                     long lastUse = cooldowns.getOrDefault("on_damage_regen", 0L);
                     
                     if (currentTick - lastUse >= cooldown * 20L) {
+                        // Duration comes from the config (on_damage_duration, in seconds).
+                        // This used to apply INFINITE regeneration, so once a mob with
+                        // regeneration level 3 or higher took damage it kept the effect
+                        // forever instead of for the configured duration.
                         mob.addStatusEffect(new StatusEffectInstance(
                             StatusEffects.REGENERATION,
-                            StatusEffectInstance.INFINITE,
+                            Math.max(1, duration) * 20,
                             regenLevel - 1,
                             false,
                             false,
