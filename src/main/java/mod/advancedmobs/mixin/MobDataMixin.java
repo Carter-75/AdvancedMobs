@@ -95,22 +95,6 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
         });
     }
 
-    @Inject(method = "doHurtTarget(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/entity/Entity;)Z", at = @At("TAIL"))
-    private void advancedmobs$handleMeleeAbilities(ServerLevel level, Entity target, CallbackInfoReturnable<Boolean> cir) {
-        AdvancedMobsMod.runSafely("MobDataMixin#handleMeleeAbilities", () -> {
-            if (!cir.getReturnValueZ() || !(target instanceof LivingEntity livingTarget)) {
-                return;
-            }
-
-            Mob self = (Mob)(Object)this;
-            if (advancedMobsData == null) {
-                return;
-            }
-
-            ScalingSystem.handleMeleeAttackAbilities(self, advancedMobsData, livingTarget, self.level().getGameTime());
-        });
-    }
-    
     // Strip ALL equipment from every mob immediately on spawn (AFTER vanilla equipment)
     // Using @At("RETURN") ensures we strip equipment AFTER Minecraft adds it in initEquipment()
     @Inject(method = "finalizeSpawn", at = @At("RETURN"))

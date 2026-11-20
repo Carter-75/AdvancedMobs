@@ -281,7 +281,6 @@ public class AdvancedMobsMod implements ModInitializer {
 		// OPTIMIZATION: Register cache cleanup for entity query system (every 5 seconds)
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			runSafely("END_SERVER_TICK tick scheduler", () -> TickScheduler.tick(server));
-			runSafely("END_SERVER_TICK extra shot queue", () -> ScalingSystem.processExtraShotQueue(server));
 
 			if (server.getTickCount() % 100 == 0) { // Every 5 seconds
 				runSafely("END_SERVER_TICK cache cleanup", () -> {

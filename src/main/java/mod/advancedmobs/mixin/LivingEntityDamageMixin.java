@@ -14,7 +14,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Handles damage-triggered scaling abilities on the LivingEntity level so all mobs stay compatible
+ * Handles damage-triggered scaling effects (critical glow, invisibility on hit,
+ * on-damage regeneration) on the LivingEntity level so all mobs stay compatible
  * even when Mojang changes Mob's overrides.
  */
 @Mixin(LivingEntity.class)
@@ -41,9 +42,6 @@ public abstract class LivingEntityDamageMixin {
 
             long currentTick = mobEntity.level().getGameTime();
             ScalingSystem.handleDamageAbilities(mobEntity, data, currentTick);
-            if (mobEntity.level() instanceof ServerLevel serverWorld) {
-                ScalingSystem.handleHordeSummon(mobEntity, data, serverWorld, currentTick);
-            }
         });
     }
 }

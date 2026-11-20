@@ -10,24 +10,15 @@
 		"MobEntityAccessor",
 		"MobEntityInitEquipmentMixin",
 		"PersistentProjectileEntityAccessor",
-		"ExplosiveProjectileEntityAccessor",
-		"CreeperEntityAccessor",
 		"MobDataMixin",
 		"LivingEntityDamageMixin",
-		"PotionEntityMixin",
 		"MobRevengeBlockerMixin",
 		"MobDeathTrackerMixin",
 		"NeutralMobBehaviorMixin",
 		"UniversalSummonerTrackingMixin",
 		"WarlordMinionProtectionMixin",
 		"RaidSpawningMixin",
-		"NaturalMobSpawnBlockerMixin",
-		"WitchAbilityMixin",
-		"PersistentProjectileAbilityMixin",
-		"ProjectileAbilityMixin",
-		"EndermanAbilityMixin",
-		"CreeperAbilityMixin",
-		"DragonFireballAbilityMixin"
+		"NaturalMobSpawnBlockerMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
