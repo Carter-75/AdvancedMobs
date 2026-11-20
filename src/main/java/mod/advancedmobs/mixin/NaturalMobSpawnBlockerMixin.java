@@ -21,7 +21,7 @@ public abstract class NaturalMobSpawnBlockerMixin {
      * - Only blocks mobs that are not spawned by players, eggs, or commands.
      * - Does NOT block mobs spawned by spawn eggs, mod code, or commands.
      */
-    @Inject(method = "spawnEntity", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "addFreshEntity", at = @At("HEAD"), cancellable = true)
     private void onSpawnEntity(net.minecraft.world.entity.Entity entity, CallbackInfoReturnable<Boolean> cir) {
         AdvancedMobsMod.runSafely("NaturalMobSpawnBlockerMixin#onSpawnEntity", () -> {
             ModConfig config = ModConfig.getInstance();

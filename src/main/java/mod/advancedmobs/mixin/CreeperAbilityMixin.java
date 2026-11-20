@@ -28,7 +28,7 @@ public abstract class CreeperAbilityMixin extends Monster {
         super(entityType, world);
     }
 
-    @Inject(method = "explode", at = @At("HEAD"))
+    @Inject(method = "explodeCreeper", at = @At("HEAD"))
     private void advancedmobs$boostExplosionRadius(CallbackInfo ci) {
         AdvancedMobsMod.runSafely("CreeperAbilityMixin#boostExplosionRadius", () -> {
             if (!(this.level() instanceof ServerLevel)) {
@@ -52,7 +52,7 @@ public abstract class CreeperAbilityMixin extends Monster {
         });
     }
 
-    @Inject(method = "explode", at = @At("TAIL"))
+    @Inject(method = "explodeCreeper", at = @At("TAIL"))
     private void advancedmobs$spawnPotionCloud(CallbackInfo ci) {
         AdvancedMobsMod.runSafely("CreeperAbilityMixin#spawnPotionCloud", () -> {
             if (!(this.level() instanceof ServerLevel serverWorld)) {

@@ -20,7 +20,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(LivingEntity.class)
 public abstract class MobDeathTrackerMixin {
     
-    @Inject(method = "onDeath", at = @At("HEAD"))
+    @Inject(method = "die", at = @At("HEAD"))
     private void advancedmobs$trackKill(DamageSource damageSource, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("MobDeathTrackerMixin#trackKill", () -> {
             LivingEntity victim = (LivingEntity)(Object)this;

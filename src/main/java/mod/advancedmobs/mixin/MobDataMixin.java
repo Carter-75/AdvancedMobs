@@ -53,22 +53,22 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
         this.advancedMobsData = data;
     }
 
-    @Inject(method = "writeCustomDataToNbt", at = @At("TAIL"))
-    private void onWriteNbt(CompoundTag nbt, CallbackInfo ci) {
-        AdvancedMobsMod.runSafely("MobDataMixin#writeCustomDataToNbt", () -> {
+    @Inject(method = "addAdditionalSaveData", at = @At("TAIL"))
+    private void onWriteNbt(net.minecraft.world.level.storage.ValueOutput output, CallbackInfo ci) {
+        AdvancedMobsMod.runSafely("MobDataMixin#addAdditionalSaveData", () -> {
             if (advancedMobsData != null) {
-                nbt.put("UniversalMobWarData", advancedMobsData.writeNbt());
+                output.store("UniversalMobWarData", CompoundTag.CODEC, advancedMobsData.writeNbt());
             }
         });
     }
 
-    @Inject(method = "readCustomDataFromNbt", at = @At("TAIL"))
-    private void onReadNbt(CompoundTag nbt, CallbackInfo ci) {
-        AdvancedMobsMod.runSafely("MobDataMixin#readCustomDataFromNbt", () -> {
-            if (nbt.contains("UniversalMobWarData")) {
+    @Inject(method = "readAdditionalSaveData", at = @At("TAIL"))
+    private void onReadNbt(net.minecraft.world.level.storage.ValueInput input, CallbackInfo ci) {
+        AdvancedMobsMod.runSafely("MobDataMixin#readAdditionalSaveData", () -> {
+            input.read("UniversalMobWarData", CompoundTag.CODEC).ifPresent(dataNbt -> {
                 advancedMobsData = new MobWarData();
-                advancedMobsData.readNbt(nbt.getCompoundOrEmpty("UniversalMobWarData"));
-            }
+                advancedMobsData.readNbt(dataNbt);
+            });
         });
     }
     
@@ -83,7 +83,7 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
     * Mobs without a JSON config fall back to auto-detected potion scaling so passive/neutral/hostile
     * behaviour still lines up with the targeting system.
      */
-    @Inject(method = "mobTick", at = @At("HEAD"))
+    @Inject(method = "serverAiStep", at = @At("HEAD"))
     private void advancedmobs$onMobTick(CallbackInfo ci) {
         AdvancedMobsMod.runSafely("MobDataMixin#onMobTick", () -> {
             if (!ModConfig.getInstance().modEnabled) {
@@ -95,8 +95,8 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
         });
     }
 
-    @Inject(method = "tryAttack(Lnet/minecraft/world/entity/Entity;)Z", at = @At("TAIL"))
-    private void advancedmobs$handleMeleeAbilities(Entity target, CallbackInfoReturnable<Boolean> cir) {
+    @Inject(method = "doHurtTarget(Lnet/minecraft/server/level/ServerLevel;Lnet/minecraft/world/entity/Entity;)Z", at = @At("TAIL"))
+    private void advancedmobs$handleMeleeAbilities(ServerLevel level, Entity target, CallbackInfoReturnable<Boolean> cir) {
         AdvancedMobsMod.runSafely("MobDataMixin#handleMeleeAbilities", () -> {
             if (!cir.getReturnValueZ() || !(target instanceof LivingEntity livingTarget)) {
                 return;
@@ -113,7 +113,7 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
     
     // Strip ALL equipment from every mob immediately on spawn (AFTER vanilla equipment)
     // Using @At("RETURN") ensures we strip equipment AFTER Minecraft adds it in initEquipment()
-    @Inject(method = "initialize", at = @At("RETURN"))
+    @Inject(method = "finalizeSpawn", at = @At("RETURN"))
     private void advancedmobs$stripAllEquipmentOnSpawn(
         net.minecraft.world.level.ServerLevelAccessor world,
         net.minecraft.world.DifficultyInstance difficulty,

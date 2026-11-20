@@ -31,14 +31,14 @@ public abstract class EndermanAbilityMixin extends Monster {
         super(entityType, world);
     }
 
-    @Inject(method = "teleportTo(DDD)Z", at = @At("HEAD"))
+    @Inject(method = "teleport(DDD)Z", at = @At("HEAD"))
     private void advancedmobs$rememberTeleportOrigin(double x, double y, double z, CallbackInfoReturnable<Boolean> cir) {
         AdvancedMobsMod.runSafely("EndermanAbilityMixin#rememberTeleportOrigin", () -> {
             this.advancedmobs$lastTeleportFrom = this.blockPosition();
         });
     }
 
-    @Inject(method = "teleportTo(DDD)Z", at = @At("RETURN"))
+    @Inject(method = "teleport(DDD)Z", at = @At("RETURN"))
     private void advancedmobs$triggerShadowStep(double x, double y, double z, CallbackInfoReturnable<Boolean> cir) {
         AdvancedMobsMod.runSafely("EndermanAbilityMixin#triggerShadowStep", () -> {
             if (!cir.getReturnValueZ()) {
@@ -55,7 +55,7 @@ public abstract class EndermanAbilityMixin extends Monster {
         });
     }
 
-    @Inject(method = "tickMovement", at = @At("TAIL"))
+    @Inject(method = "aiStep", at = @At("TAIL"))
     private void advancedmobs$handleVoidGrasp(CallbackInfo ci) {
         AdvancedMobsMod.runSafely("EndermanAbilityMixin#handleVoidGrasp", () -> {
             if (!(this.level() instanceof ServerLevel serverWorld)) {

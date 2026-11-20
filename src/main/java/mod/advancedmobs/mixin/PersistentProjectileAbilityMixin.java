@@ -71,7 +71,7 @@ public abstract class PersistentProjectileAbilityMixin implements ProjectileAbil
         });
     }
 
-    @Inject(method = "onEntityHit", at = @At("TAIL"))
+    @Inject(method = "onHitEntity", at = @At("TAIL"))
     private void advancedmobs$applyPotionMastery(EntityHitResult hitResult, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("PersistentProjectileAbilityMixin#applyPotionMastery", () -> {
             Projectile self = (Projectile) (Object) this;

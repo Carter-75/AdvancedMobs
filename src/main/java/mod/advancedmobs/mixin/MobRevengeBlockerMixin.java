@@ -2,26 +2,30 @@ package mod.advancedmobs.mixin;
 
 import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.config.ModConfig;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Blocks same-species retaliation when the gamerule is ON.
- * Uses handleAttack method which is called when an entity is attacked.
- * This prevents same-species mobs from adding each other to their revenge target lists.
+ *
+ * 26.2 API note: the old target, Entity.handleAttack, no longer exists.
+ * The revenge system reads LivingEntity.getLastHurtByMob(), which is set
+ * through setLastHurtByMob exactly when an entity is attacked, so
+ * cancelling that setter for same-species attackers has the same effect:
+ * the victim never adds the attacker to its revenge targeting.
  */
-@Mixin(Entity.class)
+@Mixin(LivingEntity.class)
 public abstract class MobRevengeBlockerMixin {
 
-	@Inject(method = "handleAttack", at = @At("HEAD"), cancellable = true)
-	private void advancedmobs$preventSameSpeciesRevenge(Entity attacker, CallbackInfoReturnable<Boolean> cir) {
+	@Inject(method = "setLastHurtByMob", at = @At("HEAD"), cancellable = true)
+	private void advancedmobs$preventSameSpeciesRevenge(LivingEntity attacker, CallbackInfo ci) {
 		AdvancedMobsMod.runSafely("MobRevengeBlockerMixin#preventSameSpeciesRevenge", () -> {
-			Entity self = (Entity)(Object)this;
+			LivingEntity self = (LivingEntity)(Object)this;
 
 			// Only apply to mobs in server worlds
 			if (self.level().isClientSide()) return;
@@ -33,13 +37,12 @@ public abstract class MobRevengeBlockerMixin {
 			boolean ignoreSame = ModConfig.getInstance().ignoreSameSpecies;
 			if (!ignoreSame) return;
 
-			// If same species, prevent revenge targeting by returning false (don't handle the attack normally)
+			// If same species, prevent revenge targeting by cancelling the
+			// last-hurt-by-mob record, so the revenge goal never picks the
+			// attacker up.
 			if (attacker.getType() == selfMob.getType()) {
-				// Return false to prevent the entity from handling the attack
-				// This prevents them from adding each other to revenge target lists
-				cir.setReturnValue(false);
+				ci.cancel();
 			}
 		});
 	}
 }
-

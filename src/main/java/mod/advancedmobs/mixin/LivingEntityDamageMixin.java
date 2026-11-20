@@ -20,8 +20,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityDamageMixin {
 
-    @Inject(method = "damage", at = @At("TAIL"))
-    private void advancedmobs$handleDamageAbilities(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+    @Inject(method = "hurtServer", at = @At("TAIL"))
+    private void advancedmobs$handleDamageAbilities(ServerLevel level, DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
         AdvancedMobsMod.runSafely("LivingEntityDamageMixin#handleDamageAbilities", () -> {
             if (!cir.getReturnValueZ()) {
                 return;

@@ -41,7 +41,7 @@ public interface IndexedIterableRawIdFixMixin {
     Map<Class<?>, Method> RAW_ID_METHOD_CACHE = new ConcurrentHashMap<>();
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    @Inject(method = "getRawIdOrThrow(Ljava/lang/Object;)I", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "getIdOrThrow(Ljava/lang/Object;)I", at = @At("HEAD"), cancellable = true)
     private void umw$fixForeignRegistryEntry(Object value, CallbackInfoReturnable<Integer> cir) {
         AdvancedMobsMod.runSafely("IndexedIterableRawIdFixMixin#fixForeignRegistryEntry", () -> {
             IdMap self = (IdMap) (Object) this;
@@ -100,7 +100,7 @@ public interface IndexedIterableRawIdFixMixin {
 
         try {
             // IdMap has a getRawId(T) method; use reflection to avoid signature churn.
-            Method method = self.getClass().getMethod("getRawId", Object.class);
+            Method method = self.getClass().getMethod("getId", Object.class);
             RAW_ID_METHOD_CACHE.put(self.getClass(), method);
             Object result = method.invoke(self, value);
             if (result instanceof Integer i) {
@@ -116,7 +116,7 @@ public interface IndexedIterableRawIdFixMixin {
         // Fallback: find any getRawId(*) method returning int.
         try {
             for (Method m : self.getClass().getMethods()) {
-                if (!"getRawId".equals(m.getName())) {
+                if (!"getId".equals(m.getName())) {
                     continue;
                 }
                 if (m.getParameterCount() != 1 || m.getReturnType() != int.class) {

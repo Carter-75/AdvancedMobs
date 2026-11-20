@@ -18,21 +18,21 @@ import java.util.Optional;
  * {@link Holder.Reference} instances originating from a different registry wrapper.
  *
  * During packet encoding, Minecraft encodes reference entries by raw id via
- * {@link IdMap#getRawIdOrThrow(Object)}. If the reference object isn't the exact
+ * {@link IdMap#getIdOrThrow(Object)}. If the reference object isn't the exact
  * instance held by the current buffer's registry wrapper, encoding throws:
  * "Can't find id for 'Reference{...}'".
  *
  * This mixin redirects the raw-id lookup and, on failure, attempts to resolve an equivalent
  * reference entry by {@link ResourceKey} from the current wrapper before retrying.
  */
-@Mixin(targets = "net.minecraft.network.codec.PacketCodecs$16")
+@Mixin(targets = "net.minecraft.network.codec.ByteBufCodecs$30")
 public final class RegistryEntryEncodingFixMixin {
 
     @Redirect(
         method = "encode",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/util/collection/IdMap;getRawIdOrThrow(Ljava/lang/Object;)I"
+            target = "Lnet/minecraft/core/IdMap;getIdOrThrow(Ljava/lang/Object;)I"
         ),
         require = 0
     )

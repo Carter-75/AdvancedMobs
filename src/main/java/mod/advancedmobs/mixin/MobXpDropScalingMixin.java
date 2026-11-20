@@ -19,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(LivingEntity.class)
 public abstract class MobXpDropScalingMixin {
 
-    @Inject(method = "getXpToDrop", at = @At("RETURN"), cancellable = true)
+    @Inject(method = "getExperienceReward", at = @At("RETURN"), cancellable = true)
     private void advancedmobs$scaleXpDrop(ServerLevel world, @Nullable Entity attacker, CallbackInfoReturnable<Integer> cir) {
         AdvancedMobsMod.runSafely("MobXpDropScalingMixin#scaleXpDrop", () -> {
             ModConfig config = ModConfig.getInstance();

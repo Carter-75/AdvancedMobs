@@ -29,7 +29,7 @@ public abstract class MobEntityInitEquipmentMixin {
         EquipmentSlot.FEET
     );
 
-    @Inject(method = "initEquipment", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "populateDefaultEquipmentSlots", at = @At("HEAD"), cancellable = true)
     private void advancedmobs$disableVanillaEquipment(RandomSource random, DifficultyInstance difficulty, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("MobEntityInitEquipmentMixin#disableVanillaEquipment", () -> {
             if (!ModConfig.getInstance().modEnabled) {

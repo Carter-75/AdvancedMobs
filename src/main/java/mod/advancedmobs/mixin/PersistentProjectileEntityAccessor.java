@@ -7,7 +7,9 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 
 @Mixin(AbstractArrow.class)
 public interface PersistentProjectileEntityAccessor {
-    @Accessor("inGround")
+    // 26.2 AbstractArrow has no inGround field; the state lives behind
+    // the protected isInGround() method, so use an invoker instead.
+    @Invoker("isInGround")
     boolean advancedmobs$isInGround();
 
     @Invoker("setPierceLevel")

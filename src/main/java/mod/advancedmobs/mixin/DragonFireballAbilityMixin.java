@@ -52,7 +52,7 @@ public abstract class DragonFireballAbilityMixin extends AbstractHurtingProjecti
         });
     }
 
-    @Inject(method = "onCollision", at = @At("TAIL"))
+    @Inject(method = "onHit", at = @At("TAIL"))
     private void advancedmobs$applyBombardmentEffects(HitResult hitResult, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("DragonFireballAbilityMixin#applyBombardmentEffects", () -> {
             if (!(this.level() instanceof ServerLevel serverWorld)) {

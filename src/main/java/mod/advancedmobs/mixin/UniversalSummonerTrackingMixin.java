@@ -28,7 +28,7 @@ public abstract class UniversalSummonerTrackingMixin {
      * - Illusioner summoning duplicates
      * - Any modded mob summoning others
      */
-    @Inject(method = "initialize", at = @At("RETURN"))
+    @Inject(method = "finalizeSpawn", at = @At("RETURN"))
     private void advancedmobs$trackSummonedMob(
         ServerLevelAccessor world, 
         DifficultyInstance difficulty, 

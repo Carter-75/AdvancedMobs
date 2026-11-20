@@ -28,28 +28,31 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class RaidSpawningMixin {
     
     @Shadow
-    private int wavesSpawned;
-    
-    @Shadow
-    private ServerLevel world;
+    private int groupsSpawned;
     
     @Shadow
     private BlockPos center;
+    
+    // 26.2 Raid no longer stores its level; spawnGroup receives it as a
+    // parameter, so the handler stashes it here for findSuitableSpawnPos.
+    @org.spongepowered.asm.mixin.Unique
+    private ServerLevel advancedmobs$raidLevel;
     
     /**
      * Injects boss spawning logic into the raid wave spawning.
      * Only spawns on final wave (wave 6+) with configurable chance.
      * Can be forced with /mobwar raid forceboss command.
      */
-    @Inject(method = "spawnNextWave", at = @At("TAIL"))
-    private void advancedmobs$spawnWarlordBoss(BlockPos pos, CallbackInfo ci) {
+    @Inject(method = "spawnGroup", at = @At("TAIL"))
+    private void advancedmobs$spawnWarlordBoss(ServerLevel level, BlockPos pos, CallbackInfo ci) {
+        this.advancedmobs$raidLevel = level;
         AdvancedMobsMod.runSafely("RaidSpawningMixin#spawnWarlordBoss", () -> {
             // Check if warlord system is enabled
             ModConfig config = ModConfig.getInstance();
             if (!config.isWarlordActive()) return;
             
             // Only spawn on final waves (configurable minimum raid level)
-            if (this.wavesSpawned < config.warlordMinRaidLevel) return;
+            if (this.groupsSpawned < config.warlordMinRaidLevel) return;
             
             // Check if force spawn is active (from command)
             boolean forceSpawn = RaidBossSpawnCommand.shouldForceSpawn();
@@ -68,7 +71,7 @@ public abstract class RaidSpawningMixin {
             if (spawnPos == null) return;
             
             // Create and spawn the Mob Warlord
-            MobWarlordEntity warlord = new MobWarlordEntity(AdvancedMobsMod.MOB_WARLORD, this.world);
+            MobWarlordEntity warlord = new MobWarlordEntity(AdvancedMobsMod.MOB_WARLORD, this.advancedmobs$raidLevel);
             warlord.snapTo(
                 spawnPos.getX() + 0.5, 
                 spawnPos.getY(), 
@@ -76,17 +79,17 @@ public abstract class RaidSpawningMixin {
                 0.0f, 
                 0.0f
             );
-            warlord.finalizeSpawn(this.world, this.world.getCurrentDifficultyAt(spawnPos), EntitySpawnReason.EVENT, null);
+            warlord.finalizeSpawn(this.advancedmobs$raidLevel, this.advancedmobs$raidLevel.getCurrentDifficultyAt(spawnPos), EntitySpawnReason.EVENT, null);
             
             // Mark as raid boss - this changes targeting behavior
             warlord.setRaidBoss(true);
             warlord.setPersistenceRequired();
             
-            boolean spawned = this.world.addFreshEntity(warlord);
+            boolean spawned = this.advancedmobs$raidLevel.addFreshEntity(warlord);
             
             if (spawned) {
                 // Broadcast to all players
-                this.world.players().forEach(player -> {
+                this.advancedmobs$raidLevel.players().forEach(player -> {
                     player.sendSystemMessage(
                         net.minecraft.network.chat.Component.literal("")
                             .append(net.minecraft.network.chat.Component.literal("═══════════════════════════════════").withStyle(style -> style.withColor(net.minecraft.ChatFormatting.DARK_RED).withBold(true)))
@@ -126,18 +129,18 @@ public abstract class RaidSpawningMixin {
             BlockPos testPos = center.offset(offsetX, 0, offsetZ);
             
             // Find ground level
-            BlockPos groundPos = new BlockPos(testPos.getX(), this.world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, testPos.getX(), testPos.getZ()), testPos.getZ());
+            BlockPos groundPos = new BlockPos(testPos.getX(), this.advancedmobs$raidLevel.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, testPos.getX(), testPos.getZ()), testPos.getZ());
             
             // Check if position is valid (solid ground, enough space above)
-            if (this.world.getBlockState(groundPos.below()).isSolid()) {
-                if (this.world.isEmptyBlock(groundPos) && this.world.isEmptyBlock(groundPos.above()) && this.world.isEmptyBlock(groundPos.above(2))) {
+            if (this.advancedmobs$raidLevel.getBlockState(groundPos.below()).isSolid()) {
+                if (this.advancedmobs$raidLevel.isEmptyBlock(groundPos) && this.advancedmobs$raidLevel.isEmptyBlock(groundPos.above()) && this.advancedmobs$raidLevel.isEmptyBlock(groundPos.above(2))) {
                     return groundPos;
                 }
             }
         }
         
         // Fallback to center if no valid position found
-        return new BlockPos(center.getX(), this.world.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, center.getX(), center.getZ()), center.getZ());
+        return new BlockPos(center.getX(), this.advancedmobs$raidLevel.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, center.getX(), center.getZ()), center.getZ());
     }
 }
 

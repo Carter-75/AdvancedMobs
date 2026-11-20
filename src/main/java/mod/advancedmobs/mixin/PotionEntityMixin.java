@@ -30,7 +30,7 @@ public abstract class PotionEntityMixin extends ThrowableItemProjectile {
         super(entityType, world);
     }
 
-    @Inject(method = "onCollision", at = @At("TAIL"))
+    @Inject(method = "onHit", at = @At("TAIL"))
     private void advancedmobs$applyRangedPotionEffects(HitResult hitResult, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("PotionEntityMixin#applyRangedPotionEffects", () -> {
             if (this.level().isClientSide()) {
