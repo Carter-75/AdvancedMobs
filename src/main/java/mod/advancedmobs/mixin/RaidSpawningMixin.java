@@ -80,13 +80,13 @@ public abstract class RaidSpawningMixin {
             
             // Mark as raid boss - this changes targeting behavior
             warlord.setRaidBoss(true);
-            warlord.setPersistent();
+            warlord.setPersistenceRequired();
             
             boolean spawned = this.world.addFreshEntity(warlord);
             
             if (spawned) {
                 // Broadcast to all players
-                this.world.getPlayers().forEach(player -> {
+                this.world.players().forEach(player -> {
                     player.sendMessage(
                         net.minecraft.network.chat.Component.literal("")
                             .append(net.minecraft.network.chat.Component.literal("═══════════════════════════════════").withStyle(style -> style.withColor(net.minecraft.ChatFormatting.DARK_RED).withBold(true)))
@@ -99,7 +99,7 @@ public abstract class RaidSpawningMixin {
                     
                     // Play dramatic sound (server-side)
                     player.playNotifySound(
-                        net.minecraft.sounds.SoundEvents.ENTITY_WITHER_SPAWN,
+                        net.minecraft.sounds.SoundEvents.WITHER_SPAWN,
                         net.minecraft.sounds.SoundSource.HOSTILE,
                         1.0f,
                         0.5f

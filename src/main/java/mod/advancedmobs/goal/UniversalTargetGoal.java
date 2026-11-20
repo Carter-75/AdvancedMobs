@@ -246,7 +246,7 @@ public class UniversalTargetGoal extends TargetGoal {
 	}
 
 	@Override
-	public boolean shouldContinue() {
+	public boolean canContinueToUse() {
 		if (!allowNeutralAggression()) {
 			return false;
 		}
