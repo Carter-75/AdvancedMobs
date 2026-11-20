@@ -32,10 +32,10 @@ public abstract class NaturalMobSpawnBlockerMixin {
 
             // Hard block mode (existing behavior)
             if (config.disableNaturalMobSpawns) {
-                if (mob.getTags().contains("umw_player_spawned")) return;
-                if (mob.getTags().contains("umw_spawner_spawned")) return;
-                if (mob.getTags().contains("umw_horde_reinforcement")) return;
-                if (mob.getTags().contains("umw_summoned")) return;
+                if (mob.entityTags().contains("umw_player_spawned")) return;
+                if (mob.entityTags().contains("umw_spawner_spawned")) return;
+                if (mob.entityTags().contains("umw_horde_reinforcement")) return;
+                if (mob.entityTags().contains("umw_summoned")) return;
                 if (entity.hasCustomName()) return;
                 cir.setReturnValue(false);
                 return;
@@ -43,13 +43,13 @@ public abstract class NaturalMobSpawnBlockerMixin {
 
             // Soft cap mode: only applies to NATURAL spawns (not spawners, eggs, commands, etc.)
             if (!config.limitNaturalMobSpawns) return;
-            if (!mob.getTags().contains("umw_natural_spawned")) return;
+            if (!mob.entityTags().contains("umw_natural_spawned")) return;
 
             // Safety allowlist
-            if (mob.getTags().contains("umw_player_spawned")) return;
-            if (mob.getTags().contains("umw_spawner_spawned")) return;
-            if (mob.getTags().contains("umw_horde_reinforcement")) return;
-            if (mob.getTags().contains("umw_summoned")) return;
+            if (mob.entityTags().contains("umw_player_spawned")) return;
+            if (mob.entityTags().contains("umw_spawner_spawned")) return;
+            if (mob.entityTags().contains("umw_horde_reinforcement")) return;
+            if (mob.entityTags().contains("umw_summoned")) return;
             if (entity.hasCustomName()) return;
 
             if (!(((Object) this) instanceof ServerLevel world)) return;

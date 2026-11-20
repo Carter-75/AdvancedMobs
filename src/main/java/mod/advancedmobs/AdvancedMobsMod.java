@@ -6,7 +6,6 @@ import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.entity.MobWarlordEntity;
 import mod.advancedmobs.goal.StalemateBreakerGoal;
 import mod.advancedmobs.goal.UniversalTargetGoal;
-import mod.advancedmobs.mixin.GameRulesAccessor;
 import mod.advancedmobs.mixin.MobEntityAccessor;
 import mod.advancedmobs.net.UmwRequiredClientPayload;
 import mod.advancedmobs.net.UmwServerEnchantCompat;
@@ -25,7 +24,7 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
+import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -46,7 +45,11 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.gamerules.GameRule;
+import net.minecraft.world.level.gamerules.GameRuleCategory;
 import net.minecraft.world.level.gamerules.GameRules;
+import net.fabricmc.fabric.api.gamerule.v1.GameRuleBuilder;
+import net.fabricmc.fabric.api.gamerule.v1.GameRuleEvents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,7 +57,6 @@ import me.shedaniel.autoconfig.AutoConfig;
 import me.shedaniel.autoconfig.serializer.GsonConfigSerializer;
 
 import java.util.UUID;
-import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
@@ -70,9 +72,9 @@ public class AdvancedMobsMod implements ModInitializer {
 
 	// Codec for an empty payload (for safety net)
 	private static final StreamCodec<RegistryFriendlyByteBuf, CustomPacketPayload> EMPTY_PAYLOAD_CODEC =
-		StreamCodec.of((payload, buf) -> {}, buf -> new CustomPacketPayload() {
+		StreamCodec.of((buf, payload) -> {}, buf -> new CustomPacketPayload() {
 			@Override
-			public Id<? extends CustomPacketPayload> getId() {
+			public Type<? extends CustomPacketPayload> type() {
 				return UMW_SAFETYNET_ID;
 			}
 		});
@@ -80,50 +82,37 @@ public class AdvancedMobsMod implements ModInitializer {
 	public static final String MODID = "advancedmobs";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MODID);
 
-	public static final GameRules.Key<GameRules.BooleanRule> IGNORE_SAME_SPECIES_RULE = registerBooleanRule(
-		"universalmobwarIgnoreSameSpecies",
-		GameRules.Category.MOBS,
-		true,
-		(server, rule) -> {
-			ModConfig config = ModConfig.getInstance();
-			if (config.ignoreSameSpecies != rule.get()) {
-				config.ignoreSameSpecies = rule.get();
-				ModConfig.save();
-			}
-		}
-	);
+	// 26.2 gamerule API note: rules are now registered by Identifier, and
+	// Identifiers are lowercase only, so the old camelCase rule names
+	// (universalmobwarIgnoreSameSpecies, universalmobwarNeutralMobsAggressive)
+	// cannot be kept literally. The registered names keep the
+	// universalmobwar prefix in snake_case under the mod namespace:
+	// /gamerule advancedmobs:universalmobwar_ignore_same_species
+	public static final GameRule<Boolean> IGNORE_SAME_SPECIES_RULE = GameRuleBuilder.forBoolean(true)
+		.category(GameRuleCategory.MOBS)
+		.buildAndRegister(Identifier.fromNamespaceAndPath(MODID, "universalmobwar_ignore_same_species"));
 
-	public static final GameRules.Key<GameRules.BooleanRule> NEUTRAL_MOBS_AGGRESSIVE_RULE = registerBooleanRule(
-		"universalmobwarNeutralMobsAggressive",
-		GameRules.Category.MOBS,
-		false,
-		(server, rule) -> {
-			ModConfig config = ModConfig.getInstance();
-			if (config.neutralMobsAlwaysAggressive != rule.get()) {
-				config.neutralMobsAlwaysAggressive = rule.get();
-				ModConfig.save();
-			}
-		}
-	);
+	public static final GameRule<Boolean> NEUTRAL_MOBS_AGGRESSIVE_RULE = GameRuleBuilder.forBoolean(false)
+		.category(GameRuleCategory.MOBS)
+		.buildAndRegister(Identifier.fromNamespaceAndPath(MODID, "universalmobwar_neutral_mobs_aggressive"));
 
 	// Mob Warlord Boss Entity (uses Monster for Iris Shaders compatibility)
 	public static final EntityType<MobWarlordEntity> MOB_WARLORD = Registry.register(
 		BuiltInRegistries.ENTITY_TYPE,
 		Identifier.fromNamespaceAndPath(MODID, "mob_warlord"),
-		EntityType.Builder.create(MobWarlordEntity::new, MobCategory.MONSTER)
-			.dimensions(1.2f, 3.6f) // Large boss size (1.2m wide x 3.6m tall)
-			.maxTrackingRange(64)
-			// Minecraft 1.21.1 requires the entity id here; the no-arg build()
-			// call only exists in 1.21.2 and later, so this never compiled
-			// against the mod's declared 1.21.1 target.
-			.build(MODID + ":mob_warlord")
+		EntityType.Builder.of(MobWarlordEntity::new, MobCategory.MONSTER)
+			.sized(1.2f, 3.6f) // Large boss size (1.2m wide x 3.6m tall)
+			.clientTrackingRange(64)
+			.build(ResourceKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(MODID, "mob_warlord")))
 	);
 	
-	// Mob Warlord Spawn Egg (same colors as witch egg)
+	// Mob Warlord Spawn Egg (26.2: SpawnEggItem takes only Item.Properties;
+	// the entity type is bound through Properties.spawnEgg)
 	public static final Item MOB_WARLORD_SPAWN_EGG = Registry.register(
 		BuiltInRegistries.ITEM,
 		Identifier.fromNamespaceAndPath(MODID, "mob_warlord_spawn_egg"),
-		new SpawnEggItem(MOB_WARLORD, 0x334E4C, 0x51A03E, new Item.Settings())
+		new SpawnEggItem(new Item.Properties().spawnEgg(MOB_WARLORD)
+			.setId(ResourceKey.create(Registries.ITEM, Identifier.fromNamespaceAndPath(MODID, "mob_warlord_spawn_egg"))))
 	);
 
 	// Safety net payload ID for global receiver
@@ -160,6 +149,23 @@ public class AdvancedMobsMod implements ModInitializer {
 		AutoConfig.register(ModConfig.class, GsonConfigSerializer::new);
 		ModConfig config = ModConfig.getInstance();
 
+		// Keep the config in sync when the gamerules are changed in game
+		// (same behavior as the old BooleanRule change callbacks).
+		GameRuleEvents.changeCallback(IGNORE_SAME_SPECIES_RULE).register((value, server) -> {
+			ModConfig cfg = ModConfig.getInstance();
+			if (cfg.ignoreSameSpecies != value) {
+				cfg.ignoreSameSpecies = value;
+				ModConfig.save();
+			}
+		});
+		GameRuleEvents.changeCallback(NEUTRAL_MOBS_AGGRESSIVE_RULE).register((value, server) -> {
+			ModConfig cfg = ModConfig.getInstance();
+			if (cfg.neutralMobsAlwaysAggressive != value) {
+				cfg.neutralMobsAlwaysAggressive = value;
+				ModConfig.save();
+			}
+		});
+
 		UmwServerEnchantCompat.init();
 		ServerLifecycleEvents.SERVER_STARTED.register(AdvancedMobsMod::syncGameRulesWithConfig);
 		
@@ -172,8 +178,8 @@ public class AdvancedMobsMod implements ModInitializer {
 		// Add spawn egg to creative inventory. In 1.21.1 the CreativeModeTabs key
 		// fields are private in the shipped jar, so the spawn eggs group key
 		// is built from its id instead of referencing CreativeModeTabs.SPAWN_EGGS.
-		ItemGroupEvents.modifyEntriesEvent(ResourceKey.create(Registries.CREATIVE_MODE_TAB, Identifier.withDefaultNamespace("spawn_eggs"))).register(content -> {
-			content.add(MOB_WARLORD_SPAWN_EGG);
+		CreativeModeTabEvents.modifyOutputEvent(ResourceKey.create(Registries.CREATIVE_MODE_TAB, Identifier.withDefaultNamespace("spawn_eggs"))).register(output -> {
+			output.accept(MOB_WARLORD_SPAWN_EGG);
 		});
 		
 		// Register commands
@@ -190,19 +196,15 @@ public class AdvancedMobsMod implements ModInitializer {
 					return;
 				}
 
-				handler.player.sendMessage(Component.literal(""), false);
-				handler.player.sendMessage(
-					Component.literal("═══════════════════════════════════════════════════").withStyle(style -> style.withColor(ChatFormatting.GOLD).withBold(true)),
-					false
+				handler.player.sendSystemMessage(Component.literal(""));
+				handler.player.sendSystemMessage(
+					Component.literal("═══════════════════════════════════════════════════").withStyle(style -> style.withColor(ChatFormatting.GOLD).withBold(true))
 				);
-				handler.player.sendMessage(
+				handler.player.sendSystemMessage(
 					Component.literal("    ADVANCED MOBS").withStyle(style -> style.withColor(ChatFormatting.RED).withBold(true))
-						,
-					false
 				);
-				handler.player.sendMessage(
-					Component.literal("═══════════════════════════════════════════════════").withStyle(style -> style.withColor(ChatFormatting.GOLD).withBold(true)),
-					false
+				handler.player.sendSystemMessage(
+					Component.literal("═══════════════════════════════════════════════════").withStyle(style -> style.withColor(ChatFormatting.GOLD).withBold(true))
 				);
 			});
 		});
@@ -214,7 +216,7 @@ public class AdvancedMobsMod implements ModInitializer {
 				() -> {
 					// Track naturally spawned mobs for spawn limiting.
 					if (world instanceof ServerLevel serverWorld && entity instanceof Mob mob) {
-						NaturalSpawnLimiter.onMobLoaded(serverWorld, mob.getTags().contains("umw_natural_spawned"));
+						NaturalSpawnLimiter.onMobLoaded(serverWorld, mob.entityTags().contains("umw_natural_spawned"));
 					}
 
 					if (!(entity instanceof Mob mob)) return;
@@ -233,13 +235,13 @@ public class AdvancedMobsMod implements ModInitializer {
 					GoalSelector goalSelector = ((MobEntityAccessor) mob).getGoalSelector();
 
 					// Check if our goal is already added to prevent duplicates on chunk reload
-					boolean alreadyHasGoal = targetSelector.getGoals().stream()
+					boolean alreadyHasGoal = targetSelector.getAvailableGoals().stream()
 						.anyMatch(goal -> goal.getGoal() instanceof UniversalTargetGoal);
 
 					if (!alreadyHasGoal) {
 						Supplier<ModConfig> configSupplier = ModConfig::getInstance;
 						// Add targeting goal
-						targetSelector.add(2, new UniversalTargetGoal(
+						targetSelector.addGoal(2, new UniversalTargetGoal(
 							mob,
 							() -> configSupplier.get().isTargetingActive(),
 							() -> configSupplier.get().ignoreSameSpecies,
@@ -249,7 +251,7 @@ public class AdvancedMobsMod implements ModInitializer {
 						));
 						
 						// Add stalemate breaker goal (Priority 0 to ensure it always runs)
-						goalSelector.add(0, new StalemateBreakerGoal(mob));
+						goalSelector.addGoal(0, new StalemateBreakerGoal(mob));
 					}
 				}
 			);
@@ -260,7 +262,7 @@ public class AdvancedMobsMod implements ModInitializer {
 				"ENTITY_UNLOAD for " + entity.getType().getDescriptionId(),
 				() -> {
 					if (world instanceof ServerLevel serverWorld && entity instanceof Mob mob) {
-						NaturalSpawnLimiter.onMobUnloaded(serverWorld, mob.getTags().contains("umw_natural_spawned"));
+						NaturalSpawnLimiter.onMobUnloaded(serverWorld, mob.entityTags().contains("umw_natural_spawned"));
 						// Drop runtime-only per-mob state so the static maps keyed
 						// by mob UUID stop growing without bound as mobs come and
 						// go. The unregister and clear methods existed but had no
@@ -309,28 +311,14 @@ public class AdvancedMobsMod implements ModInitializer {
 	}
 
 
-	private static GameRules.Key<GameRules.BooleanRule> registerBooleanRule(
-		String name,
-		GameRules.Category category,
-		boolean defaultValue,
-		BiConsumer<MinecraftServer, GameRules.BooleanRule> changeCallback
-	) {
-		return GameRulesAccessor.GameRulesInvoker.invokeRegister(
-			name,
-			category,
-			GameRulesAccessor.BooleanRuleInvoker.invokeCreate(defaultValue, changeCallback)
-		);
-	}
-
 	private static void syncGameRulesWithConfig(MinecraftServer server) {
 		ModConfig config = ModConfig.getInstance();
-		GameRules.BooleanRule ignoreSameRule = server.getGameRules().get(IGNORE_SAME_SPECIES_RULE);
-		if (ignoreSameRule.get() != config.ignoreSameSpecies) {
-			ignoreSameRule.set(config.ignoreSameSpecies, server);
+		GameRules rules = server.getGameRules();
+		if (rules.get(IGNORE_SAME_SPECIES_RULE) != config.ignoreSameSpecies) {
+			rules.set(IGNORE_SAME_SPECIES_RULE, config.ignoreSameSpecies, server);
 		}
-		GameRules.BooleanRule neutralAggressiveRule = server.getGameRules().get(NEUTRAL_MOBS_AGGRESSIVE_RULE);
-		if (neutralAggressiveRule.get() != config.neutralMobsAlwaysAggressive) {
-			neutralAggressiveRule.set(config.neutralMobsAlwaysAggressive, server);
+		if (rules.get(NEUTRAL_MOBS_AGGRESSIVE_RULE) != config.neutralMobsAlwaysAggressive) {
+			rules.set(NEUTRAL_MOBS_AGGRESSIVE_RULE, config.neutralMobsAlwaysAggressive, server);
 		}
 	}
 

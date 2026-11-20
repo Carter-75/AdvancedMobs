@@ -286,7 +286,7 @@ public class ScalingSystem {
             return;
         }
 
-        if (projectile.getTags().contains(EXTRA_SHOT_CHILD_TAG) || projectile.getTags().contains(MULTISHOT_CHILD_TAG)) {
+        if (projectile.entityTags().contains(EXTRA_SHOT_CHILD_TAG) || projectile.entityTags().contains(MULTISHOT_CHILD_TAG)) {
             return;
         }
 
@@ -1158,7 +1158,7 @@ public class ScalingSystem {
             return true;
         }
         String slotTag = getEquipmentReplacementOnceTag(slot);
-        if (mob.getTags().contains(slotTag)) {
+        if (mob.entityTags().contains(slotTag)) {
             return false;
         }
         ItemStack toDrop = current.copy();
@@ -4502,7 +4502,7 @@ public class ScalingSystem {
         if (!ModConfig.getInstance().isScalingActive()) return;
 
         // Horde reinforcements are not allowed to trigger horde summon (prevents recursion).
-        if (mob.getTags().contains(HORDE_REINFORCEMENT_TAG) || data.getSkillData().getBooleanOr(NBT_HORDE_REINFORCEMENT, false)) {
+        if (mob.entityTags().contains(HORDE_REINFORCEMENT_TAG) || data.getSkillData().getBooleanOr(NBT_HORDE_REINFORCEMENT, false)) {
             return;
         }
         

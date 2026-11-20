@@ -42,8 +42,8 @@ public abstract class ProjectileAbilityMixin {
 
             advancedmobs$abilitiesApplied = true;
 
-            if (self.getTags().contains(ScalingSystem.MULTISHOT_CHILD_TAG)
-                || self.getTags().contains(ScalingSystem.EXTRA_SHOT_CHILD_TAG)) {
+            if (self.entityTags().contains(ScalingSystem.MULTISHOT_CHILD_TAG)
+                || self.entityTags().contains(ScalingSystem.EXTRA_SHOT_CHILD_TAG)) {
                 return;
             }
 
