@@ -544,4 +544,4 @@ Advanced Mobs transforms Minecraft into a dynamic battlefield:
 
 ---
 
-**Made with ❤️ for Minecraft 1.21.1 | Powered by Fabric**
+**Made with ❤️ for Minecraft 26.2+ | Powered by Fabric**
