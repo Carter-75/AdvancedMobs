@@ -25,7 +25,7 @@ public abstract class MobDeathTrackerMixin {
         AdvancedMobsMod.runSafely("MobDeathTrackerMixin#trackKill", () -> {
             LivingEntity victim = (LivingEntity)(Object)this;
 
-            if (victim.level().isClient()) return;
+            if (victim.level().isClientSide()) return;
             if (!(victim instanceof Mob)) return;
 
             // Check if any progression system is enabled

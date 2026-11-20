@@ -36,7 +36,7 @@ public abstract class ProjectileAbilityMixin {
         AdvancedMobsMod.runSafely("ProjectileAbilityMixin#applyProjectileAbilities", () -> {
             Projectile self = (Projectile) (Object) this;
             Level world = self.level();
-            if (world.isClient() || advancedmobs$abilitiesApplied) {
+            if (world.isClientSide() || advancedmobs$abilitiesApplied) {
                 return;
             }
 
@@ -93,11 +93,11 @@ public abstract class ProjectileAbilityMixin {
                 }
                 baseSpeed = Math.max(0.05, accel);
                 Vec3 v = original.getDeltaMovement();
-                baseDir = v.lengthSquared() > 1.0E-6 ? v.normalize() : mob.getViewVector(1.0F);
+                baseDir = v.lengthSqr() > 1.0E-6 ? v.normalize() : mob.getViewVector(1.0F);
             } else {
                 Vec3 v = original.getDeltaMovement();
                 baseSpeed = Math.max(0.05, v.length());
-                baseDir = v.lengthSquared() > 1.0E-6 ? v.normalize() : mob.getViewVector(1.0F);
+                baseDir = v.lengthSqr() > 1.0E-6 ? v.normalize() : mob.getViewVector(1.0F);
             }
 
             // Use small variance: ~5-10% speed and small angle jitter.
@@ -125,7 +125,7 @@ public abstract class ProjectileAbilityMixin {
                 Vec3 dirJittered = advancedmobs$jitterDirection(baseDir, mob.getRandom().nextFloat() * 2f - 1f, mob.getRandom().nextFloat() * 2f - 1f, maxAngleDeg);
                 double speedMul = minSpeedMul + mob.getRandom().nextDouble() * (maxSpeedMul - minSpeedMul);
                 double speed = baseSpeed * speedMul;
-                Vec3 velocity = dirJittered.multiply(speed);
+                Vec3 velocity = dirJittered.scale(speed);
                 projectile.setDeltaMovement(velocity);
 
                 if (projectile instanceof AbstractHurtingProjectile explosiveCopy) {
@@ -171,7 +171,7 @@ public abstract class ProjectileAbilityMixin {
             yawed.y * sinPitch + yawed.z * cosPitch
         );
 
-        return pitched.lengthSquared() > 1.0E-6 ? pitched.normalize() : baseDir;
+        return pitched.lengthSqr() > 1.0E-6 ? pitched.normalize() : baseDir;
     }
 
     @Unique

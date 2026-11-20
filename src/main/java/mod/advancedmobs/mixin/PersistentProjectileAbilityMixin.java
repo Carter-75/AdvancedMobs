@@ -44,7 +44,7 @@ public abstract class PersistentProjectileAbilityMixin implements ProjectileAbil
     private void advancedmobs$applyProjectileAbilities(CallbackInfo ci) {
         AdvancedMobsMod.runSafely("PersistentProjectileAbilityMixin#applyProjectileAbilities", () -> {
             Projectile self = (Projectile) (Object) this;
-            if (self.level().isClient() || advancedmobs$abilitiesApplied) {
+            if (self.level().isClientSide() || advancedmobs$abilitiesApplied) {
                 return;
             }
 
@@ -75,7 +75,7 @@ public abstract class PersistentProjectileAbilityMixin implements ProjectileAbil
     private void advancedmobs$applyPotionMastery(EntityHitResult hitResult, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("PersistentProjectileAbilityMixin#applyPotionMastery", () -> {
             Projectile self = (Projectile) (Object) this;
-            if (self.level().isClient()) {
+            if (self.level().isClientSide()) {
                 return;
             }
 

@@ -209,7 +209,7 @@ public class ScalingSystem {
 
         for (ScheduledProjectileSpawn spawn : due) {
             try {
-                ServerLevel world = server.getWorld(spawn.worldKey);
+                ServerLevel world = server.getLevel(spawn.worldKey);
                 if (world == null) {
                     continue;
                 }
@@ -225,13 +225,13 @@ public class ScalingSystem {
                 if (target != null && target.isAlive()) {
                     net.minecraft.world.phys.Vec3 targetPos = target.getEyePosition();
                     net.minecraft.world.phys.Vec3 delta = targetPos.subtract(origin);
-                    direction = delta.lengthSquared() > 1.0E-6 ? delta.normalize() : shooter.getViewVector(1.0F);
+                    direction = delta.lengthSqr() > 1.0E-6 ? delta.normalize() : shooter.getViewVector(1.0F);
                 } else {
                     direction = shooter.getViewVector(1.0F);
                 }
 
-                net.minecraft.world.entity.EntityType<?> projectileType = BuiltInRegistries.ENTITY_TYPE.get(spawn.projectileTypeId);
-                net.minecraft.world.entity.Entity created = projectileType.create(world);
+                net.minecraft.world.entity.EntityType<?> projectileType = BuiltInRegistries.ENTITY_TYPE.getValue(spawn.projectileTypeId);
+                net.minecraft.world.entity.Entity created = projectileType.create(world, net.minecraft.world.entity.EntitySpawnReason.MOB_SUMMONED);
                 if (!(created instanceof net.minecraft.world.entity.projectile.Projectile projectile)) {
                     continue;
                 }
@@ -244,7 +244,7 @@ public class ScalingSystem {
                     thrown.setItem(spawn.thrownItemStack.copy());
                 }
 
-                net.minecraft.world.phys.Vec3 velocity = direction.multiply(Math.max(0.05, spawn.baseSpeed));
+                net.minecraft.world.phys.Vec3 velocity = direction.scale(Math.max(0.05, spawn.baseSpeed));
                 projectile.setDeltaMovement(velocity);
 
                 if (projectile instanceof net.minecraft.world.entity.projectile.hurtingprojectile.AbstractHurtingProjectile explosive) {
@@ -308,8 +308,8 @@ public class ScalingSystem {
             return;
         }
 
-        Identifier mobTypeId = BuiltInRegistries.ENTITY_TYPE.getId(mob.getType());
-        Identifier projectileTypeId = BuiltInRegistries.ENTITY_TYPE.getId(projectile.getType());
+        Identifier mobTypeId = BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType());
+        Identifier projectileTypeId = BuiltInRegistries.ENTITY_TYPE.getKey(projectile.getType());
 
         ShotCycleTracker tracker = EXTRA_SHOT_TRACKERS.computeIfAbsent(mob.getUUID(), id -> new ShotCycleTracker());
         long relativeOffset;
@@ -894,11 +894,11 @@ public class ScalingSystem {
             return "hostile";
         }
 
-        if (mob.getType().isIn(EntityTypeTags.UNDEAD)) {
+        if (BuiltInRegistries.ENTITY_TYPE.wrapAsHolder(mob.getType()).is(EntityTypeTags.UNDEAD)) {
             return "hostile";
         }
 
-        MobCategory spawnGroup = mob.getType().getSpawnGroup();
+        MobCategory spawnGroup = mob.getType().getCategory();
         if (spawnGroup == MobCategory.MONSTER) {
             return "hostile";
         }
@@ -990,7 +990,7 @@ public class ScalingSystem {
      * to the progression spec so the slot becomes eligible for repurchase.
      */
     public static void monitorEquipmentState(Mob mob, MobWarData data) {
-        if (mob == null || data == null || mob.level().isClient()) {
+        if (mob == null || data == null || mob.level().isClientSide()) {
             return;
         }
 
@@ -1085,7 +1085,7 @@ public class ScalingSystem {
         boolean shieldOverride = isPlayerOverrideActive(skillData, OVERRIDE_KEY_SHIELD);
         ItemStack currentShield = mob.getItemBySlot(EquipmentSlot.OFFHAND);
         boolean shieldMissing = currentShield.isEmpty();
-        boolean shieldMatches = !shieldMissing && currentShield.isOf(Items.SHIELD);
+        boolean shieldMatches = !shieldMissing && currentShield.is(Items.SHIELD);
         if (shieldMatches && shouldHaveShield) {
             if (!hasShieldEquipped) {
                 skillData.putBoolean("shield_equipped", true);
@@ -1110,7 +1110,7 @@ public class ScalingSystem {
             if (handleShieldBreak(mob, data) && serverWorld != null && shieldElement != null) {
                 applyShield(mob, skillData, shieldElement.getAsJsonObject(), serverWorld, null, false);
             }
-        } else if (!hasShieldEquipped && shouldHaveShield && !shieldMissing && currentShield.isOf(Items.SHIELD)) {
+        } else if (!hasShieldEquipped && shouldHaveShield && !shieldMissing && currentShield.is(Items.SHIELD)) {
             skillData.putBoolean("shield_equipped", true);
         } else if (!hasShieldEquipped && shouldHaveShield && serverWorld != null && shieldElement != null) {
             applyShield(mob, skillData, shieldElement.getAsJsonObject(), serverWorld, null, false);
@@ -1150,7 +1150,7 @@ public class ScalingSystem {
     }
 
     private static boolean dropAndClearSlotOnce(Mob mob, EquipmentSlot slot) {
-        if (mob == null || slot == null || mob.level().isClient()) {
+        if (mob == null || slot == null || mob.level().isClientSide()) {
             return false;
         }
         ItemStack current = mob.getItemBySlot(slot);
@@ -1169,10 +1169,10 @@ public class ScalingSystem {
         // a different RegistryManager (e.g., picked up loot from other mods / datapacks).
         if (mob.level() instanceof ServerLevel serverWorld) {
             try {
-                Registry<Enchantment> enchantRegistry = serverWorld.getRegistryManager().get(Registries.ENCHANTMENT);
+                Registry<Enchantment> enchantRegistry = serverWorld.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
                 ItemEnchantments existing = toDrop.getOrDefault(
                     DataComponents.ENCHANTMENTS,
-                    ItemEnchantments.DEFAULT
+                    ItemEnchantments.EMPTY
                 );
                 ItemEnchantments normalized = normalizeEnchantmentsComponent(existing, enchantRegistry);
                 toDrop.set(DataComponents.ENCHANTMENTS, normalized);
@@ -1181,7 +1181,7 @@ public class ScalingSystem {
             }
         }
         mob.setItemSlot(slot, ItemStack.EMPTY);
-        mob.dropStack(toDrop);
+        mob.spawnAtLocation((ServerLevel) mob.level(), toDrop);
         mob.addTag(slotTag);
         return true;
     }
@@ -1254,7 +1254,7 @@ public class ScalingSystem {
             return;
         }
         Level world = mob.level();
-        if (world == null || world.isClient()) {
+        if (world == null || world.isClientSide()) {
             return;
         }
 
@@ -1291,7 +1291,7 @@ public class ScalingSystem {
     }
 
     private static void processMobTick(Mob mob, Level world, MobWarData data, boolean forceImmediateUpgrade) {
-        if (world.isClient()) {
+        if (world.isClientSide()) {
             return;
         }
 
@@ -1425,7 +1425,7 @@ public class ScalingSystem {
         Registry<Enchantment> enchantRegistry = null;
         if (world instanceof ServerLevel serverWorld) {
             try {
-                enchantRegistry = serverWorld.getRegistryManager().get(Registries.ENCHANTMENT);
+                enchantRegistry = serverWorld.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
             } catch (Exception ignored) {
                 enchantRegistry = null;
             }
@@ -2038,7 +2038,7 @@ public class ScalingSystem {
         Registry<Enchantment> enchantRegistry = null;
         if (mob.level() instanceof ServerLevel serverWorld) {
             try {
-                enchantRegistry = serverWorld.getRegistryManager().get(Registries.ENCHANTMENT);
+                enchantRegistry = serverWorld.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
             } catch (Exception ignored) {
                 enchantRegistry = null;
             }
@@ -2094,7 +2094,7 @@ public class ScalingSystem {
         Registry<Enchantment> enchantRegistry = null;
         if (mob.level() instanceof ServerLevel serverWorld) {
             try {
-                enchantRegistry = serverWorld.getRegistryManager().get(Registries.ENCHANTMENT);
+                enchantRegistry = serverWorld.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
             } catch (Exception ignored) {
                 enchantRegistry = null;
             }
@@ -2141,7 +2141,7 @@ public class ScalingSystem {
     }
 
     private static Identifier resolveEntityId(Mob mob) {
-        return BuiltInRegistries.ENTITY_TYPE.getId(mob.getType());
+        return BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType());
     }
 
     private static boolean isBossEntity(Identifier entityId) {
@@ -2312,12 +2312,12 @@ public class ScalingSystem {
             return;
         }
 
-        double horizontalSpread = Math.max(0.2, mob.getWidth() * 0.35);
-        double verticalSpread = Math.max(0.25, mob.getHeight() * 0.4);
-        serverWorld.spawnParticles(
+        double horizontalSpread = Math.max(0.2, mob.getBbWidth() * 0.35);
+        double verticalSpread = Math.max(0.25, mob.getBbHeight() * 0.4);
+        serverWorld.sendParticles(
             ParticleTypes.ENCHANT,
             mob.getX(),
-            mob.getBodyY(0.6),
+            mob.getY(0.6),
             mob.getZ(),
             24,
             horizontalSpread,
@@ -2400,7 +2400,7 @@ public class ScalingSystem {
         if (target == null || source == null) {
             return;
         }
-        for (String key : source.getKeys()) {
+        for (String key : source.keySet()) {
             if (key == null) {
                 continue;
             }
@@ -2967,7 +2967,8 @@ public class ScalingSystem {
         // Instant effects are not reliably applied via addStatusEffect across versions.
         // Apply as a true instant effect so undead mobs actually receive the healing.
         try {
-            MobEffects.INSTANT_DAMAGE.value().applyInstantEffect(
+            ((net.minecraft.world.effect.InstantaneousMobEffect) MobEffects.INSTANT_DAMAGE.value()).applyInstantaneousEffect(
+                (ServerLevel) mob.level(),
                 null,
                 null,
                 mob,
@@ -2990,11 +2991,11 @@ public class ScalingSystem {
 
 
     private static boolean isUndeadMob(Mob mob) {
-        return mob != null && mob.getType().isIn(EntityTypeTags.UNDEAD);
+        return mob != null && BuiltInRegistries.ENTITY_TYPE.wrapAsHolder(mob.getType()).is(EntityTypeTags.UNDEAD);
     }
 
     private static void handleInvisibilityGlowFlicker(Mob mob, long currentTick) {
-        if (mob == null || mob.level().isClient()) {
+        if (mob == null || mob.level().isClientSide()) {
             return;
         }
         Map<String, Long> cooldowns = ABILITY_COOLDOWNS.get(mob.getUUID());
@@ -3383,7 +3384,7 @@ public class ScalingSystem {
         if (trackedId == null || trackedId.isEmpty()) {
             return false;
         }
-        Identifier stackId = BuiltInRegistries.ITEM.getId(stack.getItem());
+        Identifier stackId = BuiltInRegistries.ITEM.getKey(stack.getItem());
         return stackId != null && trackedId.equals(stackId.toString());
     }
 
@@ -3395,7 +3396,7 @@ public class ScalingSystem {
             skillData.remove(trackingKey);
             return;
         }
-        Identifier stackId = BuiltInRegistries.ITEM.getId(stack.getItem());
+        Identifier stackId = BuiltInRegistries.ITEM.getKey(stack.getItem());
         if (stackId != null) {
             skillData.putString(trackingKey, stackId.toString());
         }
@@ -3414,19 +3415,19 @@ public class ScalingSystem {
             return;
         }
 
-        Registry<Enchantment> enchantRegistry = world.getRegistryManager().get(Registries.ENCHANTMENT);
+        Registry<Enchantment> enchantRegistry = world.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
         ItemEnchantments existing = item.getOrDefault(
             DataComponents.ENCHANTMENTS,
-            ItemEnchantments.DEFAULT
+            ItemEnchantments.EMPTY
         );
 
         // Normalize the existing component so ALL kept entries come from THIS registry instance.
         // This avoids "Can't find id" crashes during packet encoding when another mod serializes
         // ItemStacks using a different RegistryManager than the one that created the Holder.
         ItemEnchantments normalizedExisting = normalizeEnchantmentsComponent(existing, enchantRegistry);
-        ItemEnchantments.Builder builder = new ItemEnchantments.Builder(normalizedExisting);
+        ItemEnchantments.Mutable builder = new ItemEnchantments.Mutable(normalizedExisting);
 
-        Set<String> keys = new HashSet<>(skillData.getKeys());
+        Set<String> keys = new HashSet<>(skillData.keySet());
         List<String> legacyKeysToRemove = new ArrayList<>();
 
         for (String key : keys) {
@@ -3454,12 +3455,12 @@ public class ScalingSystem {
             }
 
             Enchantment enchantment = entry.value();
-            if (enchantment == null || !enchantment.isAcceptableItem(item)) {
+            if (enchantment == null || !enchantment.isSupportedItem(item)) {
                 continue;
             }
 
             int clamped = Math.min(storedLevel, Math.max(1, enchantment.getMaxLevel()));
-            builder.add(entry, clamped);
+            builder.set(entry, clamped);
 
             // Migrate legacy minecraft keys to the new id-based format.
             if (!suffix.contains(ENCHANT_ID_SEPARATOR) && "minecraft".equals(enchantId.getNamespace())) {
@@ -3475,7 +3476,7 @@ public class ScalingSystem {
             skillData.remove(legacy);
         }
 
-        item.set(DataComponents.ENCHANTMENTS, builder.build());
+        item.set(DataComponents.ENCHANTMENTS, builder.toImmutable());
     }
 
     public static void setEnchantmentNetworkAllowlist(Set<Identifier> allowlist) {
@@ -3514,16 +3515,16 @@ public class ScalingSystem {
         Registry<Enchantment> enchantRegistry
     ) {
         if (existing == null || enchantRegistry == null) {
-            return ItemEnchantments.DEFAULT;
+            return ItemEnchantments.EMPTY;
         }
 
-        ItemEnchantments.Builder builder = new ItemEnchantments.Builder(ItemEnchantments.DEFAULT);
+        ItemEnchantments.Mutable builder = new ItemEnchantments.Mutable(ItemEnchantments.EMPTY);
 
         // Re-add enchantments using registry entries from THIS registry manager.
         // This specifically prevents holding onto Holder instances originating from a
         // different registry (common when other mods / datapacks / client registries touched the stack).
         try {
-            for (Object2IntMap.Entry<Holder<Enchantment>> entry : existing.getEnchantmentEntries()) {
+            for (Object2IntMap.Entry<Holder<Enchantment>> entry : existing.entrySet()) {
                 Holder<Enchantment> original = entry.getKey();
                 if (original == null) {
                     continue;
@@ -3531,14 +3532,14 @@ public class ScalingSystem {
 
                 Identifier id = null;
                 try {
-                    id = original.getKey().map(ResourceKey::getValue).orElse(null);
+                    id = original.unwrapKey().map(ResourceKey::identifier).orElse(null);
                 } catch (Exception ignored) {
                     id = null;
                 }
                 if (id == null) {
                     // Fallback: try resolving by value object.
                     try {
-                        id = enchantRegistry.getId(original.value());
+                        id = enchantRegistry.getKey(original.value());
                     } catch (Exception ignored) {
                         id = null;
                     }
@@ -3559,13 +3560,13 @@ public class ScalingSystem {
                     continue;
                 }
                 int clamped = Math.min(level, Math.max(1, enchantment.getMaxLevel()));
-                builder.add(normalized, clamped);
+                builder.set(normalized, clamped);
             }
         } catch (Exception ignored) {
             // If the underlying API surface differs, fail safely by dropping existing enchantments.
         }
 
-        return builder.build();
+        return builder.toImmutable();
     }
 
     private static Holder<Enchantment> getEnchantmentEntry(Registry<Enchantment> registry, Identifier id) {
@@ -3574,7 +3575,7 @@ public class ScalingSystem {
         }
         try {
             ResourceKey<Enchantment> key = ResourceKey.create(Registries.ENCHANTMENT, id);
-            return registry.getEntry(key).orElse(null);
+            return registry.get(key).orElse(null);
         } catch (Exception ignored) {
             return null;
         }
@@ -3670,7 +3671,7 @@ public class ScalingSystem {
         if (skillData == null) {
             return BASE_ENCHANT_COST;
         }
-        int bump = Math.max(0, skillData.getInt(getEnchantCostBumpKey(slotGroup)));
+        int bump = Math.max(0, skillData.getIntOr(getEnchantCostBumpKey(slotGroup), 0));
         return Math.max(0, BASE_ENCHANT_COST + bump);
     }
 
@@ -3759,7 +3760,7 @@ public class ScalingSystem {
         }
         List<Holder<Enchantment>> applied = new ArrayList<>();
 
-        for (String key : skillData.getKeys()) {
+        for (String key : skillData.keySet()) {
             if (!key.startsWith(enchantPrefix)) {
                 continue;
             }
@@ -3780,17 +3781,17 @@ public class ScalingSystem {
             }
         }
 
-        for (ResourceKey<Enchantment> enchantKey : registry.getKeys()) {
-            Identifier id = enchantKey.getValue();
+        for (Identifier enchantIdKey : registry.keySet()) {
+            Identifier id = enchantIdKey;
             if (!isEnchantmentAllowed(id)) {
                 continue;
             }
-            Holder<Enchantment> entry = registry.getEntry(enchantKey).orElse(null);
+            Holder<Enchantment> entry = registry.get(enchantIdKey).orElse(null);
             if (entry == null) {
                 continue;
             }
             Enchantment enchantment = entry.value();
-            if (enchantment == null || !enchantment.isAcceptableItem(stack)) {
+            if (enchantment == null || !enchantment.isSupportedItem(stack)) {
                 continue;
             }
             int currentLevel = getStoredEnchantLevel(skillData, enchantPrefix, id);
@@ -3820,7 +3821,7 @@ public class ScalingSystem {
         }
 
         List<Holder<Enchantment>> applied = new ArrayList<>();
-        for (String key : skillData.getKeys()) {
+        for (String key : skillData.keySet()) {
             if (!key.startsWith(enchantPrefix)) {
                 continue;
             }
@@ -3841,17 +3842,17 @@ public class ScalingSystem {
             }
         }
 
-        for (ResourceKey<Enchantment> enchantKey : registry.getKeys()) {
-            Identifier id = enchantKey.getValue();
+        for (Identifier enchantIdKey : registry.keySet()) {
+            Identifier id = enchantIdKey;
             if (!isEnchantmentAllowed(id)) {
                 continue;
             }
-            Holder<Enchantment> entry = registry.getEntry(enchantKey).orElse(null);
+            Holder<Enchantment> entry = registry.get(enchantIdKey).orElse(null);
             if (entry == null) {
                 continue;
             }
             Enchantment enchantment = entry.value();
-            if (enchantment == null || !enchantment.isAcceptableItem(stack)) {
+            if (enchantment == null || !enchantment.isSupportedItem(stack)) {
                 continue;
             }
             int maxLevel = Math.max(0, enchantment.getMaxLevel());
@@ -4050,7 +4051,7 @@ public class ScalingSystem {
         if (durabilityKey == null || durabilityKey.isEmpty()) {
             return false;
         }
-        if (!previous.isOf(target.getItem())) {
+        if (!previous.is(target.getItem())) {
             return false;
         }
         int previousLevel = snapshot.getDurabilityLevel(durabilityKey);
@@ -4170,7 +4171,7 @@ public class ScalingSystem {
             return false;
         }
         Item expected = getExpectedWeaponItem(weaponConfig, tierLevel);
-        return expected != null && equipped.isOf(expected);
+        return expected != null && equipped.is(expected);
     }
     
     /**
@@ -4249,7 +4250,7 @@ public class ScalingSystem {
             return false;
         }
         ItemStack expected = getExpectedArmorStack(armorConfig, slot, tierLevel);
-        return !expected.isEmpty() && equipped.isOf(expected.getItem());
+        return !expected.isEmpty() && equipped.is(expected.getItem());
     }
 
     private static int getTierCount(JsonObject config) {
@@ -4305,7 +4306,7 @@ public class ScalingSystem {
         };
         
         var id = net.minecraft.resources.Identifier.fromNamespaceAndPath("minecraft", key);
-        return registry.getEntry(id).orElse(null);
+        return registry.get(id).orElse(null);
     }
     
     // ==========================================================================
@@ -4561,14 +4562,14 @@ public class ScalingSystem {
 
                         // Spawn a copy of this mob type nearby
                         try {
-                            Mob reinforcement = (Mob) mob.getType().create(world);
+                            Mob reinforcement = (Mob) mob.getType().create(world, EntitySpawnReason.MOB_SUMMONED);
                             if (reinforcement != null) {
                                 double offsetX = (mob.getRandom().nextDouble() - 0.5) * 4;
                                 double offsetZ = (mob.getRandom().nextDouble() - 0.5) * 4;
                                 reinforcement.snapTo(
                                     mob.getX() + offsetX, mob.getY(), mob.getZ() + offsetZ,
                                     mob.getRandom().nextFloat() * 360, 0);
-                                reinforcement.initialize(
+                                reinforcement.finalizeSpawn(
                                     world,
                                     world.getCurrentDifficultyAt(reinforcement.blockPosition()),
                                     EntitySpawnReason.EVENT,
@@ -5122,7 +5123,7 @@ public class ScalingSystem {
                     entity -> entity != mob)
                     .forEach(entity -> {
                         // Apply extra damage
-                        entity.damage(world.getDamageSources().dragonBreath(), (float) damage);
+                        entity.hurtServer(world, world.damageSources().dragonBreath(), (float) damage);
                         
                         // Apply wither
                         entity.addEffect(new MobEffectInstance(
@@ -5327,7 +5328,7 @@ public class ScalingSystem {
 
     private static void clearEnchantsWithPrefix(CompoundTag skillData, String prefix) {
         if (skillData == null || prefix == null) return;
-        java.util.Set<String> keys = new java.util.HashSet<>(skillData.getKeys());
+        java.util.Set<String> keys = new java.util.HashSet<>(skillData.keySet());
         for (String key : keys) {
             if (key.startsWith(prefix)) {
                 skillData.remove(key);
@@ -5350,7 +5351,7 @@ public class ScalingSystem {
 
     private static void applyDropChance(Mob mob, EquipmentSlot slot, int masteryLevel) {
         float chance = getDropChanceForMastery(masteryLevel);
-        mob.setEquipmentDropChance(slot, chance);
+        mob.setDropChance(slot, chance);
     }
 
     private static float getDropChanceForMastery(int level) {
@@ -5551,7 +5552,7 @@ public class ScalingSystem {
         if (skillData == null || prefix == null) {
             return;
         }
-        Set<String> keys = new HashSet<>(skillData.getKeys());
+        Set<String> keys = new HashSet<>(skillData.keySet());
         for (String key : keys) {
             if (key.startsWith(prefix)) {
                 skillData.putInt(key, 0);
@@ -5785,7 +5786,7 @@ public class ScalingSystem {
             MutableComponent prefix = Component.literal("[MobWar][" + identifier + "] ")
                 .withStyle(style -> style.withColor(ChatFormatting.DARK_AQUA).withBold(true));
             Component finalText = prefix.append(Component.literal(message).withStyle(style -> style.withColor(ChatFormatting.WHITE)));
-            serverWorld.getServer().getPlayerList().broadcast(finalText, false);
+            serverWorld.getServer().getPlayerList().broadcastSystemMessage(finalText, false);
         }
 
         void replay(List<String> entries) {
@@ -5827,7 +5828,7 @@ public class ScalingSystem {
             }
             Map<String, Integer> durability = new HashMap<>();
             if (skillData != null) {
-                for (String key : skillData.getKeys()) {
+                for (String key : skillData.keySet()) {
                     if (key.endsWith("_durability_mastery")) {
                         durability.put(key, skillData.getIntOr(key, 0));
                     }

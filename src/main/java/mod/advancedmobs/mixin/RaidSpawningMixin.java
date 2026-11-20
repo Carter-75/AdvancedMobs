@@ -76,7 +76,7 @@ public abstract class RaidSpawningMixin {
                 0.0f, 
                 0.0f
             );
-            warlord.initialize(this.world, this.world.getCurrentDifficultyAt(spawnPos), EntitySpawnReason.EVENT, null);
+            warlord.finalizeSpawn(this.world, this.world.getCurrentDifficultyAt(spawnPos), EntitySpawnReason.EVENT, null);
             
             // Mark as raid boss - this changes targeting behavior
             warlord.setRaidBoss(true);

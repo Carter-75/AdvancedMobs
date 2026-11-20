@@ -36,7 +36,7 @@ public final class EntityCleanupSystem {
 			int removedThisWorld = 0;
 			List<AbstractArrow> candidates = new ArrayList<>();
 			try {
-				for (Entity entity : world.iterateEntities()) {
+				for (Entity entity : world.getAllEntities()) {
 					if (maxPerWorld > 0 && candidates.size() >= maxPerWorld) {
 						break;
 					}
@@ -75,7 +75,7 @@ public final class EntityCleanupSystem {
 					candidates.add(projectile);
 				}
 			} catch (RuntimeException ex) {
-				AdvancedMobsMod.LOGGER.warn("Entity cleanup skipped in world {} due to iterator failure", world.dimension().getValue(), ex);
+				AdvancedMobsMod.LOGGER.warn("Entity cleanup skipped in world {} due to iterator failure", world.dimension().identifier(), ex);
 				continue;
 			}
 

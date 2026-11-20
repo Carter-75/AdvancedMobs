@@ -33,7 +33,7 @@ public abstract class PotionEntityMixin extends ThrowableItemProjectile {
     @Inject(method = "onCollision", at = @At("TAIL"))
     private void advancedmobs$applyRangedPotionEffects(HitResult hitResult, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("PotionEntityMixin#applyRangedPotionEffects", () -> {
-            if (this.level().isClient()) {
+            if (this.level().isClientSide()) {
                 return;
             }
 

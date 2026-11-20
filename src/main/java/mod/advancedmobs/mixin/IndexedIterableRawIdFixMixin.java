@@ -164,7 +164,7 @@ public interface IndexedIterableRawIdFixMixin {
         try {
             Registry<?> outerRegistry = tryGetOuterRegistry(self);
             if (outerRegistry != null) {
-                Optional<? extends Holder.Reference<?>> resolved = outerRegistry.getEntry((ResourceKey) key);
+                Optional<? extends Holder.Reference<?>> resolved = outerRegistry.get((ResourceKey) key);
                 return resolved.orElse(null);
             }
         } catch (Exception ignored) {

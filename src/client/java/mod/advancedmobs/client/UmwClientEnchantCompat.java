@@ -20,7 +20,7 @@ public final class UmwClientEnchantCompat {
     public static void init() {
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             try {
-                Registry<Enchantment> enchantRegistry = handler.getRegistryManager().get(Registries.ENCHANTMENT);
+                Registry<Enchantment> enchantRegistry = handler.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
                 List<Identifier> ids = new ArrayList<>(enchantRegistry.getIds());
                 ClientPlayNetworking.send(new UmwClientEnchantmentsPayload(ids));
             } catch (Exception e) {

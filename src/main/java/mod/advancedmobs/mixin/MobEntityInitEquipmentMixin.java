@@ -30,7 +30,7 @@ public abstract class MobEntityInitEquipmentMixin {
     );
 
     @Inject(method = "initEquipment", at = @At("HEAD"), cancellable = true)
-    private void advancedmobs$disableVanillaEquipment(Random random, DifficultyInstance difficulty, CallbackInfo ci) {
+    private void advancedmobs$disableVanillaEquipment(RandomSource random, DifficultyInstance difficulty, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("MobEntityInitEquipmentMixin#disableVanillaEquipment", () -> {
             if (!ModConfig.getInstance().modEnabled) {
                 return;
@@ -42,7 +42,7 @@ public abstract class MobEntityInitEquipmentMixin {
                     continue;
                 }
                 self.setItemSlot(slot, ItemStack.EMPTY);
-                self.setEquipmentDropChance(slot, 0.0f);
+                self.setDropChance(slot, 0.0f);
             }
 
             ci.cancel();

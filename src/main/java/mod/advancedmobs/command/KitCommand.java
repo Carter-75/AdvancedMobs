@@ -41,7 +41,7 @@ public final class KitCommand {
     }
 
     private static int giveKit(CommandContext<CommandSourceStack> context, ServerPlayer target) throws CommandSyntaxException {
-        Registry<Enchantment> enchantRegistry = context.getDirectEntity().getServer().getRegistryManager().get(Registries.ENCHANTMENT);
+        Registry<Enchantment> enchantRegistry = context.getDirectEntity().getServer().registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
         List<ItemStack> kitItems = buildKit(enchantRegistry);
         kitItems.forEach(target::giveItemStack);
 
@@ -174,8 +174,8 @@ public final class KitCommand {
 
     private static void add(ItemStack stack, Registry<Enchantment> enchantRegistry, ResourceKey<Enchantment> enchantmentKey, int level) {
         Holder<Enchantment> entry = enchantRegistry
-            .getEntry(enchantmentKey)
-            .orElseThrow(() -> new IllegalStateException("Missing enchantment: " + enchantmentKey.getValue()));
+            .get(enchantmentKey)
+            .orElseThrow(() -> new IllegalStateException("Missing enchantment: " + enchantmentKey.identifier()));
         stack.addEnchantment(entry, level);
     }
 }

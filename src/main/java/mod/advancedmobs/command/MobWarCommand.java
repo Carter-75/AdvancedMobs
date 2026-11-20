@@ -250,7 +250,7 @@ public class MobWarCommand {
         
         // Get all mob entities in the world
         int count = 0;
-        for (net.minecraft.world.entity.Entity entity : world.iterateEntities()) {
+        for (net.minecraft.world.entity.Entity entity : world.getAllEntities()) {
             if (entity instanceof Mob mob) {
                 mob.setTarget(null);
                 count++;
@@ -349,7 +349,7 @@ public class MobWarCommand {
             // Create the Mob Warlord
             MobWarlordEntity warlord = new MobWarlordEntity(AdvancedMobsMod.MOB_WARLORD, world);
             warlord.snapTo(pos.x, pos.y, pos.z, 0.0f, 0.0f);
-            warlord.initialize(world, world.getCurrentDifficultyAt(BlockPos.ofFloored(pos)), EntitySpawnReason.COMMAND, null);
+            warlord.finalizeSpawn(world, world.getCurrentDifficultyAt(BlockPos.ofFloored(pos)), EntitySpawnReason.COMMAND, null);
             
             world.addFreshEntity(warlord);
             

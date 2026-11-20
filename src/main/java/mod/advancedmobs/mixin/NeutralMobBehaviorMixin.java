@@ -25,7 +25,7 @@ public abstract class NeutralMobBehaviorMixin {
         AdvancedMobsMod.runSafely("NeutralMobBehaviorMixin#forceAggressive", () -> {
             Mob self = (Mob)(Object)this;
             
-            if (self.level().isClient()) return;
+            if (self.level().isClientSide()) return;
             if (!(self.level() instanceof ServerLevel serverWorld)) return;
             
             // Only affect mobs with anger system (neutral mobs)

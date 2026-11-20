@@ -152,7 +152,7 @@ public class AllianceSystem {
         mobData.setCurrentTarget(targetUuid);
         
         // Check if same-species combat is allowed (chaos mode)
-        boolean ignoreSameSpecies = world.getGameRules().getBoolean(
+        boolean ignoreSameSpecies = world.getGameRules().get(
             mod.advancedmobs.AdvancedMobsMod.IGNORE_SAME_SPECIES_RULE
         );
         
@@ -275,7 +275,7 @@ public class AllianceSystem {
             LivingEntity allyTarget = ally.getTarget();
             if (allyTarget != null && allyTarget.isAlive()) {
                 // Strong allies: help even with different targets
-                if (isStrongAlly && mob.canSee(allyTarget) && Math.random() < 0.8) {
+                if (isStrongAlly && mob.getSensing().hasLineOfSight(allyTarget) && Math.random() < 0.8) {
                     return allyTarget; // 80% chance to help same-species ally
                 }
                 
@@ -303,8 +303,8 @@ public class AllianceSystem {
         // so mobs below y=0 (down to -64 in the overworld) were treated as
         // dead and had their alliance entries purged on every cleanup pass.
         AABB borderBox = new AABB(
-            centerX - size, world.getBottomY(), centerZ - size,
-            centerX + size, world.getTopY(), centerZ + size
+            centerX - size, world.getMinY(), centerZ - size,
+            centerX + size, world.getMinY() + world.getHeight(), centerZ + size
         );
         for (Mob mob : world.getEntitiesOfClass(Mob.class, borderBox, m -> true)) {
             aliveMobs.add(mob.getUUID());

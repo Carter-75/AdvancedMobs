@@ -59,7 +59,7 @@ public final class WitchAbilityHelper {
         return new ThrowStats(Math.max(0.5f, multiplier), Math.max(0.1f, accuracy));
     }
 
-    public static ItemStack resolvePotionStack(Mob witch, MobWarData data, ItemStack fallback, Random random) {
+    public static ItemStack resolvePotionStack(Mob witch, MobWarData data, ItemStack fallback, RandomSource random) {
         JsonObject abilities = getAbilitiesSection(witch);
         if (abilities == null) {
             return fallback.copy();
@@ -106,11 +106,11 @@ public final class WitchAbilityHelper {
         Vec3 aim = target.getEyePosition().subtract(witch.getEyePosition());
         if (yawOffsetDegrees != 0.0f) {
             float radians = (float) Math.toRadians(yawOffsetDegrees);
-            aim = aim.rotateY(radians);
+            aim = aim.yRot(radians);
         }
 
         double magnitude = aim.length();
-        potion.setDeltaMovement(aim.x, aim.y + magnitude * 0.2, aim.z,
+        potion.shoot(aim.x, aim.y + magnitude * 0.2, aim.z,
             BASE_THROW_SPEED * stats.speedMultiplier(), Math.max(0.1f, stats.accuracy()));
     }
 
@@ -123,7 +123,7 @@ public final class WitchAbilityHelper {
         float spreadDegrees = 6.0f;
         for (int i = 0; i < extraProjectiles; i++) {
             float offset = ((i / 2) + 1) * spreadDegrees * (i % 2 == 0 ? 1 : -1);
-            AbstractThrownPotion extra = new AbstractThrownPotion(world, witch);
+            AbstractThrownPotion extra = new net.minecraft.world.entity.projectile.throwableitemprojectile.ThrownSplashPotion(world, witch, potionStack.copy());
             extra.setItem(potionStack.copy());
             configureTrajectory(extra, witch, target, stats, offset);
             world.addFreshEntity(extra);
@@ -142,9 +142,9 @@ public final class WitchAbilityHelper {
         }
 
         ItemStack potion = new ItemStack(Items.SPLASH_POTION);
-        int color = effectInstance.getEffectType().value().getColor();
+        int color = effectInstance.getEffect().value().getColor();
         potion.set(DataComponents.POTION_CONTENTS, new PotionContents(
-            Optional.empty(), Optional.of(color), List.of(effectInstance)
+            Optional.empty(), Optional.of(color), List.of(effectInstance), Optional.empty()
         ));
         return potion;
     }

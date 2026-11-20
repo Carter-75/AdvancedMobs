@@ -440,7 +440,7 @@ public class MobWarlordEntity extends Monster {
         if (this.tickCount < 60) return; // Wait for full initialization
         
         try {
-            Vec3 bossPos = this.position().add(0, this.getHeight() / 2, 0); // Center of boss
+            Vec3 bossPos = this.position().add(0, this.getBbHeight() / 2, 0); // Center of boss
             
             // OPTIMIZATION: Limit connections drawn based on minion count
             int drawnCount = 0;
@@ -452,7 +452,7 @@ public class MobWarlordEntity extends Monster {
                 try {
                     Entity entity = serverWorld.getEntity(minionUuid);
                     if (entity instanceof Mob minion && minion.isAlive()) {
-                        Vec3 minionPos = minion.position().add(0, minion.getHeight() / 2, 0);
+                        Vec3 minionPos = minion.position().add(0, minion.getBbHeight() / 2, 0);
                         
                         // OPTIMIZATION: Skip particles if minion is very close
                         double distance = minionPos.distanceTo(bossPos);
@@ -463,25 +463,25 @@ public class MobWarlordEntity extends Monster {
                         
                         // Draw particle line from boss to minion
                         Vec3 direction = minionPos.subtract(bossPos);
-                        Vec3 step = direction.normalize().multiply(1.5); // OPTIMIZED: Particle every 1.5 blocks (was 1.0)
+                        Vec3 step = direction.normalize().scale(1.5); // OPTIMIZED: Particle every 1.5 blocks (was 1.0)
                         
                         // OPTIMIZATION: Fewer particles per connection, scale with minion count
                         int maxParticles = minionUuids.size() > 10 ? 5 : 10; // Reduced from 8/15
                         int particleCount = Math.min((int)(distance / 1.5), maxParticles);
                         for (int i = 0; i < particleCount; i++) {
-                            Vec3 particlePos = bossPos.add(step.multiply(i));
+                            Vec3 particlePos = bossPos.add(step.scale(i));
                             
                             // Choose particle type based on status
                             if (isBetrayerMinion) {
                                 // RED particles for betrayers
-                                serverWorld.spawnParticles(
+                                serverWorld.sendParticles(
                                     ParticleTypes.ANGRY_VILLAGER,
                                     particlePos.x, particlePos.y, particlePos.z,
                                     1, 0, 0, 0, 0
                                 );
                             } else {
                                 // PURPLE particles for loyal minions
-                                serverWorld.spawnParticles(
+                                serverWorld.sendParticles(
                                     ParticleTypes.PORTAL,
                                     particlePos.x, particlePos.y, particlePos.z,
                                     1, 0, 0, 0, 0
@@ -568,14 +568,14 @@ public class MobWarlordEntity extends Monster {
         // OPTIMIZED: Conversion particles - reduced count for better performance on kill events
         try {
             if (this.tickCount > 60) {
-                serverWorld.spawnParticles(ParticleTypes.SOUL,
-                    killedMob.getX(), killedMob.getY() + killedMob.getHeight() / 2, killedMob.getZ(),
+                serverWorld.sendParticles(ParticleTypes.SOUL,
+                    killedMob.getX(), killedMob.getY() + killedMob.getBbHeight() / 2, killedMob.getZ(),
                     20, 0.5, 0.5, 0.5, 0.1); // Reduced from 50 to 20
-                serverWorld.spawnParticles(ParticleTypes.ENCHANT,
-                    killedMob.getX(), killedMob.getY() + killedMob.getHeight() / 2, killedMob.getZ(),
+                serverWorld.sendParticles(ParticleTypes.ENCHANT,
+                    killedMob.getX(), killedMob.getY() + killedMob.getBbHeight() / 2, killedMob.getZ(),
                     15, 0.5, 0.5, 0.5, 0.5); // Reduced from 30 to 15
-                serverWorld.spawnParticles(ParticleTypes.PORTAL,
-                    killedMob.getX(), killedMob.getY() + killedMob.getHeight() / 2, killedMob.getZ(),
+                serverWorld.sendParticles(ParticleTypes.PORTAL,
+                    killedMob.getX(), killedMob.getY() + killedMob.getBbHeight() / 2, killedMob.getZ(),
                     10, 0.3, 0.3, 0.3, 0.3); // Reduced from 20 to 10
             }
         } catch (Exception e) {
@@ -589,7 +589,7 @@ public class MobWarlordEntity extends Monster {
         
         //noinspection deprecation
         AdvancedMobsMod.LOGGER.debug("Mob Warlord converted {} into a minion! (UUID: {})", 
-            net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getId(killedMob.getType()), 
+            net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(killedMob.getType()), 
             killedMob.getUUID());
     }
     
@@ -617,7 +617,7 @@ public class MobWarlordEntity extends Monster {
             Entity entity = minionType.create(serverWorld);
             if (entity instanceof Mob minion) {
                 minion.snapTo(spawnPos.x, spawnPos.y, spawnPos.z, this.random.nextFloat() * 360f, 0);
-                minion.initialize(serverWorld, serverWorld.getCurrentDifficultyAt(minion.blockPosition()), EntitySpawnReason.MOB_SUMMONED, null);
+                minion.finalizeSpawn(serverWorld, serverWorld.getCurrentDifficultyAt(minion.blockPosition()), EntitySpawnReason.MOB_SUMMONED, null);
                 
                 // Ensure minion doesn't despawn
                 minion.setPersistent();
@@ -660,7 +660,7 @@ public class MobWarlordEntity extends Monster {
                     // Spawn effects (after initialization delay for Iris Shaders compatibility)
                     try {
                         if (this.tickCount > 60) { // Wait 3 seconds to ensure rendering is ready
-                            serverWorld.spawnParticles(ParticleTypes.PORTAL, 
+                            serverWorld.sendParticles(ParticleTypes.PORTAL, 
                                 spawnPos.x, spawnPos.y, spawnPos.z, 
                                 20, 0.5, 0.5, 0.5, 0.1);
                         }
@@ -1014,7 +1014,7 @@ public class MobWarlordEntity extends Monster {
         // Dark purple particles
         if (this.level() instanceof ServerLevel serverWorld && this.tickCount > 60) {
             try {
-                serverWorld.spawnParticles(ParticleTypes.WITCH,
+                serverWorld.sendParticles(ParticleTypes.WITCH,
                     this.getX(), this.getY() + 1.5, this.getZ(),
                     10, 0.3, 0.3, 0.3, 0.05);
             } catch (Exception e) {
@@ -1051,7 +1051,7 @@ public class MobWarlordEntity extends Monster {
         // Golden healing particles
         if (this.level() instanceof ServerLevel serverWorld && this.tickCount > 60) {
             try {
-                serverWorld.spawnParticles(ParticleTypes.ENCHANTED_HIT,
+                serverWorld.sendParticles(ParticleTypes.ENCHANTED_HIT,
                     this.getX(), this.getY() + 1.5, this.getZ(),
                     20, 0.5, 0.5, 0.5, 0.2);
             } catch (Exception e) {
@@ -1086,7 +1086,7 @@ public class MobWarlordEntity extends Monster {
         // Pink/healing particles
         if (this.level() instanceof ServerLevel serverWorld && this.tickCount > 60) {
             try {
-                serverWorld.spawnParticles(ParticleTypes.HEART,
+                serverWorld.sendParticles(ParticleTypes.HEART,
                     this.getX(), this.getY() + 1.5, this.getZ(),
                     10, 0.3, 0.3, 0.3, 0.1);
             } catch (Exception e) {
@@ -1121,7 +1121,7 @@ public class MobWarlordEntity extends Monster {
         // Purple particles
         if (this.level() instanceof ServerLevel serverWorld && this.tickCount > 60) {
             try {
-                serverWorld.spawnParticles(ParticleTypes.ENCHANT,
+                serverWorld.sendParticles(ParticleTypes.ENCHANT,
                     this.getX(), this.getY() + 1.5, this.getZ(),
                     15, 0.3, 0.3, 0.3, 0.1);
             } catch (Exception e) {
@@ -1162,10 +1162,10 @@ public class MobWarlordEntity extends Monster {
         if (this.level() instanceof ServerLevel serverWorld && this.tickCount > 60) {
             try {
                 Vec3 targetPos = target.position();
-                serverWorld.spawnParticles(ParticleTypes.WITCH,
+                serverWorld.sendParticles(ParticleTypes.WITCH,
                     targetPos.x, targetPos.y + 1.0, targetPos.z,
                     20, 0.5, 0.5, 0.5, 0.1);
-                serverWorld.spawnParticles(ParticleTypes.DRAGON_BREATH,
+                serverWorld.sendParticles(ParticleTypes.DRAGON_BREATH,
                     targetPos.x, targetPos.y + 1.0, targetPos.z,
                     10, 0.3, 0.3, 0.3, 0.05);
             } catch (Exception e) {
@@ -1187,7 +1187,7 @@ public class MobWarlordEntity extends Monster {
         try {
             // Additional null check for serverWorld's particle manager
             if (serverWorld.getServer() != null && !serverWorld.isClient) {
-                serverWorld.spawnParticles(ParticleTypes.WITCH,
+                serverWorld.sendParticles(ParticleTypes.WITCH,
                     this.getX(), this.getY() + 2.0, this.getZ(),
                     2, 0.5, 0.5, 0.5, 0.05); // Reduced from 5 to 2
             }
@@ -1331,7 +1331,7 @@ public class MobWarlordEntity extends Monster {
             
             // Death particles
             try {
-                serverWorld.spawnParticles(ParticleTypes.POOF,
+                serverWorld.sendParticles(ParticleTypes.POOF,
                     minion.getX(), minion.getY() + 1.0, minion.getZ(),
                     10, 0.3, 0.3, 0.3, 0.05);
             } catch (Exception e) {
@@ -1416,7 +1416,7 @@ public class MobWarlordEntity extends Monster {
             // Spawn angry particles
             if (this.warlord.level() instanceof ServerLevel serverWorld && this.warlord.tickCount > 60) {
                 try {
-                    serverWorld.spawnParticles(ParticleTypes.ANGRY_VILLAGER,
+                    serverWorld.sendParticles(ParticleTypes.ANGRY_VILLAGER,
                         this.warlord.getX(), this.warlord.getY() + 2.5, this.warlord.getZ(),
                         5, 0.5, 0.5, 0.5, 0.0);
                 } catch (Exception e) {
@@ -1548,7 +1548,7 @@ public class MobWarlordEntity extends Monster {
                         if (target != null) {
                             // Move away from target to avoid explosion near allies
                             Vec3 awayDirection = this.creeper.position().subtract(target.position()).normalize();
-                            Vec3 fleePos = this.creeper.position().add(awayDirection.multiply(5.0));
+                            Vec3 fleePos = this.creeper.position().add(awayDirection.scale(5.0));
                             this.creeper.getNavigation().startMovingTo(fleePos.x, fleePos.y, fleePos.z, 1.5);
                             return true;
                         }

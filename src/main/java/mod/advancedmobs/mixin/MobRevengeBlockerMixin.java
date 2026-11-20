@@ -24,7 +24,7 @@ public abstract class MobRevengeBlockerMixin {
 			Entity self = (Entity)(Object)this;
 
 			// Only apply to mobs in server worlds
-			if (self.level().isClient()) return;
+			if (self.level().isClientSide()) return;
 			if (!(self.level() instanceof ServerLevel serverWorld)) return;
 			if (!(self instanceof Mob selfMob)) return;
 			if (attacker == null) return;
