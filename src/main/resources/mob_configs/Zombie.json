@@ -1,6 +1,6 @@
 {
   "mob_name": "Zombie",
-  "entity_class": "net.minecraft.entity.mob.ZombieEntity",
+  "entity_class": "net.minecraft.world.entity.monster.zombie.Zombie",
   "mob_type": "hostile",
   "tree_name": "Undead Horde",
 

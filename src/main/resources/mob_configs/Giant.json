@@ -1,6 +1,6 @@
 {
   "mob_name": "Giant",
-  "entity_class": "net.minecraft.entity.mob.GiantEntity",
+  "entity_class": "net.minecraft.world.entity.monster.Giant",
   "mob_type": "hostile",
   "tree_name": "Undead Colossus",
 

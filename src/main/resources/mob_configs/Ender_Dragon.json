@@ -1,6 +1,6 @@
 {
   "mob_name": "Ender_Dragon",
-  "entity_class": "net.minecraft.entity.boss.enderdragon.EnderDragonEntity",
+  "entity_class": "net.minecraft.world.entity.boss.enderdragon.EnderDragon",
   "mob_type": "hostile",
   "tree_name": "End Sovereign",
 

@@ -1,6 +1,6 @@
 {
   "mob_name": "Bogged",
-  "entity_class": "net.minecraft.entity.mob.BoggedEntity",
+  "entity_class": "net.minecraft.world.entity.monster.skeleton.Bogged",
   "mob_type": "hostile",
   "tree_name": "Swamp Stalker",
 

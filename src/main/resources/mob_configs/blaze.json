@@ -1,6 +1,6 @@
 {
   "mob_name": "Blaze",
-  "entity_class": "net.minecraft.entity.mob.BlazeEntity",
+  "entity_class": "net.minecraft.world.entity.monster.Blaze",
   "mob_type": "hostile",
   "tree_name": "Infernal Fury",
 

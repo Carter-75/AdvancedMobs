@@ -1,6 +1,6 @@
 {
   "mob_name": "Illusioner",
-  "entity_class": "net.minecraft.entity.mob.IllusionerEntity",
+  "entity_class": "net.minecraft.world.entity.monster.illager.Illusioner",
   "mob_type": "hostile",
   "tree_name": "Mirage Master",
 

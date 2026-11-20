@@ -1,6 +1,6 @@
 {
   "mob_name": "Ghast",
-  "entity_class": "net.minecraft.entity.mob.GhastEntity",
+  "entity_class": "net.minecraft.world.entity.monster.Ghast",
   "mob_type": "hostile",
   "tree_name": "Ghastly Barrage",
 

@@ -1,6 +1,6 @@
 {
   "mob_name": "Fox",
-  "entity_class": "net.minecraft.entity.passive.FoxEntity",
+  "entity_class": "net.minecraft.world.entity.animal.fox.Fox",
   "mob_type": "passive",
   "tree_name": "Silent Prowler",
 

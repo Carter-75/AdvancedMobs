@@ -1,6 +1,6 @@
 {
   "mob_name": "Cave_Spider",
-  "entity_class": "net.minecraft.entity.mob.CaveSpiderEntity",
+  "entity_class": "net.minecraft.world.entity.monster.spider.CaveSpider",
   "mob_type": "hostile",
   "tree_name": "Venomous Hunter",
 

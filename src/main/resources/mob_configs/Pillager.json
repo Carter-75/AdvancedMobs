@@ -1,6 +1,6 @@
 {
   "mob_name": "Pillager",
-  "entity_class": "net.minecraft.entity.mob.PillagerEntity",
+  "entity_class": "net.minecraft.world.entity.monster.illager.Pillager",
   "mob_type": "hostile",
   "tree_name": "Raider Marksman",
 

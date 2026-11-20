@@ -1,6 +1,6 @@
 {
   "mob_name": "Camel",
-  "entity_class": "net.minecraft.entity.passive.CamelEntity",
+  "entity_class": "net.minecraft.world.entity.animal.camel.Camel",
   "mob_type": "passive",
   "tree_name": "Desert Wanderer",
 

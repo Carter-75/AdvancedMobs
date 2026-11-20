@@ -1,6 +1,6 @@
 {
   "mob_name": "Wither_Skeleton",
-  "entity_class": "net.minecraft.entity.mob.WitherSkeletonEntity",
+  "entity_class": "net.minecraft.world.entity.monster.skeleton.WitherSkeleton",
   "mob_type": "hostile",
   "tree_name": "Charred Swordsman",
 

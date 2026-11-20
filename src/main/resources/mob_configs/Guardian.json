@@ -1,6 +1,6 @@
 {
   "mob_name": "Guardian",
-  "entity_class": "net.minecraft.entity.mob.GuardianEntity",
+  "entity_class": "net.minecraft.world.entity.monster.Guardian",
   "mob_type": "hostile",
   "tree_name": "Temple Sentinel",
 

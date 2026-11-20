@@ -1,6 +1,6 @@
 {
   "mob_name": "Piglin_Brute",
-  "entity_class": "net.minecraft.entity.mob.PiglinBruteEntity",
+  "entity_class": "net.minecraft.world.entity.monster.piglin.PiglinBrute",
   "mob_type": "hostile",
   "tree_name": "Nether Warlord",
 

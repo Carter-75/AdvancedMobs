@@ -1,6 +1,6 @@
 {
   "mob_name": "Chicken",
-  "entity_class": "net.minecraft.entity.passive.ChickenEntity",
+  "entity_class": "net.minecraft.world.entity.animal.chicken.Chicken",
   "mob_type": "passive",
   "tree_name": "Feathered Survivor",
 

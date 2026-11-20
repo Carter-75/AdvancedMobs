@@ -1,6 +1,6 @@
 {
   "mob_name": "Slime",
-  "entity_class": "net.minecraft.entity.mob.SlimeEntity",
+  "entity_class": "net.minecraft.world.entity.monster.cubemob.Slime",
   "mob_type": "hostile",
   "tree_name": "Gelatinous Bouncer",
 

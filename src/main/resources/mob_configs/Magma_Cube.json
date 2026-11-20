@@ -1,6 +1,6 @@
 {
   "mob_name": "Magma_Cube",
-  "entity_class": "net.minecraft.entity.monster.MagmaCubeEntity",
+  "entity_class": "net.minecraft.world.entity.monster.cubemob.MagmaCube",
   "mob_type": "hostile",
   "tree_name": "Molten Bouncer",
 

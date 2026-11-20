@@ -1,6 +1,6 @@
 {
   "mob_name": "Polar_Bear",
-  "entity_class": "net.minecraft.entity.mob.PolarBearEntity",
+  "entity_class": "net.minecraft.world.entity.animal.polarbear.PolarBear",
   "mob_type": "neutral",
   "tree_name": "Arctic Fury",
 

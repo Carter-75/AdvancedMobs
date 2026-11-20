@@ -1,6 +1,6 @@
 {
   "mob_name": "Wither",
-  "entity_class": "net.minecraft.entity.boss.WitherEntity",
+  "entity_class": "net.minecraft.world.entity.boss.wither.WitherBoss",
   "mob_type": "hostile",
   "tree_name": "Skull Storm",
 

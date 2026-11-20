@@ -1,6 +1,6 @@
 {
   "mob_name": "Parrot",
-  "entity_class": "net.minecraft.entity.passive.ParrotEntity",
+  "entity_class": "net.minecraft.world.entity.animal.parrot.Parrot",
   "mob_type": "passive",
   "tree_name": "Colorful Mimic",
 

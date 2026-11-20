@@ -1,6 +1,6 @@
 {
   "mob_name": "Elder_Guardian",
-  "entity_class": "net.minecraft.entity.mob.ElderGuardianEntity",
+  "entity_class": "net.minecraft.world.entity.monster.ElderGuardian",
   "mob_type": "hostile",
   "tree_name": "Ocean Monument Lord",
 

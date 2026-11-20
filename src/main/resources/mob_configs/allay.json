@@ -1,6 +1,6 @@
 {
   "mob_name": "Allay",
-  "entity_class": "net.minecraft.entity.passive.AllayEntity",
+  "entity_class": "net.minecraft.world.entity.animal.allay.Allay",
   "mob_type": "passive",
   "tree_name": "Ethereal Guardian",
 

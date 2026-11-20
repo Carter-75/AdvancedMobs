@@ -1,6 +1,6 @@
 {
   "mob_name": "Ravager",
-  "entity_class": "net.minecraft.entity.mob.RavagerEntity",
+  "entity_class": "net.minecraft.world.entity.monster.Ravager",
   "mob_type": "hostile",
   "tree_name": "Raid Destroyer",
 

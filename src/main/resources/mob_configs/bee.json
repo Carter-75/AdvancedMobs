@@ -1,6 +1,6 @@
 {
   "mob_name": "Bee",
-  "entity_class": "net.minecraft.entity.passive.BeeEntity",
+  "entity_class": "net.minecraft.world.entity.animal.bee.Bee",
   "mob_type": "neutral",
   "tree_name": "Hive Protector",
 

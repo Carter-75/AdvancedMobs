@@ -1,6 +1,6 @@
 {
   "mob_name": "Glow_Squid",
-  "entity_class": "net.minecraft.entity.passive.GlowSquidEntity",
+  "entity_class": "net.minecraft.world.entity.animal.squid.GlowSquid",
   "mob_type": "passive",
   "tree_name": "Luminescent Drifter",
 

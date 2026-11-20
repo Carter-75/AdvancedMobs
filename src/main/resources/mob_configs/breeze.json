@@ -1,6 +1,6 @@
 {
   "mob_name": "Breeze",
-  "entity_class": "net.minecraft.entity.mob.BreezeEntity",
+  "entity_class": "net.minecraft.world.entity.monster.breeze.Breeze",
   "mob_type": "hostile",
   "tree_name": "Wind Elemental",
 

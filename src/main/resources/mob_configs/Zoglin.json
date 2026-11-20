@@ -1,6 +1,6 @@
 {
   "mob_name": "Zoglin",
-  "entity_class": "net.minecraft.entity.mob.ZoglinEntity",
+  "entity_class": "net.minecraft.world.entity.monster.Zoglin",
   "mob_type": "hostile",
   "tree_name": "Corrupted Beast",
 

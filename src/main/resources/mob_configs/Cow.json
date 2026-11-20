@@ -1,6 +1,6 @@
 {
   "mob_name": "Cow",
-  "entity_class": "net.minecraft.entity.passive.CowEntity",
+  "entity_class": "net.minecraft.world.entity.animal.cow.Cow",
   "mob_type": "passive",
   "tree_name": "Grazing Giant",
 

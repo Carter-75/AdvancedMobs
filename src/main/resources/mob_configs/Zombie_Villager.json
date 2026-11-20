@@ -1,6 +1,6 @@
 {
   "mob_name": "Zombie_Villager",
-  "entity_class": "net.minecraft.entity.mob.ZombieVillagerEntity",
+  "entity_class": "net.minecraft.world.entity.monster.zombie.ZombieVillager",
   "mob_type": "hostile",
   "tree_name": "Infected Trader",
 

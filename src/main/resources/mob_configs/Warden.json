@@ -1,6 +1,6 @@
 {
   "mob_name": "Warden",
-  "entity_class": "net.minecraft.entity.mob.WardenEntity",
+  "entity_class": "net.minecraft.world.entity.monster.warden.Warden",
   "mob_type": "hostile",
   "tree_name": "Deep Dark Terror",
 

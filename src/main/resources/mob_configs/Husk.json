@@ -1,6 +1,6 @@
 {
   "mob_name": "Husk",
-  "entity_class": "net.minecraft.entity.mob.HuskEntity",
+  "entity_class": "net.minecraft.world.entity.monster.zombie.Husk",
   "mob_type": "hostile",
   "tree_name": "Desert Scourge",
 

@@ -1,6 +1,6 @@
 {
   "mob_name": "Vindicator",
-  "entity_class": "net.minecraft.entity.mob.VindicatorEntity",
+  "entity_class": "net.minecraft.world.entity.monster.illager.Vindicator",
   "mob_type": "hostile",
   "tree_name": "Axe Berserker",
 

@@ -1,6 +1,6 @@
 {
   "mob_name": "Stray",
-  "entity_class": "net.minecraft.entity.mob.StrayEntity",
+  "entity_class": "net.minecraft.world.entity.monster.skeleton.Stray",
   "mob_type": "hostile",
   "tree_name": "Frozen Archer",
 

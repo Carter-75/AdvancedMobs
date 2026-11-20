@@ -1,6 +1,6 @@
 {
   "mob_name": "Piglin",
-  "entity_class": "net.minecraft.entity.mob.PiglinEntity",
+  "entity_class": "net.minecraft.world.entity.monster.piglin.Piglin",
   "mob_type": "neutral",
   "tree_name": "Nether Trader",
 

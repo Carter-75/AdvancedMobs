@@ -1,6 +1,6 @@
 {
   "mob_name": "Iron_Golem",
-  "entity_class": "net.minecraft.entity.passive.IronGolemEntity",
+  "entity_class": "net.minecraft.world.entity.animal.golem.IronGolem",
   "mob_type": "neutral",
   "tree_name": "Village Protector",
 

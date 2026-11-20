@@ -1,6 +1,6 @@
 {
   "mob_name": "Drowned",
-  "entity_class": "net.minecraft.entity.mob.DrownedEntity",
+  "entity_class": "net.minecraft.world.entity.monster.zombie.Drowned",
   "mob_type": "hostile",
   "tree_name": "Abyssal Hunter",
 

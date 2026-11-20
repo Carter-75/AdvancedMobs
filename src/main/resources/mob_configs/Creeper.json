@@ -1,6 +1,6 @@
 {
   "mob_name": "Creeper",
-  "entity_class": "net.minecraft.entity.mob.CreeperEntity",
+  "entity_class": "net.minecraft.world.entity.monster.Creeper",
   "mob_type": "hostile",
   "tree_name": "Explosive Terror",
 

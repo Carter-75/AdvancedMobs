@@ -1,6 +1,6 @@
 {
   "mob_name": "Phantom",
-  "entity_class": "net.minecraft.entity.mob.PhantomEntity",
+  "entity_class": "net.minecraft.world.entity.monster.Phantom",
   "mob_type": "hostile",
   "tree_name": "Night Terror",
 

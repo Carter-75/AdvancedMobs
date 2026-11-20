@@ -1,6 +1,6 @@
 {
   "mob_name": "Hoglin",
-  "entity_class": "net.minecraft.entity.mob.HoglinEntity",
+  "entity_class": "net.minecraft.world.entity.monster.hoglin.Hoglin",
   "mob_type": "hostile",
   "tree_name": "Crimson Charger",
 

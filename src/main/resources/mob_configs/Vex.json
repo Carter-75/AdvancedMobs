@@ -1,6 +1,6 @@
 {
   "mob_name": "Vex",
-  "entity_class": "net.minecraft.entity.mob.VexEntity",
+  "entity_class": "net.minecraft.world.entity.monster.Vex",
   "mob_type": "hostile",
   "tree_name": "Spectral Duelist",
 

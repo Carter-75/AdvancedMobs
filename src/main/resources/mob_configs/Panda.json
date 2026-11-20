@@ -1,6 +1,6 @@
 {
   "mob_name": "Panda",
-  "entity_class": "net.minecraft.entity.passive.PandaEntity",
+  "entity_class": "net.minecraft.world.entity.animal.panda.Panda",
   "mob_type": "passive",
   "tree_name": "Bamboo Guardian",
 

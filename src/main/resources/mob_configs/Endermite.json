@@ -1,6 +1,6 @@
 {
   "mob_name": "Endermite",
-  "entity_class": "net.minecraft.entity.mob.EndermiteEntity",
+  "entity_class": "net.minecraft.world.entity.monster.Endermite",
   "mob_type": "hostile",
   "tree_name": "Void Pest",
 

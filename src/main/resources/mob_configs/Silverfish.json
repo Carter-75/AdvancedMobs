@@ -1,6 +1,6 @@
 {
   "mob_name": "Silverfish",
-  "entity_class": "net.minecraft.entity.mob.SilverfishEntity",
+  "entity_class": "net.minecraft.world.entity.monster.Silverfish",
   "mob_type": "hostile",
   "tree_name": "Stone Burrower",
 

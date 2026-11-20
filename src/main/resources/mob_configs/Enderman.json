@@ -1,6 +1,6 @@
 {
   "mob_name": "Enderman",
-  "entity_class": "net.minecraft.entity.mob.EndermanEntity",
+  "entity_class": "net.minecraft.world.entity.monster.EnderMan",
   "mob_type": "hostile",
   "tree_name": "Void Stalker",
 

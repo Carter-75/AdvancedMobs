@@ -1,6 +1,6 @@
 {
   "mob_name": "Wolf",
-  "entity_class": "net.minecraft.entity.passive.WolfEntity",
+  "entity_class": "net.minecraft.world.entity.animal.wolf.Wolf",
   "mob_type": "neutral",
   "tree_name": "Pack Hunter",
 

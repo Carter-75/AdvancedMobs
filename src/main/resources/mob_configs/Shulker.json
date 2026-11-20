@@ -1,6 +1,6 @@
 {
   "mob_name": "Shulker",
-  "entity_class": "net.minecraft.entity.mob.ShulkerEntity",
+  "entity_class": "net.minecraft.world.entity.monster.Shulker",
   "mob_type": "hostile",
   "tree_name": "Levitation Artillery",
 

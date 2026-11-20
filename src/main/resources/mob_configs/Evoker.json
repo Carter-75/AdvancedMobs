@@ -1,6 +1,6 @@
 {
   "mob_name": "Evoker",
-  "entity_class": "net.minecraft.entity.mob.EvokerEntity",
+  "entity_class": "net.minecraft.world.entity.monster.illager.Evoker",
   "mob_type": "hostile",
   "tree_name": "Spellbinder",
 

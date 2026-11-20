@@ -1,6 +1,6 @@
 {
   "mob_name": "Villager",
-  "entity_class": "net.minecraft.entity.passive.VillagerEntity",
+  "entity_class": "net.minecraft.world.entity.npc.villager.Villager",
   "mob_type": "passive",
   "tree_name": "Trade Master",
 

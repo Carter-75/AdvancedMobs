@@ -1,6 +1,6 @@
 {
   "mob_name": "Spider",
-  "entity_class": "net.minecraft.entity.mob.SpiderEntity",
+  "entity_class": "net.minecraft.world.entity.monster.spider.Spider",
   "mob_type": "hostile",
   "tree_name": "Web Weaver",
 

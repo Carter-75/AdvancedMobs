@@ -1,6 +1,6 @@
 {
   "mob_name": "Snow_Golem",
-  "entity_class": "net.minecraft.entity.passive.SnowGolemEntity",
+  "entity_class": "net.minecraft.world.entity.animal.golem.SnowGolem",
   "mob_type": "neutral",
   "tree_name": "Frost Sentry",
 

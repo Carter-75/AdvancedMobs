@@ -1,6 +1,6 @@
 {
   "mob_name": "Donkey",
-  "entity_class": "net.minecraft.entity.passive.DonkeyEntity",
+  "entity_class": "net.minecraft.world.entity.animal.equine.Donkey",
   "mob_type": "passive",
   "tree_name": "Pack Mule",
 

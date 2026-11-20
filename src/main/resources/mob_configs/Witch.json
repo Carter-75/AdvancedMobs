@@ -1,6 +1,6 @@
 {
   "mob_name": "Witch",
-  "entity_class": "net.minecraft.entity.mob.WitchEntity",
+  "entity_class": "net.minecraft.world.entity.monster.Witch",
   "mob_type": "hostile",
   "tree_name": "Potion Brewer",
 
