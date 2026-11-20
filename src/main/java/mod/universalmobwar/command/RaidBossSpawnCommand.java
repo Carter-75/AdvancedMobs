@@ -45,6 +45,13 @@ public class RaidBossSpawnCommand {
     }
     
     /**
+     * Arms the force-spawn flag for the next raid.
+     */
+    public static void forceNextRaidBoss() {
+        forceNextRaidBoss = true;
+    }
+
+    /**
      * Checks if the next raid should force-spawn the boss.
      */
     public static boolean shouldForceSpawn() {

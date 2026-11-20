@@ -12,7 +12,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Global compatibility fix for registry-entry serialization.
@@ -31,6 +33,12 @@ import java.util.Optional;
  */
 @Mixin(IndexedIterable.class)
 public interface IndexedIterableRawIdFixMixin {
+
+    // getRawIdOrThrow sits on the packet encoding path, so the reflective
+    // method lookup in tryGetRawId below ran for every registry entry being
+    // encoded. The resolved method only depends on the iterable's class, so
+    // it is resolved once per class and then cached here.
+    Map<Class<?>, Method> RAW_ID_METHOD_CACHE = new ConcurrentHashMap<>();
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     @Inject(method = "getRawIdOrThrow(Ljava/lang/Object;)I", at = @At("HEAD"), cancellable = true)
@@ -76,9 +84,24 @@ public interface IndexedIterableRawIdFixMixin {
         if (self == null || value == null) {
             return null;
         }
+
+        // Fast path: reuse the method resolved for this class on an earlier call.
+        Method cached = RAW_ID_METHOD_CACHE.get(self.getClass());
+        if (cached != null) {
+            try {
+                Object result = cached.invoke(self, value);
+                if (result instanceof Integer i) {
+                    return i;
+                }
+            } catch (Exception ignored) {
+                // Fall through to the full resolution below.
+            }
+        }
+
         try {
             // IndexedIterable has a getRawId(T) method; use reflection to avoid signature churn.
             Method method = self.getClass().getMethod("getRawId", Object.class);
+            RAW_ID_METHOD_CACHE.put(self.getClass(), method);
             Object result = method.invoke(self, value);
             if (result instanceof Integer i) {
                 return i;
@@ -99,6 +122,7 @@ public interface IndexedIterableRawIdFixMixin {
                 if (m.getParameterCount() != 1 || m.getReturnType() != int.class) {
                     continue;
                 }
+                RAW_ID_METHOD_CACHE.put(self.getClass(), m);
                 Object result = m.invoke(self, value);
                 return (Integer) result;
             }

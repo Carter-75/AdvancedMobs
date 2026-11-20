@@ -372,8 +372,10 @@ public class MobWarCommand {
     private static int executeForceRaidBoss(CommandContext<ServerCommandSource> context) {
         ServerCommandSource source = context.getSource();
         
-        // This is a simple flag setter - actual logic is in RaidBossSpawnCommand
-        mod.universalmobwar.command.RaidBossSpawnCommand.shouldForceSpawn();
+        // Arm the flag in RaidBossSpawnCommand (the raid mixin consumes it).
+        // This previously called shouldForceSpawn(), which READS and clears
+        // the flag, so the command reported success but never forced a boss.
+        mod.universalmobwar.command.RaidBossSpawnCommand.forceNextRaidBoss();
         
         source.sendFeedback(() -> 
             Text.literal("[SUCCESS] Next raid will GUARANTEE a Mob Warlord spawn on the final wave!")
