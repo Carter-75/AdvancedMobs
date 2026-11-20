@@ -1,8 +1,8 @@
 # Advanced Mobs v1.0
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue) ![Minecraft](https://img.shields.io/badge/minecraft-1.21.x-green) ![Loader](https://img.shields.io/badge/loader-Fabric-yellow)
+![Version](https://img.shields.io/badge/version-1.0.0-blue) ![Minecraft](https://img.shields.io/badge/minecraft-26.2+-green) ![Loader](https://img.shields.io/badge/loader-Fabric-yellow)
 
-**Transform Minecraft 1.21.x into an epic battlefield where mobs evolve, fight each other, form alliances, and challenge legendary bosses!**
+**Transform Minecraft 26.2+ into an epic battlefield where mobs evolve, fight each other, form alliances, and challenge legendary bosses!**
 
 ---
 
@@ -10,7 +10,7 @@
 
 Advanced Mobs completely overhauls mob behavior, creating a dynamic battlefield where mobs evolve based on world age and combat, fight each other in massive wars, form temporary alliances, and can spawn as legendary bosses.
 
-> ✅ **Targeted compatibility:** Built for Minecraft 1.21.x (tested on 1.21.1). Earlier versions and future 1.22+ updates need a dedicated port.
+> ✅ **Targeted compatibility:** Built for Minecraft 26.2 and up (26.2 and 26.3). The older 1.21.1 build remains in the project history.
 
 **Key Features:**
 - 🔥 **Progressive Evolution**: Mobs earn points and spend them on upgrades using an 80%/20% buy/save system
@@ -18,7 +18,7 @@ Advanced Mobs completely overhauls mob behavior, creating a dynamic battlefield 
 - 🤝 **Dynamic Alliances**: Mobs team up against common enemies (same species = strong, different = weak)
 - 👹 **Mob Warlord Boss**: Legendary raid boss with minion armies
 - 📊 **80 Individual Mob Configs**: Each mob has its own JSON with complete upgrade paths
-- 🌍 **Config-Driven Compatibility**: Ships with configs for every vanilla 1.21.1 mob; everything else auto-classifies for baseline potion scaling until you drop in a JSON.
+- 🌍 **Config-Driven Compatibility**: Ships with configs for every vanilla 26.2 mob; everything else auto-classifies for baseline potion scaling until you drop in a JSON.
 
 ---
 
@@ -411,7 +411,7 @@ mixin/mob/
 
 ## 📦 Installation
 
-1. Install [Fabric Loader](https://fabricmc.net/) for Minecraft 1.21.x (tested on 1.21.1)
+1. Install [Fabric Loader](https://fabricmc.net/) for Minecraft 26.2 or 26.3
 2. Install [Fabric API](https://modrinth.com/mod/fabric-api) v0.102.0+
 3. Download `advanced-mobs-1.0.0.jar`
 4. Place in `mods` folder
@@ -449,10 +449,10 @@ python universal_build.py --deploy
 
 **Build Script Features**:
 - Validates mob JSON configurations (supports partial completion)
-- Checks Java code for 1.21.1 API compatibility  
+- Checks Java code for 26.2 API compatibility  
 - Verifies core mixins and mob mixins are present
 - Runs full Gradle build
-- Shows progress: `X/80 mobs implemented`
+- Shows progress: `X/81 mobs implemented`
 - Single log file: `universal_build.log`
 
 ---
@@ -517,7 +517,7 @@ Result: EVERY mob attacks EVERY other mob at massive range!
 ## 🐛 Bug Reports
 
 Report bugs on GitHub with:
-- Minecraft 1.21.1
+- Minecraft version (26.2 or 26.3)
 - Fabric Loader version
 - Other mods installed
 - Steps to reproduce
@@ -536,7 +536,7 @@ Advanced Mobs transforms Minecraft into a dynamic battlefield:
 - ✅ **6 mob-specific skill trees** with unique abilities
 - ✅ **Dynamic alliance system** (strong/weak, 5s-20s duration)
 - ✅ **Legendary Mob Warlord boss** with minion armies
-- ✅ **Config coverage for vanilla 1.21.x mobs**; others auto-scale with fallback potions until you author a JSON
+- ✅ **Config coverage for vanilla 26.2 mobs**; others auto-scale with fallback potions until you author a JSON
 - ✅ **Performance optimized** with multithreading and batching
 - ✅ **Fully data-driven** - all costs/skills in JSON files
 
