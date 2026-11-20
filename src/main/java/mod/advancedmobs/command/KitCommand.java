@@ -31,27 +31,27 @@ public final class KitCommand {
 
     private KitCommand() {}
 
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext registryAccess, Commands.RegistrationEnvironment environment) {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext registryAccess, Commands.CommandSelection environment) {
         dispatcher.register(Commands.literal("kit")
-            .executes(context -> giveKit(context, context.getDirectEntity().getPlayerOrThrow()))
+            .executes(context -> giveKit(context, context.getSource().getPlayerOrException()))
             .then(Commands.argument("player", EntityArgument.player())
-                .requires(source -> source.hasPermissionLevel(2))
+                .requires(source -> source.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER))
                 .executes(context -> giveKit(context, EntityArgument.getPlayer(context, "player"))))
         );
     }
 
     private static int giveKit(CommandContext<CommandSourceStack> context, ServerPlayer target) throws CommandSyntaxException {
-        Registry<Enchantment> enchantRegistry = context.getDirectEntity().getServer().registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
+        Registry<Enchantment> enchantRegistry = context.getSource().getServer().registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
         List<ItemStack> kitItems = buildKit(enchantRegistry);
-        kitItems.forEach(target::giveItemStack);
+        kitItems.forEach(target::addItem);
 
-        target.sendMessage(Component.literal("You received the Universal Arsenal kit!")
-            .withStyle(style -> style.withColor(ChatFormatting.GOLD).withBold(true)), false);
+        target.sendSystemMessage(Component.literal("You received the Universal Arsenal kit!")
+            .withStyle(style -> style.withColor(ChatFormatting.GOLD).withBold(true)));
 
-        CommandSourceStack source = context.getDirectEntity();
+        CommandSourceStack source = context.getSource();
         if (source.getEntity() == null || source.getEntity() != target) {
             String targetName = target.getName().getString();
-            source.sendFeedback(() -> Component.literal("Gave the Universal kit to ")
+            source.sendSuccess(() -> Component.literal("Gave the Universal kit to ")
                 .withStyle(style -> style.withColor(ChatFormatting.GREEN))
                 .append(Component.literal(targetName).withStyle(style -> style.withColor(ChatFormatting.YELLOW).withBold(true))), true);
         }
@@ -176,6 +176,6 @@ public final class KitCommand {
         Holder<Enchantment> entry = enchantRegistry
             .get(enchantmentKey)
             .orElseThrow(() -> new IllegalStateException("Missing enchantment: " + enchantmentKey.identifier()));
-        stack.addEnchantment(entry, level);
+        stack.enchant(entry, level);
     }
 }

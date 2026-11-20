@@ -14,10 +14,10 @@ public class RaidBossSpawnCommand {
     
     private static boolean forceNextRaidBoss = false;
     
-    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext registryAccess, Commands.RegistrationEnvironment environment) {
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext registryAccess, Commands.CommandSelection environment) {
         dispatcher.register(Commands.literal("advancedmobs")
             .then(Commands.literal("raid")
-                .requires(source -> source.hasPermissionLevel(2))
+                .requires(source -> source.permissions().hasPermission(net.minecraft.server.permissions.Permissions.COMMANDS_GAMEMASTER))
                 .then(Commands.literal("forceboss")
                     .executes(RaidBossSpawnCommand::executeForceBoss))
             )
@@ -25,17 +25,17 @@ public class RaidBossSpawnCommand {
     }
     
     private static int executeForceBoss(CommandContext<CommandSourceStack> context) {
-        CommandSourceStack source = context.getDirectEntity();
+        CommandSourceStack source = context.getSource();
         
         forceNextRaidBoss = true;
         
-        source.sendFeedback(() -> 
+        source.sendSuccess(() -> 
             Component.literal("[SUCCESS] Next raid will GUARANTEE a Mob Warlord spawn on the final wave!")
                 .withStyle(style -> style.withColor(ChatFormatting.GREEN).withBold(true)), 
             true
         );
         
-        source.sendFeedback(() ->
+        source.sendSuccess(() ->
             Component.literal("  Start a raid to summon the boss!")
                 .withStyle(style -> style.withColor(ChatFormatting.GRAY)),
             false
