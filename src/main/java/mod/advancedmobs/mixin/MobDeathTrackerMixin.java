@@ -3,10 +3,10 @@ package mod.advancedmobs.mixin;
 import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.data.MobWarData;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -25,8 +25,8 @@ public abstract class MobDeathTrackerMixin {
         AdvancedMobsMod.runSafely("MobDeathTrackerMixin#trackKill", () -> {
             LivingEntity victim = (LivingEntity)(Object)this;
 
-            if (victim.getWorld().isClient()) return;
-            if (!(victim instanceof MobEntity)) return;
+            if (victim.level().isClient()) return;
+            if (!(victim instanceof Mob)) return;
 
             // Check if any progression system is enabled
             boolean scalingEnabled = ModConfig.getInstance().isScalingActive();
@@ -35,12 +35,12 @@ public abstract class MobDeathTrackerMixin {
 
             // Kill tracking hook - individual mob mixins handle their own progression
             // This provides a central point for future kill-based features
-            if (!(damageSource.getAttacker() instanceof MobEntity killer)) {
+            if (!(damageSource.getAttacker() instanceof Mob killer)) {
                 return;
             }
 
             // Count kills for player targets and mob targets alike
-            boolean countsTowardKills = victim instanceof PlayerEntity || victim instanceof MobEntity;
+            boolean countsTowardKills = victim instanceof Player || victim instanceof Mob;
             if (!countsTowardKills || killer == victim) {
                 return;
             }

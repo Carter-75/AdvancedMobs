@@ -2,11 +2,11 @@ package mod.advancedmobs.mixin;
 
 import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.config.ModConfig;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.world.LocalDifficulty;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.util.RandomSource;
+import net.minecraft.world.DifficultyInstance;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -17,7 +17,7 @@ import java.util.EnumSet;
 /**
  * Prevent vanilla from assigning random equipment so mobs only earn gear via the scaling system.
  */
-@Mixin(MobEntity.class)
+@Mixin(Mob.class)
 public abstract class MobEntityInitEquipmentMixin {
 
     private static final EnumSet<EquipmentSlot> CLEARED_SLOTS = EnumSet.of(
@@ -30,18 +30,18 @@ public abstract class MobEntityInitEquipmentMixin {
     );
 
     @Inject(method = "initEquipment", at = @At("HEAD"), cancellable = true)
-    private void advancedmobs$disableVanillaEquipment(Random random, LocalDifficulty difficulty, CallbackInfo ci) {
+    private void advancedmobs$disableVanillaEquipment(Random random, DifficultyInstance difficulty, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("MobEntityInitEquipmentMixin#disableVanillaEquipment", () -> {
             if (!ModConfig.getInstance().modEnabled) {
                 return;
             }
 
-            MobEntity self = (MobEntity)(Object)this;
+            Mob self = (Mob)(Object)this;
             for (EquipmentSlot slot : EquipmentSlot.values()) {
                 if (!CLEARED_SLOTS.contains(slot)) {
                     continue;
                 }
-                self.equipStack(slot, ItemStack.EMPTY);
+                self.setItemSlot(slot, ItemStack.EMPTY);
                 self.setEquipmentDropChance(slot, 0.0f);
             }
 

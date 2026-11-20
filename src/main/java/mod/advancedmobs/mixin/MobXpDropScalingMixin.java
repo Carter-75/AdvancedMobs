@@ -4,12 +4,12 @@ import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.data.IMobWarDataHolder;
 import mod.advancedmobs.data.MobWarData;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -20,18 +20,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class MobXpDropScalingMixin {
 
     @Inject(method = "getXpToDrop", at = @At("RETURN"), cancellable = true)
-    private void advancedmobs$scaleXpDrop(ServerWorld world, @Nullable Entity attacker, CallbackInfoReturnable<Integer> cir) {
+    private void advancedmobs$scaleXpDrop(ServerLevel world, @Nullable Entity attacker, CallbackInfoReturnable<Integer> cir) {
         AdvancedMobsMod.runSafely("MobXpDropScalingMixin#scaleXpDrop", () -> {
             ModConfig config = ModConfig.getInstance();
             if (!config.isScalingActive() || !config.scaleMobXpDropsWithSpentPoints) {
                 return;
             }
 
-            if (!(attacker instanceof PlayerEntity)) {
+            if (!(attacker instanceof Player)) {
                 return;
             }
 
-            if (!((Object) this instanceof MobEntity mob)) {
+            if (!((Object) this instanceof Mob mob)) {
                 return;
             }
 
@@ -73,7 +73,7 @@ public abstract class MobXpDropScalingMixin {
             }
 
             // Safety: XP to drop should never be negative.
-            scaledXp = MathHelper.clamp(scaledXp, 0, Integer.MAX_VALUE);
+            scaledXp = Mth.clamp(scaledXp, 0, Integer.MAX_VALUE);
             if (scaledXp != baseXp) {
                 cir.setReturnValue(scaledXp);
             }

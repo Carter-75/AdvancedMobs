@@ -34,7 +34,7 @@ public final class TickScheduler {
         if (server == null || task == null) {
             return;
         }
-        long runAt = server.getTicks() + Math.max(0, delayTicks);
+        long runAt = server.getTickCount() + Math.max(0, delayTicks);
         synchronized (TASKS) {
             TASKS.add(new ScheduledTask(runAt, task));
         }
@@ -48,7 +48,7 @@ public final class TickScheduler {
             return;
         }
         List<Runnable> due = null;
-        long now = server.getTicks();
+        long now = server.getTickCount();
         synchronized (TASKS) {
             Iterator<ScheduledTask> it = TASKS.iterator();
             while (it.hasNext()) {

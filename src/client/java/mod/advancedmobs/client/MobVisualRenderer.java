@@ -4,13 +4,13 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import mod.advancedmobs.config.ModConfig;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.*;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.*;
+import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 
 /**
@@ -23,47 +23,47 @@ public class MobVisualRenderer implements WorldRenderEvents.Last {
 
     @Override
     public void onLast(WorldRenderContext context) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client.player == null || client.world == null) return;
 
         // Performance check: Skip if FPS is too low
         if (client.getCurrentFps() < CONFIG.minFpsForVisuals) return;
 
-        MatrixStack matrices = context.matrixStack();
+        PoseStack matrices = context.matrixStack();
         Camera camera = context.camera();
-        Vec3d cameraPos = camera.getPos();
+        Vec3 cameraPos = camera.position();
 
         // Get all entities in render distance
         Iterable<Entity> entities = client.world.getEntities();
 
         for (Entity entity : entities) {
-            if (!(entity instanceof MobEntity mob)) continue;
+            if (!(entity instanceof Mob mob)) continue;
 
             // Check distance for performance
-            double distance = entity.getPos().distanceTo(cameraPos);
+            double distance = entity.position().distanceTo(cameraPos);
             if (distance > 64.0) continue; // Only render within 64 blocks
 
             renderForMob(matrices, context, camera, mob, distance);
         }
     }
 
-    private void renderForMob(MatrixStack matrices, WorldRenderContext context, Camera camera, MobEntity mob, double distance) {
-        Vec3d mobPos = mob.getPos();
-        Vec3d cameraPos = camera.getPos();
+    private void renderForMob(PoseStack matrices, WorldRenderContext context, Camera camera, Mob mob, double distance) {
+        Vec3 mobPos = mob.position();
+        Vec3 cameraPos = camera.position();
 
         // Target lines
         if (CONFIG.showTargetLines) {
             LivingEntity target = mob.getTarget();
             if (target != null) {
-                drawTargetLine(matrices, context, camera, mobPos, target.getPos());
+                drawTargetLine(matrices, context, camera, mobPos, target.position());
             }
         }
 
     }
 
-    private void drawTargetLine(MatrixStack matrices, WorldRenderContext context, Camera camera, Vec3d start, Vec3d end) {
+    private void drawTargetLine(PoseStack matrices, WorldRenderContext context, Camera camera, Vec3 start, Vec3 end) {
         matrices.push();
-        Vec3d cameraPos = camera.getPos();
+        Vec3 cameraPos = camera.position();
 
         // Use LINES render layer (correct for 1.21.1)
         Tessellator tessellator = Tessellator.getInstance();

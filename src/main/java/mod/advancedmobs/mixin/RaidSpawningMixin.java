@@ -4,10 +4,10 @@ import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.command.RaidBossSpawnCommand;
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.entity.MobWarlordEntity;
-import net.minecraft.entity.SpawnReason;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.village.raid.Raid;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.raid.Raid;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -31,7 +31,7 @@ public abstract class RaidSpawningMixin {
     private int wavesSpawned;
     
     @Shadow
-    private ServerWorld world;
+    private ServerLevel world;
     
     @Shadow
     private BlockPos center;
@@ -69,38 +69,38 @@ public abstract class RaidSpawningMixin {
             
             // Create and spawn the Mob Warlord
             MobWarlordEntity warlord = new MobWarlordEntity(AdvancedMobsMod.MOB_WARLORD, this.world);
-            warlord.refreshPositionAndAngles(
+            warlord.snapTo(
                 spawnPos.getX() + 0.5, 
                 spawnPos.getY(), 
                 spawnPos.getZ() + 0.5, 
                 0.0f, 
                 0.0f
             );
-            warlord.initialize(this.world, this.world.getLocalDifficulty(spawnPos), SpawnReason.EVENT, null);
+            warlord.initialize(this.world, this.world.getCurrentDifficultyAt(spawnPos), EntitySpawnReason.EVENT, null);
             
             // Mark as raid boss - this changes targeting behavior
             warlord.setRaidBoss(true);
             warlord.setPersistent();
             
-            boolean spawned = this.world.spawnEntity(warlord);
+            boolean spawned = this.world.addFreshEntity(warlord);
             
             if (spawned) {
                 // Broadcast to all players
                 this.world.getPlayers().forEach(player -> {
                     player.sendMessage(
-                        net.minecraft.text.Text.literal("")
-                            .append(net.minecraft.text.Text.literal("═══════════════════════════════════").styled(style -> style.withColor(net.minecraft.util.Formatting.DARK_RED).withBold(true)))
-                            .append(net.minecraft.text.Text.literal("\n"))
-                            .append(net.minecraft.text.Text.literal("    💀 THE MOB WARLORD HAS JOINED THE RAID! 💀").styled(style -> style.withColor(net.minecraft.util.Formatting.RED).withBold(true)))
-                            .append(net.minecraft.text.Text.literal("\n"))
-                            .append(net.minecraft.text.Text.literal("═══════════════════════════════════").styled(style -> style.withColor(net.minecraft.util.Formatting.DARK_RED).withBold(true))),
+                        net.minecraft.network.chat.Component.literal("")
+                            .append(net.minecraft.network.chat.Component.literal("═══════════════════════════════════").withStyle(style -> style.withColor(net.minecraft.ChatFormatting.DARK_RED).withBold(true)))
+                            .append(net.minecraft.network.chat.Component.literal("\n"))
+                            .append(net.minecraft.network.chat.Component.literal("    💀 THE MOB WARLORD HAS JOINED THE RAID! 💀").withStyle(style -> style.withColor(net.minecraft.ChatFormatting.RED).withBold(true)))
+                            .append(net.minecraft.network.chat.Component.literal("\n"))
+                            .append(net.minecraft.network.chat.Component.literal("═══════════════════════════════════").withStyle(style -> style.withColor(net.minecraft.ChatFormatting.DARK_RED).withBold(true))),
                         false
                     );
                     
                     // Play dramatic sound (server-side)
-                    player.playSoundToPlayer(
-                        net.minecraft.sound.SoundEvents.ENTITY_WITHER_SPAWN,
-                        net.minecraft.sound.SoundCategory.HOSTILE,
+                    player.playNotifySound(
+                        net.minecraft.sounds.SoundEvents.ENTITY_WITHER_SPAWN,
+                        net.minecraft.sounds.SoundSource.HOSTILE,
                         1.0f,
                         0.5f
                     );
@@ -123,18 +123,18 @@ public abstract class RaidSpawningMixin {
             BlockPos testPos = center.add(offsetX, 0, offsetZ);
             
             // Find ground level
-            BlockPos groundPos = this.world.getTopPosition(net.minecraft.world.Heightmap.Type.WORLD_SURFACE, testPos);
+            BlockPos groundPos = this.world.getTopPosition(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, testPos);
             
             // Check if position is valid (solid ground, enough space above)
             if (this.world.getBlockState(groundPos.down()).isSolidBlock(this.world, groundPos.down())) {
-                if (this.world.isAir(groundPos) && this.world.isAir(groundPos.up()) && this.world.isAir(groundPos.up(2))) {
+                if (this.world.isEmptyBlock(groundPos) && this.world.isEmptyBlock(groundPos.up()) && this.world.isEmptyBlock(groundPos.up(2))) {
                     return groundPos;
                 }
             }
         }
         
         // Fallback to center if no valid position found
-        return this.world.getTopPosition(net.minecraft.world.Heightmap.Type.WORLD_SURFACE, center);
+        return this.world.getTopPosition(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE, center);
     }
 }
 

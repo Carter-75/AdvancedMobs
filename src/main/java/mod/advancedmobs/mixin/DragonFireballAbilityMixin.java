@@ -4,18 +4,18 @@ import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.data.IMobWarDataHolder;
 import mod.advancedmobs.data.MobWarData;
 import mod.advancedmobs.system.ScalingSystem;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.projectile.DragonFireballEntity;
-import net.minecraft.entity.projectile.ExplosiveProjectileEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
-import net.minecraft.entity.boss.dragon.EnderDragonEntity;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.projectile.hurtingprojectile.DragonFireball;
+import net.minecraft.world.entity.projectile.hurtingprojectile.AbstractHurtingProjectile;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -25,21 +25,21 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Augments Ender Dragon fireballs with void bombardment scaling effects.
  */
-@Mixin(DragonFireballEntity.class)
-public abstract class DragonFireballAbilityMixin extends ExplosiveProjectileEntity {
+@Mixin(DragonFireball.class)
+public abstract class DragonFireballAbilityMixin extends AbstractHurtingProjectile {
 
-    protected DragonFireballAbilityMixin(EntityType<? extends DragonFireballEntity> entityType, World world) {
+    protected DragonFireballAbilityMixin(EntityType<? extends DragonFireball> entityType, Level world) {
         super(entityType, world);
     }
 
-    @Inject(method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/util/math/Vec3d;)V", at = @At("TAIL"))
-    private void advancedmobs$configureBombardment(World world, LivingEntity owner, Vec3d direction, CallbackInfo ci) {
+    @Inject(method = "<init>(Lnet/minecraft/world/level/Level;Lnet/minecraft/world/entity/LivingEntity;Lnet/minecraft/world/phys/Vec3;)V", at = @At("TAIL"))
+    private void advancedmobs$configureBombardment(Level world, LivingEntity owner, Vec3 direction, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("DragonFireballAbilityMixin#configureBombardment", () -> {
-            if (!(world instanceof ServerWorld serverWorld)) {
+            if (!(world instanceof ServerLevel serverWorld)) {
                 return;
             }
 
-            if (!(owner instanceof EnderDragonEntity dragon)) {
+            if (!(owner instanceof EnderDragon dragon)) {
                 return;
             }
 
@@ -48,18 +48,18 @@ public abstract class DragonFireballAbilityMixin extends ExplosiveProjectileEnti
                 return;
             }
 
-            ScalingSystem.handleVoidBombardment(dragon, data, serverWorld, (DragonFireballEntity) (Object) this, serverWorld.getTime());
+            ScalingSystem.handleVoidBombardment(dragon, data, serverWorld, (DragonFireball) (Object) this, serverWorld.getGameTime());
         });
     }
 
     @Inject(method = "onCollision", at = @At("TAIL"))
     private void advancedmobs$applyBombardmentEffects(HitResult hitResult, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("DragonFireballAbilityMixin#applyBombardmentEffects", () -> {
-            if (!(this.getWorld() instanceof ServerWorld serverWorld)) {
+            if (!(this.level() instanceof ServerLevel serverWorld)) {
                 return;
             }
 
-            MobEntity owner = advancedmobs$getOwner();
+            Mob owner = advancedmobs$getOwner();
             if (owner == null) {
                 return;
             }
@@ -74,18 +74,18 @@ public abstract class DragonFireballAbilityMixin extends ExplosiveProjectileEnti
                 directHit = living;
             }
 
-            Vec3d impactPos = hitResult.getPos();
+            Vec3 impactPos = hitResult.position();
             ScalingSystem.applyVoidBombardmentEffects(owner, data, serverWorld, impactPos, directHit);
         });
     }
 
     @Unique
     private boolean advancedmobs$hasVoidBombardment(MobWarData data) {
-        return data != null && data.getSkillData().getInt("ability_void_bombardment") > 0;
+        return data != null && data.getSkillData().getIntOr("ability_void_bombardment", 0) > 0;
     }
 
     @Unique
-    private MobWarData advancedmobs$getData(MobEntity mob) {
+    private MobWarData advancedmobs$getData(Mob mob) {
         if (mob instanceof IMobWarDataHolder holder) {
             return holder.getMobWarData();
         }
@@ -93,8 +93,8 @@ public abstract class DragonFireballAbilityMixin extends ExplosiveProjectileEnti
     }
 
     @Unique
-    private MobEntity advancedmobs$getOwner() {
+    private Mob advancedmobs$getOwner() {
         Entity owner = this.getOwner();
-        return owner instanceof MobEntity mob ? mob : null;
+        return owner instanceof Mob mob ? mob : null;
     }
 }

@@ -4,14 +4,14 @@ import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.data.IMobWarDataHolder;
 import mod.advancedmobs.data.MobWarData;
 import mod.advancedmobs.system.ScalingSystem;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.mob.CreeperEntity;
-import net.minecraft.entity.mob.HostileEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.monster.Creeper;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -21,17 +21,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Hooks Creeper-specific scaling abilities for explosion power and lingering clouds.
  */
-@Mixin(CreeperEntity.class)
-public abstract class CreeperAbilityMixin extends HostileEntity {
+@Mixin(Creeper.class)
+public abstract class CreeperAbilityMixin extends Monster {
 
-    protected CreeperAbilityMixin(EntityType<? extends HostileEntity> entityType, World world) {
+    protected CreeperAbilityMixin(EntityType<? extends Monster> entityType, Level world) {
         super(entityType, world);
     }
 
     @Inject(method = "explode", at = @At("HEAD"))
     private void advancedmobs$boostExplosionRadius(CallbackInfo ci) {
         AdvancedMobsMod.runSafely("CreeperAbilityMixin#boostExplosionRadius", () -> {
-            if (!(this.getWorld() instanceof ServerWorld)) {
+            if (!(this.level() instanceof ServerLevel)) {
                 return;
             }
 
@@ -40,12 +40,12 @@ public abstract class CreeperAbilityMixin extends HostileEntity {
                 return;
             }
 
-            NbtCompound skillData = data.getSkillData();
-            if (skillData.getInt("ability_creeper_power") <= 0) {
+            CompoundTag skillData = data.getSkillData();
+            if (skillData.getIntOr("ability_creeper_power", 0) <= 0) {
                 return;
             }
 
-            float configuredRadius = ScalingSystem.getCreeperExplosionRadius((MobEntity) (Object) this, data);
+            float configuredRadius = ScalingSystem.getCreeperExplosionRadius((Mob) (Object) this, data);
             CreeperEntityAccessor accessor = (CreeperEntityAccessor) this;
             int upgradedRadius = Math.max(accessor.advancedmobs$getExplosionRadius(), Math.round(configuredRadius));
             accessor.advancedmobs$setExplosionRadius(upgradedRadius);
@@ -55,7 +55,7 @@ public abstract class CreeperAbilityMixin extends HostileEntity {
     @Inject(method = "explode", at = @At("TAIL"))
     private void advancedmobs$spawnPotionCloud(CallbackInfo ci) {
         AdvancedMobsMod.runSafely("CreeperAbilityMixin#spawnPotionCloud", () -> {
-            if (!(this.getWorld() instanceof ServerWorld serverWorld)) {
+            if (!(this.level() instanceof ServerLevel serverWorld)) {
                 return;
             }
 
@@ -64,12 +64,12 @@ public abstract class CreeperAbilityMixin extends HostileEntity {
                 return;
             }
 
-            if (data.getSkillData().getInt("ability_creeper_potion_cloud") <= 0) {
+            if (data.getSkillData().getIntOr("ability_creeper_potion_cloud", 0) <= 0) {
                 return;
             }
 
-            BlockPos pos = this.getBlockPos();
-            ScalingSystem.spawnCreeperPotionCloud((MobEntity) (Object) this, data, serverWorld, pos);
+            BlockPos pos = this.blockPosition();
+            ScalingSystem.spawnCreeperPotionCloud((Mob) (Object) this, data, serverWorld, pos);
         });
     }
 
@@ -78,6 +78,6 @@ public abstract class CreeperAbilityMixin extends HostileEntity {
         if (this instanceof IMobWarDataHolder holder) {
             return holder.getMobWarData();
         }
-        return MobWarData.get((MobEntity) (Object) this);
+        return MobWarData.get((Mob) (Object) this);
     }
 }

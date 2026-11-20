@@ -3,11 +3,11 @@ package mod.advancedmobs.system;
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.data.MobWarData;
 import mod.advancedmobs.util.OperationScheduler;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.border.WorldBorder;
-import net.minecraft.util.math.Box;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.border.WorldBorder;
+import net.minecraft.world.phys.AABB;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -46,7 +46,7 @@ public class AllianceSystem {
     /**
      * Check if alliance system is active (config + gamerule)
      */
-    public static boolean isEnabled(ServerWorld world) {
+    public static boolean isEnabled(ServerLevel world) {
         ModConfig config = ModConfig.getInstance();
         return config.isAllianceActive();
     }
@@ -91,11 +91,11 @@ public class AllianceSystem {
      * Different-species alliances are WEAK and temporary.
      * Alliances break immediately when target dies or changes.
      */
-    public static void updateAlliances(MobEntity mob, ServerWorld world) {
+    public static void updateAlliances(Mob mob, ServerLevel world) {
         // Check if alliance system is enabled
         if (!isEnabled(world)) return;
         
-        String mobId = mob.getUuid().toString();
+        String mobId = mob.getUUID().toString();
         
         // SMART SCHEDULING: Only process if not overlapping with other operations
         if (!OperationScheduler.canExecuteAlliance(mobId)) {
@@ -130,10 +130,10 @@ public class AllianceSystem {
     /**
      * Internal alliance update processing.
      */
-    private static void updateAlliancesInternal(MobEntity mob, ServerWorld world) {
+    private static void updateAlliancesInternal(Mob mob, ServerLevel world) {
         LivingEntity target = mob.getTarget();
         MobWarData mobData = MobWarData.get(mob);
-        UUID mobUuid = mob.getUuid();
+        UUID mobUuid = mob.getUUID();
         
         // If no target, clear all alliances
         if (target == null || !target.isAlive()) {
@@ -141,7 +141,7 @@ public class AllianceSystem {
             return;
         }
         
-        UUID targetUuid = target.getUuid();
+        UUID targetUuid = target.getUUID();
         
         // If target changed, break old alliances
         if (mobData.getCurrentTarget() != null && !mobData.getCurrentTarget().equals(targetUuid)) {
@@ -158,18 +158,18 @@ public class AllianceSystem {
         
         // Find other mobs attacking the same target
         double range = 16.0; // Alliance detection range
-        Box searchBox = mob.getBoundingBox().expand(range);
+        AABB searchBox = mob.getBoundingBox().inflate(range);
         
-        List<MobEntity> nearbyMobs = world.getEntitiesByClass(
-            MobEntity.class, 
+        List<Mob> nearbyMobs = world.getEntitiesOfClass(
+            Mob.class, 
             searchBox, 
             other -> other != mob && other.isAlive() && other.getTarget() == target
         );
         
         // Form alliances with mobs attacking the same target
         long currentTime = System.currentTimeMillis();
-        for (MobEntity ally : nearbyMobs) {
-            UUID allyUuid = ally.getUuid();
+        for (Mob ally : nearbyMobs) {
+            UUID allyUuid = ally.getUUID();
             
             // Check if same species
             boolean sameSpecies = mob.getType() == ally.getType();
@@ -207,9 +207,9 @@ public class AllianceSystem {
     /**
      * Clears all alliances for a mob (when target dies or changes).
      */
-    private static void clearAllAlliances(MobEntity mob) {
+    private static void clearAllAlliances(Mob mob) {
         MobWarData mobData = MobWarData.get(mob);
-        UUID mobUuid = mob.getUuid();
+        UUID mobUuid = mob.getUUID();
         
         // Break alliances with all allies
         for (UUID allyUuid : new HashSet<>(mobData.getAllies())) {
@@ -231,14 +231,14 @@ public class AllianceSystem {
      * - Weak (different species): 70% chance to ignore, very self-focused
      * - Strong (same species): 20% chance to ignore, more cooperative
      */
-    public static LivingEntity findFriendToHelp(MobEntity mob, double range) {
+    public static LivingEntity findFriendToHelp(Mob mob, double range) {
         MobWarData mobData = MobWarData.get(mob);
         Set<UUID> allies = mobData.getAllies();
-        UUID mobUuid = mob.getUuid();
+        UUID mobUuid = mob.getUUID();
         
         if (allies.isEmpty()) return null;
         
-        ServerWorld world = (ServerWorld) mob.getWorld();
+        ServerLevel world = (ServerLevel) mob.level();
         
         // Check for strong alliances first (same-species bonds)
         Map<UUID, Boolean> strongAllyMap = strongAlliances.get(mobUuid);
@@ -258,18 +258,18 @@ public class AllianceSystem {
         // Random chance to not help at all
         if (Math.random() < ignoreChance) return null;
         
-        Box searchBox = mob.getBoundingBox().expand(searchRange);
+        AABB searchBox = mob.getBoundingBox().inflate(searchRange);
         
         // Find allied mobs in range
-        List<MobEntity> nearbyAllies = world.getEntitiesByClass(
-            MobEntity.class,
+        List<Mob> nearbyAllies = world.getEntitiesOfClass(
+            Mob.class,
             searchBox,
-            other -> other != mob && allies.contains(other.getUuid()) && other.isAlive()
+            other -> other != mob && allies.contains(other.getUUID()) && other.isAlive()
         );
         
         // Prioritize helping strong allies (same species)
-        for (MobEntity ally : nearbyAllies) {
-            UUID allyUuid = ally.getUuid();
+        for (Mob ally : nearbyAllies) {
+            UUID allyUuid = ally.getUUID();
             boolean isStrongAlly = strongAllyMap != null && strongAllyMap.getOrDefault(allyUuid, false);
             
             LivingEntity allyTarget = ally.getTarget();
@@ -292,9 +292,9 @@ public class AllianceSystem {
     /**
      * Cleans up dead mob UUIDs from alliance maps (prevents memory leak).
      */
-    public static void cleanupDeadMobs(ServerWorld world) {
+    public static void cleanupDeadMobs(ServerLevel world) {
         Set<UUID> aliveMobs = new HashSet<>();
-        // Construct a Box covering the world border
+        // Construct a AABB covering the world border
         WorldBorder border = world.getWorldBorder();
         double centerX = border.getCenterX();
         double centerZ = border.getCenterZ();
@@ -302,12 +302,12 @@ public class AllianceSystem {
         // Use the world's real vertical bounds. The old box started at y=0,
         // so mobs below y=0 (down to -64 in the overworld) were treated as
         // dead and had their alliance entries purged on every cleanup pass.
-        Box borderBox = new Box(
+        AABB borderBox = new AABB(
             centerX - size, world.getBottomY(), centerZ - size,
             centerX + size, world.getTopY(), centerZ + size
         );
-        for (MobEntity mob : world.getEntitiesByClass(MobEntity.class, borderBox, m -> true)) {
-            aliveMobs.add(mob.getUuid());
+        for (Mob mob : world.getEntitiesOfClass(Mob.class, borderBox, m -> true)) {
+            aliveMobs.add(mob.getUUID());
         }
         
         // Clean allianceTimestamps
@@ -331,9 +331,9 @@ public class AllianceSystem {
      * Cleans up expired alliances.
      * Strong alliances (same species) last longer than weak alliances.
      */
-    public static void cleanupExpiredAlliances(MobEntity mob) {
+    public static void cleanupExpiredAlliances(Mob mob) {
         MobWarData mobData = MobWarData.get(mob);
-        UUID mobUuid = mob.getUuid();
+        UUID mobUuid = mob.getUUID();
         long currentTime = System.currentTimeMillis();
         
         Map<UUID, Long> mobAlliances = allianceTimestamps.get(mobUuid);
@@ -380,27 +380,27 @@ public class AllianceSystem {
     /**
      * Checks if two mobs are allies.
      */
-    public static boolean areAllies(MobEntity mob1, MobEntity mob2) {
+    public static boolean areAllies(Mob mob1, Mob mob2) {
         MobWarData data1 = MobWarData.get(mob1);
-        return data1.isAlly(mob2.getUuid());
+        return data1.isAlly(mob2.getUUID());
     }
     
     /**
      * Breaks alliance between two mobs.
      */
-    public static void breakAlliance(MobEntity mob1, MobEntity mob2) {
+    public static void breakAlliance(Mob mob1, Mob mob2) {
         MobWarData data1 = MobWarData.get(mob1);
         MobWarData data2 = MobWarData.get(mob2);
         
-        data1.removeAlly(mob2.getUuid());
-        data2.removeAlly(mob1.getUuid());
+        data1.removeAlly(mob2.getUUID());
+        data2.removeAlly(mob1.getUUID());
         
         MobWarData.save(mob1, data1);
         MobWarData.save(mob2, data2);
         
         // Clean up timestamps and strong alliance markers
-        UUID uuid1 = mob1.getUuid();
-        UUID uuid2 = mob2.getUuid();
+        UUID uuid1 = mob1.getUUID();
+        UUID uuid2 = mob2.getUUID();
         
         Map<UUID, Long> alliances1 = allianceTimestamps.get(uuid1);
         if (alliances1 != null) alliances1.remove(uuid2);

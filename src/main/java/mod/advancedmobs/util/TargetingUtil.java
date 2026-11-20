@@ -2,16 +2,16 @@ package mod.advancedmobs.util;
 
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.entity.MobWarlordEntity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.mob.Angerable;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.entity.passive.IronGolemEntity;
-import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.NeutralMob;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.entity.animal.golem.IronGolem;
+import net.minecraft.world.entity.npc.villager.Villager;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -93,11 +93,11 @@ public final class TargetingUtil {
 	 * OPTIMIZED: Finds nearest valid target using cached entity queries.
 	 * LOW OVERHEAD: Multiple early-exit paths and smart filtering.
 	 */
-	public static LivingEntity findNearestValidTarget(MobEntity self, double range, boolean ignoreSameSpecies, boolean targetPlayers) {
+	public static LivingEntity findNearestValidTarget(Mob self, double range, boolean ignoreSameSpecies, boolean targetPlayers) {
 		// Performance mode check: allow faster targeting when few mobs are requesting it
 		if (ModConfig.getInstance().performanceMode) {
 			boolean lowLoad = queriesThisTick < (MAX_QUERIES_PER_TICK / 4);
-			if (!lowLoad && self.age % 2 != 0 && self.getTarget() == null) {
+			if (!lowLoad && self.tickCount % 2 != 0 && self.getTarget() == null) {
 				return null;
 			}
 		}
@@ -132,13 +132,13 @@ public final class TargetingUtil {
 			// Cache miss - perform world query
 			queriesThisTick++;
 			
-			Box box = self.getBoundingBox().expand(range, range / 2, range); // Narrower vertical range
+			AABB box = self.getBoundingBox().inflate(range, range / 2, range); // Narrower vertical range
 			// CRITICAL FIX: Cache must store ALL living entities, not just valid ones for THIS mob
 			// Otherwise, a Zombie populating the cache would exclude other Zombies, 
 			// causing a Skeleton using the cache to ignore Zombies.
 			Predicate<LivingEntity> cacheFilter = target -> target != null && target.isAlive();
 			
-			cachedEntities = self.getWorld().getEntitiesByClass(LivingEntity.class, box, cacheFilter::test);
+			cachedEntities = self.level().getEntitiesOfClass(LivingEntity.class, box, cacheFilter::test);
 			
 			// Update cache
 			ENTITY_CACHE.put(cacheKey, new ChunkEntityCache(new ArrayList<>(cachedEntities), currentTime));
@@ -165,7 +165,7 @@ public final class TargetingUtil {
 			}
 
 			boolean currentNotWarlord = !(entity instanceof MobWarlordEntity);
-			double currentDistanceSq = entity.squaredDistanceTo(self);
+			double currentDistanceSq = entity.distanceToSqr(self);
 			if (best == null) {
 				best = entity;
 				bestNotWarlord = currentNotWarlord;
@@ -175,7 +175,7 @@ public final class TargetingUtil {
 
 			// Comparator equivalent to:
 			//   Comparator.comparing((LivingEntity e) -> !(e instanceof MobWarlordEntity))
-			//             .thenComparingDouble(e -> e.squaredDistanceTo(self))
+			//             .thenComparingDouble(e -> e.distanceToSqr(self))
 			int warlordCmp = Boolean.compare(currentNotWarlord, bestNotWarlord);
 			if (warlordCmp < 0) {
 				best = entity;
@@ -202,12 +202,12 @@ public final class TargetingUtil {
 	/**
 	 * Generates cache key based on chunk position.
 	 */
-	private static ChunkCacheKey getCacheKey(MobEntity self) {
-		if (!(self.getWorld() instanceof ServerWorld world)) {
+	private static ChunkCacheKey getCacheKey(Mob self) {
+		if (!(self.level() instanceof ServerLevel world)) {
 			return UNKNOWN_CACHE_KEY;
 		}
-		ChunkPos chunkPos = new ChunkPos(self.getBlockPos());
-		return new ChunkCacheKey(world.getRegistryKey().getValue(), chunkPos.x, chunkPos.z);
+		ChunkPos chunkPos = self.chunkPosition();
+		return new ChunkCacheKey(world.dimension().identifier(), chunkPos.x(), chunkPos.z());
 	}
 	
 	/**
@@ -236,7 +236,7 @@ public final class TargetingUtil {
 	 * OPTIMIZED: Checks ordered from cheapest to most expensive.
 	 * Early exits reduce unnecessary computation.
 	 */
-	public static boolean isValidTarget(MobEntity self, LivingEntity target, boolean ignoreSameSpecies, boolean targetPlayers) {
+	public static boolean isValidTarget(Mob self, LivingEntity target, boolean ignoreSameSpecies, boolean targetPlayers) {
 		// CHEAPEST: Null/self check (pointer comparison)
 		if (target == null || target == self) return false;
 		
@@ -244,17 +244,17 @@ public final class TargetingUtil {
 		if (!target.isAlive()) return false;
 		
 		// Neutral mobs stay out unless toggle is on
-		if (!ModConfig.getInstance().neutralMobsAlwaysAggressive && target instanceof Angerable) {
+		if (!ModConfig.getInstance().neutralMobsAlwaysAggressive && target instanceof NeutralMob) {
 			return false;
 		}
 
 		// Iron golems still protect villagers even when neutral aggression is forced on
-		if (self instanceof IronGolemEntity && target instanceof VillagerEntity) {
+		if (self instanceof IronGolem && target instanceof Villager) {
 			return false;
 		}
 
 		// CHEAP: Player targeting check BEFORE expensive checks
-		if (target instanceof ServerPlayerEntity player) {
+		if (target instanceof ServerPlayer player) {
 			// Early exit if player targeting is disabled (saves expensive checks below)
 			if (!targetPlayers) return false;
 			// Check spectator/creative (cheap boolean checks)
@@ -265,11 +265,11 @@ public final class TargetingUtil {
 		if (ignoreSameSpecies && target.getType() == self.getType()) return false;
 
 		// EXPENSIVE: Distance calculation (only if needed for visibility)
-		double distanceSq = self.squaredDistanceTo(target);
+		double distanceSq = self.distanceToSqr(target);
 		
 		// MOST EXPENSIVE: Visibility check with raycasting (only for far targets)
 		// Skip visibility check if very close (< 4 blocks) - reduces expensive raycasting
-		if (distanceSq > 16.0 && !self.canSee(target)) {
+		if (distanceSq > 16.0 && !self.getSensing().hasLineOfSight(target)) {
 			return false;
 		}
 

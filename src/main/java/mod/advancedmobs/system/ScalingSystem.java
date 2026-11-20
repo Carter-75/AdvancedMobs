@@ -8,38 +8,38 @@ import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.data.MobWarData;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.ItemEnchantmentsComponent;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.entity.EquipmentSlot;
-import net.minecraft.entity.SpawnReason;
-import net.minecraft.entity.SpawnGroup;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.attribute.EntityAttributeInstance;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.mob.Angerable;
-import net.minecraft.entity.mob.HostileEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.passive.PassiveEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
-import net.minecraft.registry.tag.EntityTypeTags;
-import net.minecraft.world.World;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.NeutralMob;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.core.Holder;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import net.minecraft.resources.Identifier;
+import net.minecraft.tags.EntityTypeTags;
+import net.minecraft.world.level.Level;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 
@@ -163,13 +163,13 @@ public class ScalingSystem {
     }
 
     private static final class ScheduledProjectileSpawn {
-        private final RegistryKey<World> worldKey;
+        private final ResourceKey<Level> worldKey;
         private final UUID shooterUuid;
         private final Identifier projectileTypeId;
         private final double baseSpeed;
         private final ItemStack thrownItemStack;
 
-        private ScheduledProjectileSpawn(RegistryKey<World> worldKey, UUID shooterUuid, Identifier projectileTypeId,
+        private ScheduledProjectileSpawn(ResourceKey<Level> worldKey, UUID shooterUuid, Identifier projectileTypeId,
                                          double baseSpeed, ItemStack thrownItemStack) {
             this.worldKey = worldKey;
             this.shooterUuid = shooterUuid;
@@ -187,7 +187,7 @@ public class ScalingSystem {
             return;
         }
 
-        long now = server.getTicks();
+        long now = server.getTickCount();
         List<ScheduledProjectileSpawn> due;
 
         synchronized (EXTRA_SHOT_LOCK) {
@@ -209,45 +209,45 @@ public class ScalingSystem {
 
         for (ScheduledProjectileSpawn spawn : due) {
             try {
-                ServerWorld world = server.getWorld(spawn.worldKey);
+                ServerLevel world = server.getWorld(spawn.worldKey);
                 if (world == null) {
                     continue;
                 }
 
-                net.minecraft.entity.Entity shooterEntity = world.getEntity(spawn.shooterUuid);
-                if (!(shooterEntity instanceof MobEntity shooter) || !shooter.isAlive()) {
+                net.minecraft.world.entity.Entity shooterEntity = world.getEntity(spawn.shooterUuid);
+                if (!(shooterEntity instanceof Mob shooter) || !shooter.isAlive()) {
                     continue;
                 }
 
-                net.minecraft.entity.LivingEntity target = shooter.getTarget();
-                net.minecraft.util.math.Vec3d origin = shooter.getEyePos();
-                net.minecraft.util.math.Vec3d direction;
+                net.minecraft.world.entity.LivingEntity target = shooter.getTarget();
+                net.minecraft.world.phys.Vec3 origin = shooter.getEyePosition();
+                net.minecraft.world.phys.Vec3 direction;
                 if (target != null && target.isAlive()) {
-                    net.minecraft.util.math.Vec3d targetPos = target.getEyePos();
-                    net.minecraft.util.math.Vec3d delta = targetPos.subtract(origin);
-                    direction = delta.lengthSquared() > 1.0E-6 ? delta.normalize() : shooter.getRotationVec(1.0F);
+                    net.minecraft.world.phys.Vec3 targetPos = target.getEyePosition();
+                    net.minecraft.world.phys.Vec3 delta = targetPos.subtract(origin);
+                    direction = delta.lengthSquared() > 1.0E-6 ? delta.normalize() : shooter.getViewVector(1.0F);
                 } else {
-                    direction = shooter.getRotationVec(1.0F);
+                    direction = shooter.getViewVector(1.0F);
                 }
 
-                net.minecraft.entity.EntityType<?> projectileType = Registries.ENTITY_TYPE.get(spawn.projectileTypeId);
-                net.minecraft.entity.Entity created = projectileType.create(world);
-                if (!(created instanceof net.minecraft.entity.projectile.ProjectileEntity projectile)) {
+                net.minecraft.world.entity.EntityType<?> projectileType = BuiltInRegistries.ENTITY_TYPE.get(spawn.projectileTypeId);
+                net.minecraft.world.entity.Entity created = projectileType.create(world);
+                if (!(created instanceof net.minecraft.world.entity.projectile.Projectile projectile)) {
                     continue;
                 }
 
                 projectile.setOwner(shooter);
-                projectile.refreshPositionAndAngles(shooter.getX(), shooter.getEyeY() - 0.1, shooter.getZ(), shooter.getYaw(), shooter.getPitch());
-                projectile.addCommandTag(EXTRA_SHOT_CHILD_TAG);
+                projectile.snapTo(shooter.getX(), shooter.getEyeY() - 0.1, shooter.getZ(), shooter.getYRot(), shooter.getXRot());
+                projectile.addTag(EXTRA_SHOT_CHILD_TAG);
 
-                if (spawn.thrownItemStack != null && projectile instanceof net.minecraft.entity.projectile.thrown.ThrownItemEntity thrown) {
+                if (spawn.thrownItemStack != null && projectile instanceof net.minecraft.world.entity.projectile.throwableitemprojectile.ThrowableItemProjectile thrown) {
                     thrown.setItem(spawn.thrownItemStack.copy());
                 }
 
-                net.minecraft.util.math.Vec3d velocity = direction.multiply(Math.max(0.05, spawn.baseSpeed));
-                projectile.setVelocity(velocity);
+                net.minecraft.world.phys.Vec3 velocity = direction.multiply(Math.max(0.05, spawn.baseSpeed));
+                projectile.setDeltaMovement(velocity);
 
-                if (projectile instanceof net.minecraft.entity.projectile.ExplosiveProjectileEntity explosive) {
+                if (projectile instanceof net.minecraft.world.entity.projectile.hurtingprojectile.AbstractHurtingProjectile explosive) {
                     try {
                         ((mod.advancedmobs.mixin.ExplosiveProjectileEntityAccessor) (Object) explosive)
                             .advancedmobs$setAccelerationPower(Math.max(0.05, spawn.baseSpeed));
@@ -255,7 +255,7 @@ public class ScalingSystem {
                     }
                 }
 
-                world.spawnEntity(projectile);
+                world.addFreshEntity(projectile);
             } catch (Throwable t) {
                 AdvancedMobsMod.LOGGER.error(
                     "[ScalingSystem] Failed extra-shot spawn for projectile {} in world {}",
@@ -276,9 +276,9 @@ public class ScalingSystem {
      * - Schedule level extra cycles between now and the next natural cycle
      * - Preserve within-cycle timing by using a relative offset from cycle start
      */
-    public static void onMobFiredProjectileForExtraShot(MobEntity mob, MobWarData data,
-                                                       net.minecraft.entity.projectile.ProjectileEntity projectile,
-                                                       ServerWorld world, long serverTick) {
+    public static void onMobFiredProjectileForExtraShot(Mob mob, MobWarData data,
+                                                       net.minecraft.world.entity.projectile.Projectile projectile,
+                                                       ServerLevel world, long serverTick) {
         if (mob == null || data == null || projectile == null || world == null) {
             return;
         }
@@ -286,7 +286,7 @@ public class ScalingSystem {
             return;
         }
 
-        if (projectile.getCommandTags().contains(EXTRA_SHOT_CHILD_TAG) || projectile.getCommandTags().contains(MULTISHOT_CHILD_TAG)) {
+        if (projectile.getTags().contains(EXTRA_SHOT_CHILD_TAG) || projectile.getTags().contains(MULTISHOT_CHILD_TAG)) {
             return;
         }
 
@@ -303,15 +303,15 @@ public class ScalingSystem {
             return;
         }
 
-        int level = data.getSkillData().getInt("ability_extra_shot");
+        int level = data.getSkillData().getIntOr("ability_extra_shot", 0);
         if (level <= 0) {
             return;
         }
 
-        Identifier mobTypeId = Registries.ENTITY_TYPE.getId(mob.getType());
-        Identifier projectileTypeId = Registries.ENTITY_TYPE.getId(projectile.getType());
+        Identifier mobTypeId = BuiltInRegistries.ENTITY_TYPE.getId(mob.getType());
+        Identifier projectileTypeId = BuiltInRegistries.ENTITY_TYPE.getId(projectile.getType());
 
-        ShotCycleTracker tracker = EXTRA_SHOT_TRACKERS.computeIfAbsent(mob.getUuid(), id -> new ShotCycleTracker());
+        ShotCycleTracker tracker = EXTRA_SHOT_TRACKERS.computeIfAbsent(mob.getUUID(), id -> new ShotCycleTracker());
         long relativeOffset;
         long cycleStartTick;
 
@@ -347,8 +347,8 @@ public class ScalingSystem {
             baseCycleTicks = (int) Math.round(Math.max(1.0, timing.averageTicks));
         }
 
-        double baseSpeed = Math.max(0.05, projectile.getVelocity().length());
-        if (projectile instanceof net.minecraft.entity.projectile.ExplosiveProjectileEntity explosive) {
+        double baseSpeed = Math.max(0.05, projectile.getDeltaMovement().length());
+        if (projectile instanceof net.minecraft.world.entity.projectile.hurtingprojectile.AbstractHurtingProjectile explosive) {
             try {
                 double accel = ((mod.advancedmobs.mixin.ExplosiveProjectileEntityAccessor) (Object) explosive).advancedmobs$getAccelerationPower();
                 baseSpeed = Math.max(0.05, accel);
@@ -357,9 +357,9 @@ public class ScalingSystem {
         }
 
         ItemStack thrownStack = null;
-        if (projectile instanceof net.minecraft.entity.projectile.thrown.ThrownItemEntity thrown) {
+        if (projectile instanceof net.minecraft.world.entity.projectile.throwableitemprojectile.ThrowableItemProjectile thrown) {
             try {
-                thrownStack = thrown.getStack().copy();
+                thrownStack = thrown.getItem().copy();
             } catch (Throwable ignored) {
             }
         }
@@ -369,7 +369,7 @@ public class ScalingSystem {
             interval = 1.0;
         }
 
-        RegistryKey<World> worldKey = world.getRegistryKey();
+        ResourceKey<Level> worldKey = world.dimension();
 
         synchronized (EXTRA_SHOT_LOCK) {
             for (int i = 1; i <= level; i++) {
@@ -378,7 +378,7 @@ public class ScalingSystem {
                     continue;
                 }
                 EXTRA_SHOT_QUEUE.computeIfAbsent(dueTick, t -> new ArrayList<>())
-                    .add(new ScheduledProjectileSpawn(worldKey, mob.getUuid(), projectileTypeId, baseSpeed, thrownStack));
+                    .add(new ScheduledProjectileSpawn(worldKey, mob.getUUID(), projectileTypeId, baseSpeed, thrownStack));
             }
         }
     }
@@ -628,7 +628,7 @@ public class ScalingSystem {
         }
     }
 
-    private static JsonObject tryLoadMobConfigForMob(MobEntity mob) {
+    private static JsonObject tryLoadMobConfigForMob(Mob mob) {
         if (mob == null) {
             return null;
         }
@@ -712,7 +712,7 @@ public class ScalingSystem {
     /**
      * Get config for a mob entity
      */
-    public static JsonObject getConfigForMob(MobEntity mob) {
+    public static JsonObject getConfigForMob(Mob mob) {
         if (!configsLoaded) initialize();
         
         // Try full class name first
@@ -775,7 +775,7 @@ public class ScalingSystem {
         return getOrCreateFallbackConfig(mob);
     }
 
-    private static JsonObject getOrCreateFallbackConfig(MobEntity mob) {
+    private static JsonObject getOrCreateFallbackConfig(Mob mob) {
         if (mob == null) {
             return null;
         }
@@ -807,7 +807,7 @@ public class ScalingSystem {
         return fallbackConfig;
     }
 
-    private static JsonObject buildFallbackConfig(MobEntity mob, String mobType, String keyBase) {
+    private static JsonObject buildFallbackConfig(Mob mob, String mobType, String keyBase) {
         JsonObject config = new JsonObject();
         config.addProperty(FALLBACK_FLAG_KEY, true);
         config.addProperty("mob_name", keyBase);
@@ -885,12 +885,12 @@ public class ScalingSystem {
         return effects;
     }
 
-    private static String determineFallbackMobType(MobEntity mob) {
+    private static String determineFallbackMobType(Mob mob) {
         if (mob == null) {
             return "passive";
         }
 
-        if (mob instanceof HostileEntity) {
+        if (mob instanceof Monster) {
             return "hostile";
         }
 
@@ -898,29 +898,29 @@ public class ScalingSystem {
             return "hostile";
         }
 
-        SpawnGroup spawnGroup = mob.getType().getSpawnGroup();
-        if (spawnGroup == SpawnGroup.MONSTER) {
+        MobCategory spawnGroup = mob.getType().getSpawnGroup();
+        if (spawnGroup == MobCategory.MONSTER) {
             return "hostile";
         }
 
-        if (mob instanceof PassiveEntity) {
+        if (mob instanceof AgeableMob) {
             return "passive";
         }
 
-        if (mob instanceof Angerable) {
+        if (mob instanceof NeutralMob) {
             return ModConfig.getInstance().neutralMobsAlwaysAggressive ? "hostile" : "neutral";
         }
 
-        if (spawnGroup == SpawnGroup.CREATURE ||
-            spawnGroup == SpawnGroup.WATER_CREATURE ||
-            spawnGroup == SpawnGroup.WATER_AMBIENT ||
-            spawnGroup == SpawnGroup.AXOLOTLS ||
-            spawnGroup == SpawnGroup.UNDERGROUND_WATER_CREATURE ||
-            spawnGroup == SpawnGroup.AMBIENT) {
+        if (spawnGroup == MobCategory.CREATURE ||
+            spawnGroup == MobCategory.WATER_CREATURE ||
+            spawnGroup == MobCategory.WATER_AMBIENT ||
+            spawnGroup == MobCategory.AXOLOTLS ||
+            spawnGroup == MobCategory.UNDERGROUND_WATER_CREATURE ||
+            spawnGroup == MobCategory.AMBIENT) {
             return "passive";
         }
 
-        EntityAttributeInstance attackAttr = mob.getAttributeInstance(EntityAttributes.GENERIC_ATTACK_DAMAGE);
+        AttributeInstance attackAttr = mob.getAttribute(Attributes.ATTACK_DAMAGE);
         double attackDamage = attackAttr != null ? attackAttr.getBaseValue() : 0.0d;
         if (attackDamage > 0.0d) {
             return ModConfig.getInstance().neutralMobsAlwaysAggressive ? "hostile" : "neutral";
@@ -929,13 +929,13 @@ public class ScalingSystem {
         return "passive";
     }
 
-    private static void initializeFallbackSkillData(NbtCompound skillData, String mobType) {
+    private static void initializeFallbackSkillData(CompoundTag skillData, String mobType) {
         if (skillData == null) {
             return;
         }
 
-        boolean typeChanged = !skillData.contains(NBT_FALLBACK_TYPE) || !mobType.equals(skillData.getString(NBT_FALLBACK_TYPE));
-        boolean needsInit = typeChanged || !skillData.getBoolean(NBT_FALLBACK_INITIALIZED);
+        boolean typeChanged = !skillData.contains(NBT_FALLBACK_TYPE) || !mobType.equals(skillData.getStringOr(NBT_FALLBACK_TYPE, ""));
+        boolean needsInit = typeChanged || !skillData.getBooleanOr(NBT_FALLBACK_INITIALIZED, false);
         if (!needsInit) {
             return;
         }
@@ -954,8 +954,8 @@ public class ScalingSystem {
         skillData.putString(NBT_FALLBACK_TYPE, mobType);
     }
 
-    private static void processFallbackMob(MobEntity mob, World world, MobWarData data, JsonObject config,
-            NbtCompound skillData, long currentTick) {
+    private static void processFallbackMob(Mob mob, Level world, MobWarData data, JsonObject config,
+            CompoundTag skillData, long currentTick) {
         if (mob == null || world == null || data == null || skillData == null) {
             return;
         }
@@ -976,7 +976,7 @@ public class ScalingSystem {
     /**
      * Check if a mob has scaling configured
      */
-    public static boolean hasScalingConfig(MobEntity mob) {
+    public static boolean hasScalingConfig(Mob mob) {
         return getConfigForMob(mob) != null;
     }
 
@@ -989,8 +989,8 @@ public class ScalingSystem {
      * If an item breaks or disappears, downgrade tiers and reset masteries according
      * to the progression spec so the slot becomes eligible for repurchase.
      */
-    public static void monitorEquipmentState(MobEntity mob, MobWarData data) {
-        if (mob == null || data == null || mob.getWorld().isClient()) {
+    public static void monitorEquipmentState(Mob mob, MobWarData data) {
+        if (mob == null || data == null || mob.level().isClient()) {
             return;
         }
 
@@ -1001,13 +1001,13 @@ public class ScalingSystem {
             return;
         }
 
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (skillData == null || skillData.isEmpty()) {
             return;
         }
 
         boolean stateChanged = ensureInitialDisarm(mob, skillData);
-        if (!skillData.getBoolean(NBT_EQUIPMENT_PRIMED)) {
+        if (!skillData.getBooleanOr(NBT_EQUIPMENT_PRIMED, false)) {
             if (stateChanged) {
                 MobWarData.save(mob, data);
             }
@@ -1021,8 +1021,8 @@ public class ScalingSystem {
         // above still runs every tick, and a broken or swapped item is now
         // detected at most 10 ticks (half a second) later, which is not
         // observable in gameplay.
-        long worldTime = mob.getWorld().getTime();
-        if (Math.floorMod(worldTime + (mob.getUuid().hashCode() & 1023), 10) != 0) {
+        long worldTime = mob.level().getGameTime();
+        if (Math.floorMod(worldTime + (mob.getUUID().hashCode() & 1023), 10) != 0) {
             if (stateChanged) {
                 MobWarData.save(mob, data);
             }
@@ -1030,7 +1030,7 @@ public class ScalingSystem {
         }
 
         JsonObject tree = config.getAsJsonObject("tree");
-        ServerWorld serverWorld = mob.getWorld() instanceof ServerWorld sw ? sw : null;
+        ServerLevel serverWorld = mob.level() instanceof ServerLevel sw ? sw : null;
         JsonElement shieldElement = tree.has("shield") ? tree.get("shield") : null;
 
         JsonElement weaponElement = tree.has("weapon") ? tree.get("weapon") : null;
@@ -1038,11 +1038,11 @@ public class ScalingSystem {
         boolean scopedWeapon = lockedWeapon != null && hasMultipleWeaponOptions(weaponElement);
         String weaponScopeKey = scopedWeapon ? getWeaponScopeIdentifier(lockedWeapon) : "";
 
-        boolean hasWeaponEquipped = skillData.getBoolean("weapon_equipped");
-        int weaponTier = skillData.getInt("weapon_tier");
+        boolean hasWeaponEquipped = skillData.getBooleanOr("weapon_equipped", false);
+        int weaponTier = skillData.getIntOr("weapon_tier", 0);
         boolean shouldHaveWeapon = weaponTier > 0;
         boolean weaponOverride = isPlayerOverrideActive(skillData, OVERRIDE_KEY_WEAPON);
-        ItemStack currentWeapon = mob.getEquippedStack(EquipmentSlot.MAINHAND);
+        ItemStack currentWeapon = mob.getItemBySlot(EquipmentSlot.MAINHAND);
         boolean weaponMissing = currentWeapon.isEmpty();
         boolean weaponMismatch = false;
         if (!weaponMissing && lockedWeapon != null && shouldHaveWeapon) {
@@ -1071,7 +1071,7 @@ public class ScalingSystem {
             weaponOverride = false;
         }
         if (hasWeaponEquipped && weaponMissing) {
-            mob.equipStack(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+            mob.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
             if (handleWeaponBreak(mob, data) && serverWorld != null && lockedWeapon != null) {
                 applyWeapon(mob, skillData, lockedWeapon, serverWorld, scopedWeapon, weaponScopeKey, null, false);
             }
@@ -1079,11 +1079,11 @@ public class ScalingSystem {
             applyWeapon(mob, skillData, lockedWeapon, serverWorld, scopedWeapon, weaponScopeKey, null, false);
         }
 
-        boolean hasShieldEquipped = skillData.getBoolean("shield_equipped");
-        int hasShieldTier = skillData.getInt("has_shield");
+        boolean hasShieldEquipped = skillData.getBooleanOr("shield_equipped", false);
+        int hasShieldTier = skillData.getIntOr("has_shield", 0);
         boolean shouldHaveShield = hasShieldTier > 0;
         boolean shieldOverride = isPlayerOverrideActive(skillData, OVERRIDE_KEY_SHIELD);
-        ItemStack currentShield = mob.getEquippedStack(EquipmentSlot.OFFHAND);
+        ItemStack currentShield = mob.getItemBySlot(EquipmentSlot.OFFHAND);
         boolean shieldMissing = currentShield.isEmpty();
         boolean shieldMatches = !shieldMissing && currentShield.isOf(Items.SHIELD);
         if (shieldMatches && shouldHaveShield) {
@@ -1126,8 +1126,8 @@ public class ScalingSystem {
         }
     }
 
-    private static boolean ensureInitialDisarm(MobEntity mob, NbtCompound skillData) {
-        if (skillData == null || skillData.getBoolean(NBT_INITIAL_DISARMED)) {
+    private static boolean ensureInitialDisarm(Mob mob, CompoundTag skillData) {
+        if (skillData == null || skillData.getBooleanOr(NBT_INITIAL_DISARMED, false)) {
             return false;
         }
         clearMobEquipment(mob);
@@ -1137,52 +1137,52 @@ public class ScalingSystem {
         return true;
     }
 
-    private static void clearMobEquipment(MobEntity mob) {
+    private static void clearMobEquipment(Mob mob) {
         if (mob == null) {
             return;
         }
-        mob.equipStack(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
-        mob.equipStack(EquipmentSlot.OFFHAND, ItemStack.EMPTY);
-        mob.equipStack(EquipmentSlot.HEAD, ItemStack.EMPTY);
-        mob.equipStack(EquipmentSlot.CHEST, ItemStack.EMPTY);
-        mob.equipStack(EquipmentSlot.LEGS, ItemStack.EMPTY);
-        mob.equipStack(EquipmentSlot.FEET, ItemStack.EMPTY);
+        mob.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
+        mob.setItemSlot(EquipmentSlot.OFFHAND, ItemStack.EMPTY);
+        mob.setItemSlot(EquipmentSlot.HEAD, ItemStack.EMPTY);
+        mob.setItemSlot(EquipmentSlot.CHEST, ItemStack.EMPTY);
+        mob.setItemSlot(EquipmentSlot.LEGS, ItemStack.EMPTY);
+        mob.setItemSlot(EquipmentSlot.FEET, ItemStack.EMPTY);
     }
 
-    private static boolean dropAndClearSlotOnce(MobEntity mob, EquipmentSlot slot) {
-        if (mob == null || slot == null || mob.getWorld().isClient()) {
+    private static boolean dropAndClearSlotOnce(Mob mob, EquipmentSlot slot) {
+        if (mob == null || slot == null || mob.level().isClient()) {
             return false;
         }
-        ItemStack current = mob.getEquippedStack(slot);
+        ItemStack current = mob.getItemBySlot(slot);
         if (current == null || current.isEmpty()) {
             return true;
         }
         String slotTag = getEquipmentReplacementOnceTag(slot);
-        if (mob.getCommandTags().contains(slotTag)) {
+        if (mob.getTags().contains(slotTag)) {
             return false;
         }
         ItemStack toDrop = current.copy();
 
-        // Defensive: normalize enchantment RegistryEntry references to the server's registry instance
+        // Defensive: normalize enchantment Holder references to the server's registry instance
         // before spawning the ItemEntity (which triggers ItemStack network serialization).
         // This reduces the chance of "Can't find id" crashes when the equipped stack originated from
         // a different RegistryManager (e.g., picked up loot from other mods / datapacks).
-        if (mob.getWorld() instanceof ServerWorld serverWorld) {
+        if (mob.level() instanceof ServerLevel serverWorld) {
             try {
-                Registry<Enchantment> enchantRegistry = serverWorld.getRegistryManager().get(RegistryKeys.ENCHANTMENT);
-                ItemEnchantmentsComponent existing = toDrop.getOrDefault(
-                    DataComponentTypes.ENCHANTMENTS,
-                    ItemEnchantmentsComponent.DEFAULT
+                Registry<Enchantment> enchantRegistry = serverWorld.getRegistryManager().get(Registries.ENCHANTMENT);
+                ItemEnchantments existing = toDrop.getOrDefault(
+                    DataComponents.ENCHANTMENTS,
+                    ItemEnchantments.DEFAULT
                 );
-                ItemEnchantmentsComponent normalized = normalizeEnchantmentsComponent(existing, enchantRegistry);
-                toDrop.set(DataComponentTypes.ENCHANTMENTS, normalized);
+                ItemEnchantments normalized = normalizeEnchantmentsComponent(existing, enchantRegistry);
+                toDrop.set(DataComponents.ENCHANTMENTS, normalized);
             } catch (Exception ignored) {
                 // Best-effort only; dropping the stack is still preferable to crashing.
             }
         }
-        mob.equipStack(slot, ItemStack.EMPTY);
+        mob.setItemSlot(slot, ItemStack.EMPTY);
         mob.dropStack(toDrop);
-        mob.addCommandTag(slotTag);
+        mob.addTag(slotTag);
         return true;
     }
 
@@ -1194,35 +1194,35 @@ public class ScalingSystem {
         return EQUIPMENT_REPLACEMENT_ONCE_TAG + "_" + slot.getName();
     }
 
-    private static void abortUpgradesForMob(MobEntity mob, MobWarData data) {
+    private static void abortUpgradesForMob(Mob mob, MobWarData data) {
         if (mob == null || data == null) {
             return;
         }
-        UUID mobUuid = mob.getUuid();
+        UUID mobUuid = mob.getUUID();
         UpgradeJobScheduler.getInstance().cancel(mobUuid);
         PENDING_EQUIPMENT_SNAPSHOTS.remove(mobUuid);
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (skillData != null) {
             clearUpgradeSchedule(skillData);
         }
     }
 
-    private static void resetUpgradesForConfigChange(MobEntity mob, MobWarData data, long newFingerprint) {
+    private static void resetUpgradesForConfigChange(Mob mob, MobWarData data, long newFingerprint) {
         if (mob == null || data == null) {
             return;
         }
-        UUID mobUuid = mob.getUuid();
+        UUID mobUuid = mob.getUUID();
         UpgradeJobScheduler.getInstance().cancel(mobUuid);
         PENDING_EQUIPMENT_SNAPSHOTS.remove(mobUuid);
-        NbtCompound previousData = data.getSkillData();
-        boolean hadPrimedEquipment = previousData != null && previousData.getBoolean(NBT_EQUIPMENT_PRIMED);
+        CompoundTag previousData = data.getSkillData();
+        boolean hadPrimedEquipment = previousData != null && previousData.getBooleanOr(NBT_EQUIPMENT_PRIMED, false);
         if (previousData != null) {
             clearUpgradeSchedule(previousData);
         }
         if (hadPrimedEquipment) {
             clearMobEquipment(mob);
         }
-        NbtCompound resetData = new NbtCompound();
+        CompoundTag resetData = new CompoundTag();
         resetData.putLong(NBT_CONFIG_FINGERPRINT, newFingerprint);
         resetData.putBoolean(NBT_EQUIPMENT_PRIMED, false);
         resetEquippedFlags(resetData);
@@ -1231,7 +1231,7 @@ public class ScalingSystem {
         MobWarData.save(mob, data);
     }
 
-    private static void resetEquippedFlags(NbtCompound skillData) {
+    private static void resetEquippedFlags(CompoundTag skillData) {
         if (skillData == null) {
             return;
         }
@@ -1244,16 +1244,16 @@ public class ScalingSystem {
     }
 
     /**
-     * Called during {@link MobEntity#initialize} to bootstrap upgrades directly from spawn logic.
+     * Called during {@link Mob#initialize} to bootstrap upgrades directly from spawn logic.
      * This leverages Minecraft's native spawning pipeline so mobs that have never upgraded (or
      * have gone more than a day without upgrading) immediately run a scaling pass instead of
      * waiting for the tick scheduler to catch up later.
      */
-    public static void handleSpawnBootstrap(MobEntity mob, SpawnReason spawnReason, MobWarData data) {
+    public static void handleSpawnBootstrap(Mob mob, EntitySpawnReason spawnReason, MobWarData data) {
         if (mob == null || data == null) {
             return;
         }
-        World world = mob.getWorld();
+        Level world = mob.level();
         if (world == null || world.isClient()) {
             return;
         }
@@ -1268,9 +1268,9 @@ public class ScalingSystem {
             return;
         }
 
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         boolean firstCycle = skillData == null || !skillData.contains(NBT_LAST_UPGRADE_MARKER);
-        long currentTick = world.getTime();
+        long currentTick = world.getGameTime();
         boolean cooldownElapsed = hasUpgradeCooldownElapsed(skillData, currentTick, modConfig);
 
         if (firstCycle || cooldownElapsed) {
@@ -1286,11 +1286,11 @@ public class ScalingSystem {
      * MAIN ENTRY POINT - Called from MobDataMixin on every mob tick
      * This single method handles ALL scaling logic for ALL mobs
      */
-    public static void processMobTick(MobEntity mob, World world, MobWarData data) {
+    public static void processMobTick(Mob mob, Level world, MobWarData data) {
         processMobTick(mob, world, data, false);
     }
 
-    private static void processMobTick(MobEntity mob, World world, MobWarData data, boolean forceImmediateUpgrade) {
+    private static void processMobTick(Mob mob, Level world, MobWarData data, boolean forceImmediateUpgrade) {
         if (world.isClient()) {
             return;
         }
@@ -1316,20 +1316,20 @@ public class ScalingSystem {
             return;
         }
 
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (skillData == null) {
-            skillData = new NbtCompound();
+            skillData = new CompoundTag();
             data.setSkillData(skillData);
         }
 
         long configFingerprint = computeEffectiveConfigFingerprint(config, modConfig);
         if (skillData.contains(NBT_CONFIG_FINGERPRINT)) {
-            long storedFingerprint = skillData.getLong(NBT_CONFIG_FINGERPRINT);
+            long storedFingerprint = skillData.getLongOr(NBT_CONFIG_FINGERPRINT, 0L);
             if (storedFingerprint != configFingerprint) {
                 resetUpgradesForConfigChange(mob, data, configFingerprint);
                 skillData = data.getSkillData();
                 if (skillData == null) {
-                    skillData = new NbtCompound();
+                    skillData = new CompoundTag();
                     data.setSkillData(skillData);
                 }
             }
@@ -1339,7 +1339,7 @@ public class ScalingSystem {
 
         boolean fallbackConfig = config.has(FALLBACK_FLAG_KEY) && config.get(FALLBACK_FLAG_KEY).getAsBoolean();
         if (fallbackConfig) {
-            processFallbackMob(mob, world, data, config, skillData, world.getTime());
+            processFallbackMob(mob, world, data, config, skillData, world.getGameTime());
             return;
         }
 
@@ -1353,11 +1353,11 @@ public class ScalingSystem {
         int worldDays = resolveConfiguredWorldDays(world, modConfig);
         boolean hasLastAccountedDay = skillData.contains(NBT_LAST_ACCOUNTED_DAY);
         boolean hasDayPointCache = skillData.contains(NBT_TOTAL_POINT_CACHE);
-        int lastAccountedDay = hasLastAccountedDay ? skillData.getInt(NBT_LAST_ACCOUNTED_DAY) : worldDays;
+        int lastAccountedDay = hasLastAccountedDay ? skillData.getIntOr(NBT_LAST_ACCOUNTED_DAY, 0) : worldDays;
         boolean skillDataDirty = false;
         boolean rebuiltDayPointCache = false;
         double dayPointCache = hasDayPointCache
-            ? skillData.getDouble(NBT_TOTAL_POINT_CACHE)
+            ? skillData.getDoubleOr(NBT_TOTAL_POINT_CACHE, 0.0)
             : Math.max(0.0, data.getSkillPoints() - killPoints);
 
         if (!hasLastAccountedDay || !hasDayPointCache) {
@@ -1395,12 +1395,12 @@ public class ScalingSystem {
         int budget = (int)Math.max(0, Math.floor(totalPoints - spentPoints));
 
         // One-time spawn logging so you can verify points/budget are correct.
-        if (forceImmediateUpgrade && modConfig.logSpawnPointSummary && !skillData.getBoolean(NBT_SPAWN_LOGGED)) {
+        if (forceImmediateUpgrade && modConfig.logSpawnPointSummary && !skillData.getBooleanOr(NBT_SPAWN_LOGGED, false)) {
             String mobName = config.has("mob_name") ? config.get("mob_name").getAsString() : mob.getType().toString();
             AdvancedMobsMod.LOGGER.info(
                 "[UMW Spawn] mob={} uuid={} reason={} worldDays={} dayMult={} killMult={} killCount={} killPoints={} dayPointCache={} totalPoints={} spentPoints={} budget={} rebuiltDayCache={}",
                 mobName,
-                mob.getUuidAsString(),
+                mob.getStringUUID(),
                 "bootstrap",
                 worldDays,
                 modConfig.getDayScalingMultiplier(),
@@ -1417,15 +1417,15 @@ public class ScalingSystem {
             skillDataDirty = true;
         }
 
-        long currentTick = world.getTime();
+        long currentTick = world.getGameTime();
         long upgradeIntervalTicks = getUpgradeIntervalTicks(modConfig);
         int currentTimeOfDay = getCurrentUpgradeMarker(world, upgradeIntervalTicks);
-        UUID mobUuid = mob.getUuid();
+        UUID mobUuid = mob.getUUID();
 
         Registry<Enchantment> enchantRegistry = null;
-        if (world instanceof ServerWorld serverWorld) {
+        if (world instanceof ServerLevel serverWorld) {
             try {
-                enchantRegistry = serverWorld.getRegistryManager().get(RegistryKeys.ENCHANTMENT);
+                enchantRegistry = serverWorld.getRegistryManager().get(Registries.ENCHANTMENT);
             } catch (Exception ignored) {
                 enchantRegistry = null;
             }
@@ -1458,8 +1458,8 @@ public class ScalingSystem {
         boolean firstUpgradeCycle = !skillData.contains(NBT_LAST_UPGRADE_MARKER);
         boolean readyForNextCycle = isUpgradeWindowOpen(skillData, currentTimeOfDay, currentTick, upgradeIntervalTicks);
         boolean shouldRequestUpgrade = firstUpgradeCycle || readyForNextCycle;
-        boolean upgradePending = skillData.getBoolean(NBT_UPGRADE_PENDING);
-        boolean windowApproved = skillData.getBoolean(NBT_WINDOW_APPROVED);
+        boolean upgradePending = skillData.getBooleanOr(NBT_UPGRADE_PENDING, false);
+        boolean windowApproved = skillData.getBooleanOr(NBT_WINDOW_APPROVED, false);
         boolean upgradeScheduleReady = isUpgradeScheduleReady(skillData, currentTick);
         boolean shouldScheduleNow = shouldRequestUpgrade && !upgradePending;
         if (shouldScheduleNow && isBudgetProbeThrottled(skillData, currentTick)) {
@@ -1509,8 +1509,8 @@ public class ScalingSystem {
         }
 
         boolean canSyncEquipment = !upgradeScheduleReady
-            && !skillData.getBoolean(NBT_UPGRADE_PENDING)
-            && skillData.getBoolean(NBT_EQUIPMENT_PRIMED);
+            && !skillData.getBooleanOr(NBT_UPGRADE_PENDING, false)
+            && skillData.getBooleanOr(NBT_EQUIPMENT_PRIMED, false);
         boolean needsEquipmentSync = canSyncEquipment && requiresEquipmentSync(mob, skillData);
 
         if (upgradeScheduleReady && !readyForNextCycle && !windowApproved) {
@@ -1535,7 +1535,7 @@ public class ScalingSystem {
             if (asyncEnabled) {
                 boolean jobActive = scheduler.isJobActive(mobUuid) || PENDING_EQUIPMENT_SNAPSHOTS.containsKey(mobUuid);
                 if (!jobActive) {
-                    boolean spawnBurst = skillData.getBoolean(NBT_SPAWN_BURST_PENDING);
+                    boolean spawnBurst = skillData.getBooleanOr(NBT_SPAWN_BURST_PENDING, false);
                     boolean preferSync = spawnBurst && modConfig != null && modConfig.forceSyncSpawnUpgrade;
 
                     if (preferSync) {
@@ -1596,7 +1596,7 @@ public class ScalingSystem {
                 }
             } else {
                 ModConfigSnapshot configSnapshot = ModConfigSnapshot.capture(modConfig);
-                if (skillData.getBoolean(NBT_SPAWN_BURST_PENDING)) {
+                if (skillData.getBooleanOr(NBT_SPAWN_BURST_PENDING, false)) {
                     configSnapshot = configSnapshot.forSpawnBurst(modConfig);
                 }
                 boolean applied = executeUpgradeNow(
@@ -1621,7 +1621,7 @@ public class ScalingSystem {
                 }
                 upgradeScheduleReady = false;
             }
-        } else if (world instanceof ServerWorld serverWorld && needsEquipmentSync) {
+        } else if (world instanceof ServerLevel serverWorld && needsEquipmentSync) {
             applyEquipment(mob, data, config, serverWorld, null, false);
             appliedEquipment = true;
             stateChanged = true;
@@ -1639,7 +1639,7 @@ public class ScalingSystem {
     /**
      * Calculate points from world age based on JSON daily_scaling config
      */
-    private static double calculateWorldAgePoints(World world, JsonObject config, ModConfig modConfig) {
+    private static double calculateWorldAgePoints(Level world, JsonObject config, ModConfig modConfig) {
         int worldDays = resolveConfiguredWorldDays(world, modConfig);
         return calculateWorldAgePointsThroughDay(worldDays, config, modConfig);
     }
@@ -1762,16 +1762,16 @@ public class ScalingSystem {
         return accumulateSegment(startDay, endDay, DEFAULT_DAILY_POINTS);
     }
 
-    private static int getCurrentUpgradeMarker(World world, long upgradeIntervalTicks) {
+    private static int getCurrentUpgradeMarker(Level world, long upgradeIntervalTicks) {
         if (world == null) {
             return 0;
         }
         long interval = Math.max(1L, upgradeIntervalTicks);
-        long tick = Math.max(0L, world.getTime());
+        long tick = Math.max(0L, world.getGameTime());
         return (int) Math.floorMod(tick, interval);
     }
 
-    private static boolean isUpgradeWindowOpen(NbtCompound skillData, int currentTimeOfDay, long currentTick, long upgradeIntervalTicks) {
+    private static boolean isUpgradeWindowOpen(CompoundTag skillData, int currentTimeOfDay, long currentTick, long upgradeIntervalTicks) {
         if (skillData == null || !skillData.contains(NBT_LAST_UPGRADE_MARKER)) {
             return true;
         }
@@ -1781,8 +1781,8 @@ public class ScalingSystem {
             return true;
         }
 
-        int marker = skillData.getInt(NBT_LAST_UPGRADE_MARKER);
-        boolean wrapped = skillData.getBoolean(NBT_UPGRADE_WRAP_STATE);
+        int marker = skillData.getIntOr(NBT_LAST_UPGRADE_MARKER, 0);
+        boolean wrapped = skillData.getBooleanOr(NBT_UPGRADE_WRAP_STATE, false);
         if (!wrapped && currentTimeOfDay < marker) {
             skillData.putBoolean(NBT_UPGRADE_WRAP_STATE, true);
             wrapped = true;
@@ -1790,18 +1790,18 @@ public class ScalingSystem {
         return wrapped && currentTimeOfDay >= marker;
     }
 
-    private static boolean hasUpgradeCooldownElapsed(NbtCompound skillData, long currentTick, ModConfig modConfig) {
+    private static boolean hasUpgradeCooldownElapsed(CompoundTag skillData, long currentTick, ModConfig modConfig) {
         return hasUpgradeCooldownElapsed(skillData, currentTick, getUpgradeIntervalTicks(modConfig));
     }
 
-    private static boolean hasUpgradeCooldownElapsed(NbtCompound skillData, long currentTick, long upgradeIntervalTicks) {
+    private static boolean hasUpgradeCooldownElapsed(CompoundTag skillData, long currentTick, long upgradeIntervalTicks) {
         if (skillData == null) {
             return true;
         }
         if (!skillData.contains(NBT_LAST_UPGRADE_TICK)) {
             return false;
         }
-        long lastTick = skillData.getLong(NBT_LAST_UPGRADE_TICK);
+        long lastTick = skillData.getLongOr(NBT_LAST_UPGRADE_TICK, 0L);
         if (lastTick <= 0L || currentTick <= lastTick) {
             return true;
         }
@@ -1809,11 +1809,11 @@ public class ScalingSystem {
         return elapsed >= Math.max(1L, upgradeIntervalTicks);
     }
 
-    private static int resolveConfiguredWorldDays(World world, ModConfig modConfig) {
+    private static int resolveConfiguredWorldDays(Level world, ModConfig modConfig) {
         if (modConfig.manualWorldDayOverride >= 0) {
             return modConfig.manualWorldDayOverride;
         }
-        long worldTicks = Math.max(0L, world.getTime());
+        long worldTicks = Math.max(0L, world.getGameTime());
         return (int) (worldTicks / 24000L);
     }
 
@@ -1825,7 +1825,7 @@ public class ScalingSystem {
         return Math.max(1L, Math.round(ms / 50.0));
     }
 
-    private static void scheduleUpgradePass(NbtCompound skillData, long currentTick, ModConfig modConfig, boolean windowApproved) {
+    private static void scheduleUpgradePass(CompoundTag skillData, long currentTick, ModConfig modConfig, boolean windowApproved) {
         if (skillData == null) {
             return;
         }
@@ -1838,7 +1838,7 @@ public class ScalingSystem {
         skillData.putLong(NBT_NEXT_UPGRADE_TICK, scheduled);
     }
 
-    private static void scheduleSpawnBurstUpgradePass(NbtCompound skillData, long currentTick) {
+    private static void scheduleSpawnBurstUpgradePass(CompoundTag skillData, long currentTick) {
         if (skillData == null) {
             return;
         }
@@ -1849,7 +1849,7 @@ public class ScalingSystem {
         skillData.putLong(NBT_NEXT_UPGRADE_TICK, scheduled);
     }
 
-    private static void deferUpgradePass(NbtCompound skillData, long currentTick, long delayTicks) {
+    private static void deferUpgradePass(CompoundTag skillData, long currentTick, long delayTicks) {
         if (skillData == null) {
             return;
         }
@@ -1913,7 +1913,7 @@ public class ScalingSystem {
         return baseDelay + (overload * step);
     }
 
-    private static long computeTicksUntilUpgradeWindow(NbtCompound skillData, int currentTimeOfDay, long currentTick, long upgradeIntervalTicks) {
+    private static long computeTicksUntilUpgradeWindow(CompoundTag skillData, int currentTimeOfDay, long currentTick, long upgradeIntervalTicks) {
         if (skillData == null || !skillData.contains(NBT_LAST_UPGRADE_MARKER)) {
             return 0L;
         }
@@ -1922,7 +1922,7 @@ public class ScalingSystem {
             return computeLegacyTicksUntilUpgradeWindow(skillData, currentTimeOfDay, upgradeIntervalTicks);
         }
 
-        long lastTick = skillData.getLong(NBT_LAST_UPGRADE_TICK);
+        long lastTick = skillData.getLongOr(NBT_LAST_UPGRADE_TICK, 0L);
         if (currentTick <= lastTick) {
             return 0L;
         }
@@ -1934,9 +1934,9 @@ public class ScalingSystem {
         return interval - elapsed;
     }
 
-    private static long computeLegacyTicksUntilUpgradeWindow(NbtCompound skillData, int currentTimeOfDay, long upgradeIntervalTicks) {
-        int marker = skillData.getInt(NBT_LAST_UPGRADE_MARKER);
-        boolean wrapped = skillData.getBoolean(NBT_UPGRADE_WRAP_STATE);
+    private static long computeLegacyTicksUntilUpgradeWindow(CompoundTag skillData, int currentTimeOfDay, long upgradeIntervalTicks) {
+        int marker = skillData.getIntOr(NBT_LAST_UPGRADE_MARKER, 0);
+        boolean wrapped = skillData.getBooleanOr(NBT_UPGRADE_WRAP_STATE, false);
         int ticksPerDay = (int) Math.max(1L, upgradeIntervalTicks);
 
         if (!wrapped) {
@@ -1951,15 +1951,15 @@ public class ScalingSystem {
         return Math.max(1L, marker - currentTimeOfDay);
     }
 
-    private static boolean isUpgradeScheduleReady(NbtCompound skillData, long currentTick) {
-        if (skillData == null || !skillData.getBoolean(NBT_UPGRADE_PENDING)) {
+    private static boolean isUpgradeScheduleReady(CompoundTag skillData, long currentTick) {
+        if (skillData == null || !skillData.getBooleanOr(NBT_UPGRADE_PENDING, false)) {
             return false;
         }
-        long readyTick = skillData.getLong(NBT_NEXT_UPGRADE_TICK);
+        long readyTick = skillData.getLongOr(NBT_NEXT_UPGRADE_TICK, 0L);
         return readyTick > 0L && currentTick >= readyTick;
     }
 
-    private static void clearUpgradeSchedule(NbtCompound skillData) {
+    private static void clearUpgradeSchedule(CompoundTag skillData) {
         if (skillData == null) {
             return;
         }
@@ -1969,15 +1969,15 @@ public class ScalingSystem {
         skillData.remove(NBT_NEXT_UPGRADE_TICK);
     }
 
-    private static boolean isBudgetProbeThrottled(NbtCompound skillData, long currentTick) {
+    private static boolean isBudgetProbeThrottled(CompoundTag skillData, long currentTick) {
         if (skillData == null || !skillData.contains(NBT_NEXT_BUDGET_CHECK_TICK)) {
             return false;
         }
-        long nextProbe = skillData.getLong(NBT_NEXT_BUDGET_CHECK_TICK);
+        long nextProbe = skillData.getLongOr(NBT_NEXT_BUDGET_CHECK_TICK, 0L);
         return nextProbe > currentTick;
     }
 
-    private static void throttleBudgetProbe(NbtCompound skillData, long currentTick) {
+    private static void throttleBudgetProbe(CompoundTag skillData, long currentTick) {
         if (skillData == null) {
             return;
         }
@@ -1985,14 +1985,14 @@ public class ScalingSystem {
         skillData.putLong(NBT_NEXT_BUDGET_CHECK_TICK, nextProbe);
     }
 
-    private static void clearBudgetProbeThrottle(NbtCompound skillData) {
+    private static void clearBudgetProbeThrottle(CompoundTag skillData) {
         if (skillData == null) {
             return;
         }
         skillData.remove(NBT_NEXT_BUDGET_CHECK_TICK);
     }
 
-    private static void lockEquipmentForUpgrade(NbtCompound skillData) {
+    private static void lockEquipmentForUpgrade(CompoundTag skillData) {
         if (skillData == null) {
             return;
         }
@@ -2003,11 +2003,11 @@ public class ScalingSystem {
     }
 
     private static boolean submitUpgradeJob(
-        MobEntity mob,
+        Mob mob,
         MobWarData data,
         JsonObject config,
         String mobType,
-        NbtCompound skillData,
+        CompoundTag skillData,
         ModConfig modConfig,
         ModConfigSnapshot configSnapshot,
         long currentTick,
@@ -2029,16 +2029,16 @@ public class ScalingSystem {
             }
         }
 
-        UUID mobUuid = mob.getUuid();
+        UUID mobUuid = mob.getUUID();
         EquipmentSnapshot snapshot = EquipmentSnapshot.capture(mob, skillData);
         PENDING_EQUIPMENT_SNAPSHOTS.put(mobUuid, snapshot);
         lockEquipmentForUpgrade(skillData);
         long seed = computeUpgradeSeed(mobUuid, currentTick, budget);
 
         Registry<Enchantment> enchantRegistry = null;
-        if (mob.getWorld() instanceof ServerWorld serverWorld) {
+        if (mob.level() instanceof ServerLevel serverWorld) {
             try {
-                enchantRegistry = serverWorld.getRegistryManager().get(RegistryKeys.ENCHANTMENT);
+                enchantRegistry = serverWorld.getRegistryManager().get(Registries.ENCHANTMENT);
             } catch (Exception ignored) {
                 enchantRegistry = null;
             }
@@ -2065,7 +2065,7 @@ public class ScalingSystem {
     }
 
     private static boolean executeUpgradeNow(
-        MobEntity mob,
+        Mob mob,
         MobWarData data,
         JsonObject config,
         String mobType,
@@ -2081,26 +2081,26 @@ public class ScalingSystem {
             return false;
         }
 
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (skillData == null) {
-            skillData = new NbtCompound();
+            skillData = new CompoundTag();
             data.setSkillData(skillData);
         }
 
         EquipmentSnapshot snapshot = EquipmentSnapshot.capture(mob, skillData);
         lockEquipmentForUpgrade(skillData);
-        long seed = computeUpgradeSeed(mob.getUuid(), currentTick, budget);
+        long seed = computeUpgradeSeed(mob.getUUID(), currentTick, budget);
 
         Registry<Enchantment> enchantRegistry = null;
-        if (mob.getWorld() instanceof ServerWorld serverWorld) {
+        if (mob.level() instanceof ServerLevel serverWorld) {
             try {
-                enchantRegistry = serverWorld.getRegistryManager().get(RegistryKeys.ENCHANTMENT);
+                enchantRegistry = serverWorld.getRegistryManager().get(Registries.ENCHANTMENT);
             } catch (Exception ignored) {
                 enchantRegistry = null;
             }
         }
         UpgradeComputationResult computation = calculateUpgradeResult(
-            mob.getUuid(),
+            mob.getUUID(),
             skillData.copy(),
             config,
             mobType,
@@ -2140,8 +2140,8 @@ public class ScalingSystem {
         return 1.0;
     }
 
-    private static Identifier resolveEntityId(MobEntity mob) {
-        return Registries.ENTITY_TYPE.getId(mob.getType());
+    private static Identifier resolveEntityId(Mob mob) {
+        return BuiltInRegistries.ENTITY_TYPE.getId(mob.getType());
     }
 
     private static boolean isBossEntity(Identifier entityId) {
@@ -2157,7 +2157,7 @@ public class ScalingSystem {
      */
     private static UpgradeComputationResult calculateUpgradeResult(
             UUID mobUuid,
-            NbtCompound skillData,
+            CompoundTag skillData,
             JsonObject config,
             String mobType,
             Registry<Enchantment> enchantRegistry,
@@ -2256,7 +2256,7 @@ public class ScalingSystem {
             } else {
                 logBuffer.logIteration(iterations, 0.0, affordable.size(), null);
             }
-            int previousLevel = skillData.getInt(chosen.key);
+            int previousLevel = skillData.getIntOr(chosen.key, 0);
             skillData.putInt(chosen.key, chosen.newLevel);
             handleTierPromotion(skillData, chosen.key, previousLevel, chosen.newLevel);
             maybeBumpEnchantCost(skillData, chosen.key, random, logBuffer);
@@ -2301,14 +2301,14 @@ public class ScalingSystem {
         return options.get(options.size() - 1);
     }
 
-    private static void spawnUpgradeParticles(MobEntity mob) {
+    private static void spawnUpgradeParticles(Mob mob) {
         ModConfig config = ModConfig.getInstance();
         if (config.disableParticles || !config.showLevelParticles) {
             return;
         }
 
-        World world = mob.getWorld();
-        if (!(world instanceof ServerWorld serverWorld)) {
+        Level world = mob.level();
+        if (!(world instanceof ServerLevel serverWorld)) {
             return;
         }
 
@@ -2328,7 +2328,7 @@ public class ScalingSystem {
     }
 
     private static void applyUpgradeComputation(
-            MobEntity mob,
+            Mob mob,
             MobWarData data,
             JsonObject config,
             String mobType,
@@ -2339,18 +2339,18 @@ public class ScalingSystem {
         if (mob == null || data == null || config == null || computation == null) {
             return;
         }
-        NbtCompound computedData = computation.skillData();
+        CompoundTag computedData = computation.skillData();
         if (computedData == null) {
             return;
         }
 
-        NbtCompound existingData = data.getSkillData();
-        boolean previouslyDisarmed = existingData != null && existingData.getBoolean(NBT_INITIAL_DISARMED);
+        CompoundTag existingData = data.getSkillData();
+        boolean previouslyDisarmed = existingData != null && existingData.getBooleanOr(NBT_INITIAL_DISARMED, false);
 
         // Async upgrade jobs operate on a snapshot of skillData taken when the job was submitted.
         // Replacing the entire compound can roll back runtime/cache fields that have been updated
         // on the main thread since then (e.g., config fingerprint, day point cache).
-        NbtCompound mergedData = existingData != null ? existingData.copy() : new NbtCompound();
+        CompoundTag mergedData = existingData != null ? existingData.copy() : new CompoundTag();
         mergeNbtCompound(mergedData, computedData);
 
         // Preserve fields that are maintained on the hot tick path and should never roll back.
@@ -2366,7 +2366,7 @@ public class ScalingSystem {
 
         data.setSkillData(mergedData);
         data.setSpentPoints(computation.spentPoints());
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (skillData == null) {
             return;
         }
@@ -2383,7 +2383,7 @@ public class ScalingSystem {
         UpgradeLogger logger = new UpgradeLogger(mob);
         logger.replay(computation.logEntries());
 
-        if (mob.getWorld() instanceof ServerWorld serverWorld) {
+        if (mob.level() instanceof ServerLevel serverWorld) {
             // Force overrides during upgrade passes so new tiers replace previously equipped items
             // instead of being blocked by the player-override guard that protects manual gear swaps.
             applyEquipment(mob, data, config, serverWorld, snapshot, true);
@@ -2396,7 +2396,7 @@ public class ScalingSystem {
         }
     }
 
-    private static void mergeNbtCompound(NbtCompound target, NbtCompound source) {
+    private static void mergeNbtCompound(CompoundTag target, CompoundTag source) {
         if (target == null || source == null) {
             return;
         }
@@ -2404,7 +2404,7 @@ public class ScalingSystem {
             if (key == null) {
                 continue;
             }
-            net.minecraft.nbt.NbtElement element = source.get(key);
+            net.minecraft.nbt.Tag element = source.get(key);
             if (element == null) {
                 continue;
             }
@@ -2412,14 +2412,14 @@ public class ScalingSystem {
         }
     }
 
-    private static void copyNbtKeyIfPresent(NbtCompound source, NbtCompound target, String key) {
+    private static void copyNbtKeyIfPresent(CompoundTag source, CompoundTag target, String key) {
         if (source == null || target == null || key == null) {
             return;
         }
         if (!source.contains(key)) {
             return;
         }
-        net.minecraft.nbt.NbtElement element = source.get(key);
+        net.minecraft.nbt.Tag element = source.get(key);
         if (element == null) {
             return;
         }
@@ -2430,7 +2430,7 @@ public class ScalingSystem {
      * Get list of affordable upgrades from the mob's JSON config
      */
     private static List<UpgradeOption> getAffordableUpgrades(UUID mobUuid, JsonObject config, String mobType, 
-            Registry<Enchantment> enchantRegistry, NbtCompound skillData, int budget) {
+            Registry<Enchantment> enchantRegistry, CompoundTag skillData, int budget) {
 
         List<UpgradeOption> affordable = new ArrayList<>();
         collectAffordableUpgrades(mobUuid, config, mobType, enchantRegistry, skillData, budget, affordable);
@@ -2438,7 +2438,7 @@ public class ScalingSystem {
     }
 
     private static void collectAffordableUpgrades(UUID mobUuid, JsonObject config, String mobType,
-            Registry<Enchantment> enchantRegistry, NbtCompound skillData, int budget, List<UpgradeOption> affordable) {
+            Registry<Enchantment> enchantRegistry, CompoundTag skillData, int budget, List<UpgradeOption> affordable) {
 
         if (affordable == null || config == null) {
             return;
@@ -2502,7 +2502,7 @@ public class ScalingSystem {
 
         // Check weapon upgrades
         if (weaponElement != null) {
-            int currentTier = skillData.getInt("weapon_tier");
+            int currentTier = skillData.getIntOr("weapon_tier", 0);
             boolean scopedWeapon = hasMultipleWeaponOptions(weaponElement);
             String weaponScopeKey = scopedWeapon && lockedWeapon != null ? getWeaponScopeIdentifier(lockedWeapon) : "";
             String weaponEnchantPrefix = getWeaponEnchantPrefix(scopedWeapon, weaponScopeKey);
@@ -2548,7 +2548,7 @@ public class ScalingSystem {
             JsonObject shield = tree.getAsJsonObject("shield");
 
             // Base shield cost
-            int hasShield = skillData.getInt("has_shield");
+            int hasShield = skillData.getIntOr("has_shield", 0);
             if (hasShield == 0 && shield.has("base_cost")) {
                 int cost = shield.get("base_cost").getAsInt();
                 if (cost <= budget) {
@@ -2573,7 +2573,7 @@ public class ScalingSystem {
                 JsonObject armor = tree.getAsJsonObject(slot);
 
                 // Armor tiers
-                int currentTier = skillData.getInt(slot + "_tier");
+                int currentTier = skillData.getIntOr(slot + "_tier", 0);
 
                 if (armor.has("tiers")) {
                     JsonArray tiers = armor.getAsJsonArray("tiers");
@@ -2651,7 +2651,7 @@ public class ScalingSystem {
     }
 
     private static boolean hasAffordableUpgradeAvailable(UUID mobUuid, JsonObject config, String mobType,
-            Registry<Enchantment> enchantRegistry, NbtCompound skillData, int budget) {
+            Registry<Enchantment> enchantRegistry, CompoundTag skillData, int budget) {
         // Budget can be 0 when configs contain 0-cost bootstrap upgrades (e.g., base weapons).
         // We still want those to be discovered so mobs can equip immediately on spawn.
         // Use the exact same logic as getAffordableUpgrades, but stop as soon as one option is discovered.
@@ -2666,7 +2666,7 @@ public class ScalingSystem {
     /**
      * Helper to add upgrades from a section with levels
      */
-    private static void addUpgradesFromSection(JsonObject section, NbtCompound skillData, 
+    private static void addUpgradesFromSection(JsonObject section, CompoundTag skillData, 
             int budget, List<UpgradeOption> affordable, String prefix) {
         addUpgradesFromSection(section, skillData, budget, affordable, prefix, null);
     }
@@ -2674,7 +2674,7 @@ public class ScalingSystem {
     /**
      * Helper to add upgrades from a section with levels (with attack capability filtering)
      */
-    private static void addUpgradesFromSection(JsonObject section, NbtCompound skillData, 
+    private static void addUpgradesFromSection(JsonObject section, CompoundTag skillData, 
             int budget, List<UpgradeOption> affordable, String prefix, String attackCapability) {
         
         for (String key : section.keySet()) {
@@ -2682,7 +2682,7 @@ public class ScalingSystem {
             if (!element.isJsonArray()) continue;
 
             // Horde reinforcements should never be able to learn horde_summon (prevents chain-spawning).
-            if (prefix.equals("ability_") && key.equals("horde_summon") && skillData.getBoolean(NBT_HORDE_REINFORCEMENT)) {
+            if (prefix.equals("ability_") && key.equals("horde_summon") && skillData.getBooleanOr(NBT_HORDE_REINFORCEMENT, false)) {
                 continue;
             }
             
@@ -2706,7 +2706,7 @@ public class ScalingSystem {
             
             JsonArray levels = element.getAsJsonArray();
             String fullKey = prefix + key;
-            int currentLevel = skillData.getInt(fullKey);
+            int currentLevel = skillData.getIntOr(fullKey, 0);
             
             if (currentLevel < levels.size()) {
                 JsonObject nextLevel = levels.get(currentLevel).getAsJsonObject();
@@ -2722,13 +2722,13 @@ public class ScalingSystem {
     /**
      * Helper to add mastery upgrades (drop_mastery, durability_mastery)
      */
-    private static void addMasteryUpgrades(JsonObject parent, String masteryKey, NbtCompound skillData,
+    private static void addMasteryUpgrades(JsonObject parent, String masteryKey, CompoundTag skillData,
             int budget, List<UpgradeOption> affordable, String saveKey) {
         
         if (!parent.has(masteryKey)) return;
         
         JsonArray levels = parent.getAsJsonArray(masteryKey);
-        int currentLevel = skillData.getInt(saveKey);
+        int currentLevel = skillData.getIntOr(saveKey, 0);
         
         if (currentLevel < levels.size()) {
             JsonObject nextLevel = levels.get(currentLevel).getAsJsonObject();
@@ -2747,8 +2747,8 @@ public class ScalingSystem {
     /**
      * Apply all effects based on current upgrade levels
      */
-    private static void applyEffects(MobEntity mob, MobWarData data, JsonObject config, String mobType, long currentTick) {
-        NbtCompound skillData = data.getSkillData();
+    private static void applyEffects(Mob mob, MobWarData data, JsonObject config, String mobType, long currentTick) {
+        CompoundTag skillData = data.getSkillData();
         
         if (!config.has("tree")) return;
         JsonObject tree = config.getAsJsonObject("tree");
@@ -2760,19 +2760,19 @@ public class ScalingSystem {
             JsonObject effects = tree.getAsJsonObject(effectsKey);
             
             // Apply regeneration
-            applyPotionEffect(mob, skillData, effects, "regeneration", StatusEffects.REGENERATION, "effect_regeneration", "regen_level");
+            applyPotionEffect(mob, skillData, effects, "regeneration", MobEffects.REGENERATION, "effect_regeneration", "regen_level");
             
             // Apply health boost
-            applyPotionEffect(mob, skillData, effects, "health_boost", StatusEffects.HEALTH_BOOST, "effect_health_boost", null);
+            applyPotionEffect(mob, skillData, effects, "health_boost", MobEffects.HEALTH_BOOST, "effect_health_boost", null);
             
             // Apply resistance (and optional fire resistance) directly from config
             applyResistanceEffect(mob, skillData, effects);
             
             // Apply strength
-            applyPotionEffect(mob, skillData, effects, "strength", StatusEffects.STRENGTH, "effect_strength", "strength_level");
+            applyPotionEffect(mob, skillData, effects, "strength", MobEffects.STRENGTH, "effect_strength", "strength_level");
             
             // Apply speed
-            applyPotionEffect(mob, skillData, effects, "speed", StatusEffects.SPEED, "effect_speed", "speed_level");
+            applyPotionEffect(mob, skillData, effects, "speed", MobEffects.SPEED, "effect_speed", "speed_level");
             
         }
     }
@@ -2780,11 +2780,11 @@ public class ScalingSystem {
     /**
      * Helper to apply a potion effect based on JSON level data
      */
-    private static void applyPotionEffect(MobEntity mob, NbtCompound skillData, JsonObject effects,
-            String effectName, net.minecraft.registry.entry.RegistryEntry<net.minecraft.entity.effect.StatusEffect> effect,
+    private static void applyPotionEffect(Mob mob, CompoundTag skillData, JsonObject effects,
+            String effectName, net.minecraft.core.Holder<net.minecraft.world.effect.MobEffect> effect,
             String skillKey, String levelKey) {
         
-        int level = skillData.getInt(skillKey);
+        int level = skillData.getIntOr(skillKey, 0);
         if (level <= 0) return;
         
         int amplifier = level - 1; // Default: level 1 = amplifier 0
@@ -2801,9 +2801,9 @@ public class ScalingSystem {
         }
         
         boolean showParticles = !ModConfig.getInstance().disableParticles;
-        mob.addStatusEffect(new StatusEffectInstance(
+        mob.addEffect(new MobEffectInstance(
             effect,
-            StatusEffectInstance.INFINITE,
+            MobEffectInstance.INFINITE_DURATION,
             Math.max(0, amplifier),
             false,
             showParticles,
@@ -2811,11 +2811,11 @@ public class ScalingSystem {
         ));
     }
 
-    private static void applyResistanceEffect(MobEntity mob, NbtCompound skillData, JsonObject effects) {
+    private static void applyResistanceEffect(Mob mob, CompoundTag skillData, JsonObject effects) {
         if (skillData == null || effects == null || !effects.has("resistance")) {
             return;
         }
-        int resistanceLevel = skillData.getInt("effect_resistance");
+        int resistanceLevel = skillData.getIntOr("effect_resistance", 0);
         if (resistanceLevel <= 0) {
             return;
         }
@@ -2829,18 +2829,18 @@ public class ScalingSystem {
             ? Math.max(0, levelData.get("resistance_level").getAsInt() - 1)
             : Math.max(0, resolvedLevel - 1);
         boolean showParticles = !ModConfig.getInstance().disableParticles;
-        mob.addStatusEffect(new StatusEffectInstance(
-            StatusEffects.RESISTANCE,
-            StatusEffectInstance.INFINITE,
+        mob.addEffect(new MobEffectInstance(
+            MobEffects.RESISTANCE,
+            MobEffectInstance.INFINITE_DURATION,
             amplifier,
             false,
             showParticles,
             true
         ));
         if (levelData.has("fire_resistance") && levelData.get("fire_resistance").getAsBoolean()) {
-            mob.addStatusEffect(new StatusEffectInstance(
-                StatusEffects.FIRE_RESISTANCE,
-                StatusEffectInstance.INFINITE,
+            mob.addEffect(new MobEffectInstance(
+                MobEffects.FIRE_RESISTANCE,
+                MobEffectInstance.INFINITE_DURATION,
                 0,
                 false,
                 showParticles,
@@ -2849,11 +2849,11 @@ public class ScalingSystem {
         }
     }
 
-    private static void ensureResistanceEffects(MobEntity mob, NbtCompound skillData, JsonObject effects) {
+    private static void ensureResistanceEffects(Mob mob, CompoundTag skillData, JsonObject effects) {
         if (mob == null || skillData == null || effects == null || !effects.has("resistance")) {
             return;
         }
-        int resistanceLevel = skillData.getInt("effect_resistance");
+        int resistanceLevel = skillData.getIntOr("effect_resistance", 0);
         if (resistanceLevel <= 0) {
             return;
         }
@@ -2863,8 +2863,8 @@ public class ScalingSystem {
             return;
         }
         boolean needsFire = resistanceLevelGrantsFire(resistanceLevels, resolvedLevel);
-        boolean missingResistance = !mob.hasStatusEffect(StatusEffects.RESISTANCE);
-        boolean missingFire = needsFire && !mob.hasStatusEffect(StatusEffects.FIRE_RESISTANCE);
+        boolean missingResistance = !mob.hasEffect(MobEffects.RESISTANCE);
+        boolean missingFire = needsFire && !mob.hasEffect(MobEffects.FIRE_RESISTANCE);
         if (missingResistance || missingFire) {
             applyResistanceEffect(mob, skillData, effects);
         }
@@ -2878,7 +2878,7 @@ public class ScalingSystem {
         return levelData.has("fire_resistance") && levelData.get("fire_resistance").getAsBoolean();
     }
 
-    private static void refreshMissingEffects(MobEntity mob, NbtCompound skillData, JsonObject config, String mobType) {
+    private static void refreshMissingEffects(Mob mob, CompoundTag skillData, JsonObject config, String mobType) {
         if (skillData == null || mob == null || config == null || !config.has("tree")) {
             return;
         }
@@ -2888,20 +2888,20 @@ public class ScalingSystem {
             return;
         }
         JsonObject effects = tree.getAsJsonObject(effectsKey);
-        ensureEffectPresent(mob, skillData, effects, "regeneration", StatusEffects.REGENERATION, "effect_regeneration", "regen_level");
-        ensureEffectPresent(mob, skillData, effects, "health_boost", StatusEffects.HEALTH_BOOST, "effect_health_boost", null);
-        ensureEffectPresent(mob, skillData, effects, "strength", StatusEffects.STRENGTH, "effect_strength", "strength_level");
-        ensureEffectPresent(mob, skillData, effects, "speed", StatusEffects.SPEED, "effect_speed", "speed_level");
+        ensureEffectPresent(mob, skillData, effects, "regeneration", MobEffects.REGENERATION, "effect_regeneration", "regen_level");
+        ensureEffectPresent(mob, skillData, effects, "health_boost", MobEffects.HEALTH_BOOST, "effect_health_boost", null);
+        ensureEffectPresent(mob, skillData, effects, "strength", MobEffects.STRENGTH, "effect_strength", "strength_level");
+        ensureEffectPresent(mob, skillData, effects, "speed", MobEffects.SPEED, "effect_speed", "speed_level");
         ensureResistanceEffects(mob, skillData, effects);
     }
 
-    private static void ensureEffectPresent(MobEntity mob, NbtCompound skillData, JsonObject effects,
-            String effectName, RegistryEntry<net.minecraft.entity.effect.StatusEffect> effect,
+    private static void ensureEffectPresent(Mob mob, CompoundTag skillData, JsonObject effects,
+            String effectName, Holder<net.minecraft.world.effect.MobEffect> effect,
             String skillKey, String levelKey) {
-        if (skillData.getInt(skillKey) <= 0) {
+        if (skillData.getIntOr(skillKey, 0) <= 0) {
             return;
         }
-        if (mob.hasStatusEffect(effect)) {
+        if (mob.hasEffect(effect)) {
             return;
         }
         applyPotionEffect(mob, skillData, effects, effectName, effect, skillKey, levelKey);
@@ -2925,19 +2925,19 @@ public class ScalingSystem {
         PENDING_EQUIPMENT_SNAPSHOTS.remove(mobUuid);
     }
 
-    private static void handleUndeadHealingPulse(MobEntity mob, NbtCompound skillData, long currentTick) {
+    private static void handleUndeadHealingPulse(Mob mob, CompoundTag skillData, long currentTick) {
         if (mob == null || skillData == null) {
             return;
         }
         if (!isUndeadMob(mob)) {
             return;
         }
-        int regenerationLevel = skillData.getInt("effect_regeneration");
+        int regenerationLevel = skillData.getIntOr("effect_regeneration", 0);
         if (regenerationLevel <= 0) {
             return;
         }
 
-        UUID mobUuid = mob.getUuid();
+        UUID mobUuid = mob.getUUID();
         Map<String, Long> cooldowns = ABILITY_COOLDOWNS.computeIfAbsent(mobUuid, k -> new HashMap<>());
         long lastPulse = cooldowns.getOrDefault(ABILITY_KEY_UNDEAD_PULSE, Long.MIN_VALUE);
         if (currentTick - lastPulse < UNDEAD_HARMING_INTERVAL_TICKS) {
@@ -2959,7 +2959,7 @@ public class ScalingSystem {
         }
     }
 
-    private static void applyInstantDamagePulse(MobEntity mob, int amplifier) {
+    private static void applyInstantDamagePulse(Mob mob, int amplifier) {
         if (mob == null) {
             return;
         }
@@ -2967,7 +2967,7 @@ public class ScalingSystem {
         // Instant effects are not reliably applied via addStatusEffect across versions.
         // Apply as a true instant effect so undead mobs actually receive the healing.
         try {
-            StatusEffects.INSTANT_DAMAGE.value().applyInstantEffect(
+            MobEffects.INSTANT_DAMAGE.value().applyInstantEffect(
                 null,
                 null,
                 mob,
@@ -2977,8 +2977,8 @@ public class ScalingSystem {
         } catch (Exception ignored) {
             // Fallback: still try as a status effect instance.
             boolean showParticles = !ModConfig.getInstance().disableParticles;
-            mob.addStatusEffect(new StatusEffectInstance(
-                StatusEffects.INSTANT_DAMAGE,
+            mob.addEffect(new MobEffectInstance(
+                MobEffects.INSTANT_DAMAGE,
                 1,
                 Math.max(0, amplifier),
                 false,
@@ -2989,28 +2989,28 @@ public class ScalingSystem {
     }
 
 
-    private static boolean isUndeadMob(MobEntity mob) {
+    private static boolean isUndeadMob(Mob mob) {
         return mob != null && mob.getType().isIn(EntityTypeTags.UNDEAD);
     }
 
-    private static void handleInvisibilityGlowFlicker(MobEntity mob, long currentTick) {
-        if (mob == null || mob.getWorld().isClient()) {
+    private static void handleInvisibilityGlowFlicker(Mob mob, long currentTick) {
+        if (mob == null || mob.level().isClient()) {
             return;
         }
-        Map<String, Long> cooldowns = ABILITY_COOLDOWNS.get(mob.getUuid());
+        Map<String, Long> cooldowns = ABILITY_COOLDOWNS.get(mob.getUUID());
         if (cooldowns == null) {
             return;
         }
         long glowUntil = cooldowns.getOrDefault(ABILITY_KEY_INVIS_GLOW_UNTIL, 0L);
-        if (glowUntil <= currentTick || !mob.hasStatusEffect(StatusEffects.INVISIBILITY)) {
+        if (glowUntil <= currentTick || !mob.hasEffect(MobEffects.INVISIBILITY)) {
             cooldowns.remove(ABILITY_KEY_INVIS_GLOW_UNTIL);
             cooldowns.remove(ABILITY_KEY_INVIS_GLOW_NEXT);
             return;
         }
         long nextGlow = cooldowns.getOrDefault(ABILITY_KEY_INVIS_GLOW_NEXT, 0L);
         if (currentTick >= nextGlow) {
-            mob.addStatusEffect(new StatusEffectInstance(
-                StatusEffects.GLOWING,
+            mob.addEffect(new MobEffectInstance(
+                MobEffects.GLOWING,
                 INVIS_GLOW_DURATION_TICKS,
                 0,
                 false,
@@ -3021,7 +3021,7 @@ public class ScalingSystem {
         }
     }
 
-    private static void startInvisibilityGlowFlicker(MobEntity mob, Map<String, Long> cooldowns,
+    private static void startInvisibilityGlowFlicker(Mob mob, Map<String, Long> cooldowns,
             long currentTick, int durationSeconds) {
         if (mob == null || cooldowns == null) {
             return;
@@ -3029,8 +3029,8 @@ public class ScalingSystem {
         long windowTicks = Math.max(40L, durationSeconds * 20L);
         cooldowns.put(ABILITY_KEY_INVIS_GLOW_UNTIL, currentTick + windowTicks);
         cooldowns.put(ABILITY_KEY_INVIS_GLOW_NEXT, currentTick);
-        mob.addStatusEffect(new StatusEffectInstance(
-            StatusEffects.GLOWING,
+        mob.addEffect(new MobEffectInstance(
+            MobEffects.GLOWING,
             INVIS_GLOW_DURATION_TICKS,
             0,
             false,
@@ -3046,9 +3046,9 @@ public class ScalingSystem {
     /**
      * Apply equipment based on upgrade levels
      */
-    private static void applyEquipment(MobEntity mob, MobWarData data, JsonObject config, ServerWorld world,
+    private static void applyEquipment(Mob mob, MobWarData data, JsonObject config, ServerLevel world,
             EquipmentSnapshot snapshot, boolean forceOverride) {
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         
         if (!config.has("tree")) return;
         JsonObject tree = config.getAsJsonObject("tree");
@@ -3090,11 +3090,11 @@ public class ScalingSystem {
     /**
      * Apply weapon with enchants
      */
-        private static void applyWeapon(MobEntity mob, NbtCompound skillData, JsonObject weaponConfig,
-            ServerWorld world, boolean scopedWeapon, String weaponScopeKey,
+        private static void applyWeapon(Mob mob, CompoundTag skillData, JsonObject weaponConfig,
+            ServerLevel world, boolean scopedWeapon, String weaponScopeKey,
             EquipmentSnapshot snapshot, boolean forceOverride) {
         String weaponType = weaponConfig.has("weapon_type") ? weaponConfig.get("weapon_type").getAsString() : "sword";
-        int weaponTierLevel = skillData.getInt("weapon_tier");
+        int weaponTierLevel = skillData.getIntOr("weapon_tier", 0);
         if (weaponTierLevel <= 0) {
             logEquipmentDebug(mob, "weapon", "No weapon tier purchased yet—skipping equip");
             skillData.putBoolean("weapon_equipped", false);
@@ -3102,7 +3102,7 @@ public class ScalingSystem {
             trackEquippedItem(skillData, NBT_WEAPON_LAST_ITEM, ItemStack.EMPTY);
             return;
         }
-        boolean previouslyEquipped = skillData.getBoolean("weapon_equipped");
+        boolean previouslyEquipped = skillData.getBooleanOr("weapon_equipped", false);
         String enchantPrefix = getWeaponEnchantPrefix(scopedWeapon, weaponScopeKey);
         String durabilityKey = getWeaponScopedKey("weapon_durability_mastery", scopedWeapon, weaponScopeKey);
         String dropMasteryKey = getWeaponScopedKey("weapon_drop_mastery", scopedWeapon, weaponScopeKey);
@@ -3121,7 +3121,7 @@ public class ScalingSystem {
             return;
         }
 
-        ItemStack current = mob.getEquippedStack(EquipmentSlot.MAINHAND);
+        ItemStack current = mob.getItemBySlot(EquipmentSlot.MAINHAND);
         boolean blockingItem = !current.isEmpty() && !isScalingEquippedItem(skillData, NBT_WEAPON_LAST_ITEM, current);
         if (blockingItem) {
             if (!dropAndClearSlotOnce(mob, EquipmentSlot.MAINHAND)) {
@@ -3141,16 +3141,16 @@ public class ScalingSystem {
         // Apply durability mastery or preserve previous damage if mastery unchanged
         ItemStack previousWeapon = snapshot != null ? snapshot.getMainHand() : ItemStack.EMPTY;
         if (!tryPreserveDurability(weapon, previousWeapon,
-                durabilityKey, skillData.getInt(durabilityKey), snapshot)) {
+                durabilityKey, skillData.getIntOr(durabilityKey, 0), snapshot)) {
             applyDurabilityMastery(weapon, skillData, weaponConfig, durabilityKey, previousWeapon);
         }
         
         // Equip it
-        mob.equipStack(EquipmentSlot.MAINHAND, weapon);
+        mob.setItemSlot(EquipmentSlot.MAINHAND, weapon);
         logEquipmentDebug(mob, "weapon", "Equipped tier " + weaponTierLevel + " item " + weapon.getItem());
         skillData.putBoolean("weapon_equipped", true);
         trackEquippedItem(skillData, NBT_WEAPON_LAST_ITEM, weapon);
-        applyDropChance(mob, EquipmentSlot.MAINHAND, skillData.getInt(dropMasteryKey));
+        applyDropChance(mob, EquipmentSlot.MAINHAND, skillData.getIntOr(dropMasteryKey, 0));
         skillData.putString(NBT_WEAPON_ACTIVE_KEY, scopedWeapon ? weaponScopeKey : "");
         skillData.putBoolean(NBT_WEAPON_ACTIVE_SCOPED, scopedWeapon);
     }
@@ -3158,9 +3158,9 @@ public class ScalingSystem {
     /**
      * Apply shield with enchants
      */
-    private static void applyShield(MobEntity mob, NbtCompound skillData, JsonObject shieldConfig, ServerWorld world,
+    private static void applyShield(Mob mob, CompoundTag skillData, JsonObject shieldConfig, ServerLevel world,
             EquipmentSnapshot snapshot, boolean forceOverride) {
-        int hasShield = skillData.getInt("has_shield");
+        int hasShield = skillData.getIntOr("has_shield", 0);
         if (hasShield <= 0) {
             logEquipmentDebug(mob, "shield", "Shield not purchased—clearing slot");
             skillData.putBoolean("shield_equipped", false);
@@ -3169,8 +3169,8 @@ public class ScalingSystem {
             return;
         }
 
-        boolean previouslyEquipped = skillData.getBoolean("shield_equipped");
-        ItemStack current = mob.getEquippedStack(EquipmentSlot.OFFHAND);
+        boolean previouslyEquipped = skillData.getBooleanOr("shield_equipped", false);
+        ItemStack current = mob.getItemBySlot(EquipmentSlot.OFFHAND);
         boolean blockingItem = !current.isEmpty() && !isScalingEquippedItem(skillData, NBT_SHIELD_LAST_ITEM, current);
         if (blockingItem) {
             if (!dropAndClearSlotOnce(mob, EquipmentSlot.OFFHAND)) {
@@ -3192,23 +3192,23 @@ public class ScalingSystem {
         // Apply durability mastery or preserve damage
         ItemStack previousShield = snapshot != null ? snapshot.getOffHand() : ItemStack.EMPTY;
         if (!tryPreserveDurability(shield, previousShield,
-                "shield_durability_mastery", skillData.getInt("shield_durability_mastery"), snapshot)) {
+                "shield_durability_mastery", skillData.getIntOr("shield_durability_mastery", 0), snapshot)) {
             applyDurabilityMastery(shield, skillData, shieldConfig, "shield_durability_mastery", previousShield);
         }
         
         // Equip it
-        mob.equipStack(EquipmentSlot.OFFHAND, shield);
+        mob.setItemSlot(EquipmentSlot.OFFHAND, shield);
         logEquipmentDebug(mob, "shield", "Equipped shield with enchants/masteries applied");
         skillData.putBoolean("shield_equipped", true);
         trackEquippedItem(skillData, NBT_SHIELD_LAST_ITEM, shield);
-        applyDropChance(mob, EquipmentSlot.OFFHAND, skillData.getInt("shield_drop_mastery"));
+        applyDropChance(mob, EquipmentSlot.OFFHAND, skillData.getIntOr("shield_drop_mastery", 0));
     }
     
     /**
      * Apply armor piece with enchants
      */
-        private static void applyArmor(MobEntity mob, NbtCompound skillData, JsonObject tree,
-            String slotName, EquipmentSlot slot, ServerWorld world,
+        private static void applyArmor(Mob mob, CompoundTag skillData, JsonObject tree,
+            String slotName, EquipmentSlot slot, ServerLevel world,
             EquipmentSnapshot snapshot, boolean forceOverride) {
         
         if (!tree.has(slotName)) {
@@ -3217,12 +3217,12 @@ public class ScalingSystem {
         }
         JsonObject armorConfig = tree.getAsJsonObject(slotName);
         
-        int tier = skillData.getInt(slotName + "_tier");
+        int tier = skillData.getIntOr(slotName + "_tier", 0);
         if (tier <= 0) {
             logEquipmentDebug(mob, slotName, "Tier 0 -> clearing slot");
             skillData.putBoolean(slotName + "_equipped", false);
             setPlayerOverride(skillData, getArmorOverrideKey(slotName), false);
-            mob.equipStack(slot, ItemStack.EMPTY);
+            mob.setItemSlot(slot, ItemStack.EMPTY);
             trackEquippedItem(skillData, getArmorTrackingKey(slotName), ItemStack.EMPTY);
             return;
         }
@@ -3245,9 +3245,9 @@ public class ScalingSystem {
             return;
         }
 
-        ItemStack current = mob.getEquippedStack(slot);
+        ItemStack current = mob.getItemBySlot(slot);
         String trackingKey = getArmorTrackingKey(slotName);
-        boolean previouslyEquipped = skillData.getBoolean(slotName + "_equipped");
+        boolean previouslyEquipped = skillData.getBooleanOr(slotName + "_equipped", false);
         boolean blockingItem = !current.isEmpty() && !isScalingEquippedItem(skillData, trackingKey, current);
         if (blockingItem) {
             if (!dropAndClearSlotOnce(mob, slot)) {
@@ -3269,28 +3269,28 @@ public class ScalingSystem {
         if (!tryPreserveDurability(armor,
                 previousArmor,
                 durabilityKey,
-                skillData.getInt(durabilityKey),
+                skillData.getIntOr(durabilityKey, 0),
                 snapshot)) {
             applyDurabilityMastery(armor, skillData, armorConfig, durabilityKey, previousArmor);
         }
         
         // Equip it
-        mob.equipStack(slot, armor);
+        mob.setItemSlot(slot, armor);
         logEquipmentDebug(mob, slotName, "Equipped tier " + tier + " item " + armor.getItem());
         skillData.putBoolean(slotName + "_equipped", true);
         trackEquippedItem(skillData, trackingKey, armor);
-        applyDropChance(mob, slot, skillData.getInt(slotName + "_drop_mastery"));
+        applyDropChance(mob, slot, skillData.getIntOr(slotName + "_drop_mastery", 0));
     }
 
-    private static boolean requiresEquipmentSync(MobEntity mob, NbtCompound skillData) {
+    private static boolean requiresEquipmentSync(Mob mob, CompoundTag skillData) {
         if (mob == null || skillData == null) {
             return false;
         }
-        if (!skillData.getBoolean(NBT_EQUIPMENT_PRIMED)) {
+        if (!skillData.getBooleanOr(NBT_EQUIPMENT_PRIMED, false)) {
             return false;
         }
-        if (skillData.getInt("weapon_tier") > 0) {
-            ItemStack weapon = mob.getEquippedStack(EquipmentSlot.MAINHAND);
+        if (skillData.getIntOr("weapon_tier", 0) > 0) {
+            ItemStack weapon = mob.getItemBySlot(EquipmentSlot.MAINHAND);
             if (weapon.isEmpty()) {
                 return true;
             }
@@ -3298,8 +3298,8 @@ public class ScalingSystem {
                 return true;
             }
         }
-        if (skillData.getInt("has_shield") > 0) {
-            ItemStack shield = mob.getEquippedStack(EquipmentSlot.OFFHAND);
+        if (skillData.getIntOr("has_shield", 0) > 0) {
+            ItemStack shield = mob.getItemBySlot(EquipmentSlot.OFFHAND);
             if (shield.isEmpty()) {
                 return true;
             }
@@ -3318,22 +3318,22 @@ public class ScalingSystem {
         return false;
     }
 
-    private static boolean isArmorSlotMissing(MobEntity mob, NbtCompound skillData, EquipmentSlot slot, String slotPrefix) {
-        return skillData.getInt(slotPrefix + "_tier") > 0 && mob.getEquippedStack(slot).isEmpty();
+    private static boolean isArmorSlotMissing(Mob mob, CompoundTag skillData, EquipmentSlot slot, String slotPrefix) {
+        return skillData.getIntOr(slotPrefix + "_tier", 0) > 0 && mob.getItemBySlot(slot).isEmpty();
     }
 
-    private static boolean isArmorSlotMismatched(MobEntity mob, NbtCompound skillData, EquipmentSlot slot, String slotPrefix) {
-        if (skillData.getInt(slotPrefix + "_tier") <= 0) {
+    private static boolean isArmorSlotMismatched(Mob mob, CompoundTag skillData, EquipmentSlot slot, String slotPrefix) {
+        if (skillData.getIntOr(slotPrefix + "_tier", 0) <= 0) {
             return false;
         }
-        ItemStack stack = mob.getEquippedStack(slot);
+        ItemStack stack = mob.getItemBySlot(slot);
         if (stack.isEmpty()) {
             return false;
         }
         return !isScalingEquippedItem(skillData, getArmorTrackingKey(slotPrefix), stack);
     }
 
-    private static void logEquipmentDebug(MobEntity mob, String slotLabel, String message) {
+    private static void logEquipmentDebug(Mob mob, String slotLabel, String message) {
         if (mob == null) {
             return;
         }
@@ -3342,7 +3342,7 @@ public class ScalingSystem {
             return;
         }
         String mobName = mob.getDisplayName().getString();
-        String uuid = mob.getUuid().toString();
+        String uuid = mob.getUUID().toString();
         String shortId = uuid.length() > 8 ? uuid.substring(0, 8) : uuid;
         AdvancedMobsMod.LOGGER.info(
             "[ScalingSystem][Equipment] {}#{} [{}] {}",
@@ -3353,11 +3353,11 @@ public class ScalingSystem {
         );
     }
 
-    private static boolean isPlayerOverrideActive(NbtCompound skillData, String key) {
-        return skillData != null && key != null && skillData.getBoolean(key);
+    private static boolean isPlayerOverrideActive(CompoundTag skillData, String key) {
+        return skillData != null && key != null && skillData.getBooleanOr(key, false);
     }
 
-    private static void setPlayerOverride(NbtCompound skillData, String key, boolean active) {
+    private static void setPlayerOverride(CompoundTag skillData, String key, boolean active) {
         if (skillData == null || key == null) {
             return;
         }
@@ -3372,22 +3372,22 @@ public class ScalingSystem {
         return slotPrefix + NBT_ARMOR_LAST_ITEM_SUFFIX;
     }
 
-    private static boolean isScalingEquippedItem(NbtCompound skillData, String trackingKey, ItemStack stack) {
+    private static boolean isScalingEquippedItem(CompoundTag skillData, String trackingKey, ItemStack stack) {
         if (skillData == null || trackingKey == null || stack == null || stack.isEmpty()) {
             return false;
         }
         if (!skillData.contains(trackingKey)) {
             return false;
         }
-        String trackedId = skillData.getString(trackingKey);
+        String trackedId = skillData.getStringOr(trackingKey, "");
         if (trackedId == null || trackedId.isEmpty()) {
             return false;
         }
-        Identifier stackId = Registries.ITEM.getId(stack.getItem());
+        Identifier stackId = BuiltInRegistries.ITEM.getId(stack.getItem());
         return stackId != null && trackedId.equals(stackId.toString());
     }
 
-    private static void trackEquippedItem(NbtCompound skillData, String trackingKey, ItemStack stack) {
+    private static void trackEquippedItem(CompoundTag skillData, String trackingKey, ItemStack stack) {
         if (skillData == null || trackingKey == null) {
             return;
         }
@@ -3395,7 +3395,7 @@ public class ScalingSystem {
             skillData.remove(trackingKey);
             return;
         }
-        Identifier stackId = Registries.ITEM.getId(stack.getItem());
+        Identifier stackId = BuiltInRegistries.ITEM.getId(stack.getItem());
         if (stackId != null) {
             skillData.putString(trackingKey, stackId.toString());
         }
@@ -3407,24 +3407,24 @@ public class ScalingSystem {
      * New format keys are: {prefix}{namespace}__{path}
      * Legacy format keys (minecraft-only) are: {prefix}{path}
      */
-    private static void applyEnchantmentsFromSkillData(ItemStack item, NbtCompound skillData,
-            String prefix, ServerWorld world) {
+    private static void applyEnchantmentsFromSkillData(ItemStack item, CompoundTag skillData,
+            String prefix, ServerLevel world) {
 
         if (item == null || item.isEmpty() || skillData == null || prefix == null || world == null) {
             return;
         }
 
-        Registry<Enchantment> enchantRegistry = world.getRegistryManager().get(RegistryKeys.ENCHANTMENT);
-        ItemEnchantmentsComponent existing = item.getOrDefault(
-            DataComponentTypes.ENCHANTMENTS,
-            ItemEnchantmentsComponent.DEFAULT
+        Registry<Enchantment> enchantRegistry = world.getRegistryManager().get(Registries.ENCHANTMENT);
+        ItemEnchantments existing = item.getOrDefault(
+            DataComponents.ENCHANTMENTS,
+            ItemEnchantments.DEFAULT
         );
 
         // Normalize the existing component so ALL kept entries come from THIS registry instance.
         // This avoids "Can't find id" crashes during packet encoding when another mod serializes
-        // ItemStacks using a different RegistryManager than the one that created the RegistryEntry.
-        ItemEnchantmentsComponent normalizedExisting = normalizeEnchantmentsComponent(existing, enchantRegistry);
-        ItemEnchantmentsComponent.Builder builder = new ItemEnchantmentsComponent.Builder(normalizedExisting);
+        // ItemStacks using a different RegistryManager than the one that created the Holder.
+        ItemEnchantments normalizedExisting = normalizeEnchantmentsComponent(existing, enchantRegistry);
+        ItemEnchantments.Builder builder = new ItemEnchantments.Builder(normalizedExisting);
 
         Set<String> keys = new HashSet<>(skillData.getKeys());
         List<String> legacyKeysToRemove = new ArrayList<>();
@@ -3433,7 +3433,7 @@ public class ScalingSystem {
             if (!key.startsWith(prefix)) {
                 continue;
             }
-            int storedLevel = skillData.getInt(key);
+            int storedLevel = skillData.getIntOr(key, 0);
             if (storedLevel <= 0) {
                 continue;
             }
@@ -3448,7 +3448,7 @@ public class ScalingSystem {
                 continue;
             }
 
-            RegistryEntry<Enchantment> entry = getEnchantmentEntry(enchantRegistry, enchantId);
+            Holder<Enchantment> entry = getEnchantmentEntry(enchantRegistry, enchantId);
             if (entry == null) {
                 continue;
             }
@@ -3475,7 +3475,7 @@ public class ScalingSystem {
             skillData.remove(legacy);
         }
 
-        item.set(DataComponentTypes.ENCHANTMENTS, builder.build());
+        item.set(DataComponents.ENCHANTMENTS, builder.build());
     }
 
     public static void setEnchantmentNetworkAllowlist(Set<Identifier> allowlist) {
@@ -3509,29 +3509,29 @@ public class ScalingSystem {
         return allowed;
     }
 
-    private static ItemEnchantmentsComponent normalizeEnchantmentsComponent(
-        ItemEnchantmentsComponent existing,
+    private static ItemEnchantments normalizeEnchantmentsComponent(
+        ItemEnchantments existing,
         Registry<Enchantment> enchantRegistry
     ) {
         if (existing == null || enchantRegistry == null) {
-            return ItemEnchantmentsComponent.DEFAULT;
+            return ItemEnchantments.DEFAULT;
         }
 
-        ItemEnchantmentsComponent.Builder builder = new ItemEnchantmentsComponent.Builder(ItemEnchantmentsComponent.DEFAULT);
+        ItemEnchantments.Builder builder = new ItemEnchantments.Builder(ItemEnchantments.DEFAULT);
 
         // Re-add enchantments using registry entries from THIS registry manager.
-        // This specifically prevents holding onto RegistryEntry instances originating from a
+        // This specifically prevents holding onto Holder instances originating from a
         // different registry (common when other mods / datapacks / client registries touched the stack).
         try {
-            for (Object2IntMap.Entry<RegistryEntry<Enchantment>> entry : existing.getEnchantmentEntries()) {
-                RegistryEntry<Enchantment> original = entry.getKey();
+            for (Object2IntMap.Entry<Holder<Enchantment>> entry : existing.getEnchantmentEntries()) {
+                Holder<Enchantment> original = entry.getKey();
                 if (original == null) {
                     continue;
                 }
 
                 Identifier id = null;
                 try {
-                    id = original.getKey().map(RegistryKey::getValue).orElse(null);
+                    id = original.getKey().map(ResourceKey::getValue).orElse(null);
                 } catch (Exception ignored) {
                     id = null;
                 }
@@ -3548,7 +3548,7 @@ public class ScalingSystem {
                     continue;
                 }
 
-                RegistryEntry<Enchantment> normalized = getEnchantmentEntry(enchantRegistry, id);
+                Holder<Enchantment> normalized = getEnchantmentEntry(enchantRegistry, id);
                 if (normalized == null) {
                     continue;
                 }
@@ -3568,12 +3568,12 @@ public class ScalingSystem {
         return builder.build();
     }
 
-    private static RegistryEntry<Enchantment> getEnchantmentEntry(Registry<Enchantment> registry, Identifier id) {
+    private static Holder<Enchantment> getEnchantmentEntry(Registry<Enchantment> registry, Identifier id) {
         if (registry == null || id == null) {
             return null;
         }
         try {
-            RegistryKey<Enchantment> key = RegistryKey.of(RegistryKeys.ENCHANTMENT, id);
+            ResourceKey<Enchantment> key = ResourceKey.create(Registries.ENCHANTMENT, id);
             return registry.getEntry(key).orElse(null);
         } catch (Exception ignored) {
             return null;
@@ -3595,7 +3595,7 @@ public class ScalingSystem {
         if (sep <= 0) {
             // Legacy format: treat suffix as minecraft path
             try {
-                return Identifier.of("minecraft", suffix);
+                return Identifier.fromNamespaceAndPath("minecraft", suffix);
             } catch (Exception ignored) {
                 return null;
             }
@@ -3606,25 +3606,25 @@ public class ScalingSystem {
             return null;
         }
         try {
-            return Identifier.of(ns, path);
+            return Identifier.fromNamespaceAndPath(ns, path);
         } catch (Exception ignored) {
             return null;
         }
     }
 
-    private static int getStoredEnchantLevel(NbtCompound skillData, String prefix, Identifier id) {
+    private static int getStoredEnchantLevel(CompoundTag skillData, String prefix, Identifier id) {
         if (skillData == null || prefix == null || id == null) {
             return 0;
         }
         String encodedKey = prefix + encodeEnchantmentId(id);
         if (skillData.contains(encodedKey)) {
-            return skillData.getInt(encodedKey);
+            return skillData.getIntOr(encodedKey, 0);
         }
         // Backward compatibility for old configs that stored minecraft enchantments by path only.
         if ("minecraft".equals(id.getNamespace())) {
             String legacyKey = prefix + id.getPath();
             if (skillData.contains(legacyKey)) {
-                return skillData.getInt(legacyKey);
+                return skillData.getIntOr(legacyKey, 0);
             }
         }
         return 0;
@@ -3666,7 +3666,7 @@ public class ScalingSystem {
         return "enchant_cost_bump_" + slotGroup;
     }
 
-    private static int getEnchantUpgradeCost(NbtCompound skillData, String slotGroup) {
+    private static int getEnchantUpgradeCost(CompoundTag skillData, String slotGroup) {
         if (skillData == null) {
             return BASE_ENCHANT_COST;
         }
@@ -3674,7 +3674,7 @@ public class ScalingSystem {
         return Math.max(0, BASE_ENCHANT_COST + bump);
     }
 
-    private static void maybeBumpEnchantCost(NbtCompound skillData, String enchantUpgradeKey, Random random, UpgradeLogBuffer logBuffer) {
+    private static void maybeBumpEnchantCost(CompoundTag skillData, String enchantUpgradeKey, Random random, UpgradeLogBuffer logBuffer) {
         if (skillData == null || random == null || enchantUpgradeKey == null) {
             return;
         }
@@ -3689,14 +3689,14 @@ public class ScalingSystem {
             return;
         }
         String bumpKey = getEnchantCostBumpKey(slotGroup);
-        int bump = Math.max(0, skillData.getInt(bumpKey));
+        int bump = Math.max(0, skillData.getIntOr(bumpKey, 0));
         skillData.putInt(bumpKey, bump + 1);
         if (logBuffer != null) {
             logBuffer.log("Enchant cost bump: " + slotGroup + " is now +" + (bump + 1));
         }
     }
 
-    private static void logEnchantOptionCounts(UpgradeLogBuffer logBuffer, List<UpgradeOption> options, NbtCompound skillData) {
+    private static void logEnchantOptionCounts(UpgradeLogBuffer logBuffer, List<UpgradeOption> options, CompoundTag skillData) {
         if (logBuffer == null || options == null) {
             return;
         }
@@ -3737,11 +3737,11 @@ public class ScalingSystem {
         );
     }
 
-    private static boolean isCompatibleWithApplied(RegistryEntry<Enchantment> candidate, List<RegistryEntry<Enchantment>> applied) {
+    private static boolean isCompatibleWithApplied(Holder<Enchantment> candidate, List<Holder<Enchantment>> applied) {
         if (candidate == null || applied == null) {
             return true;
         }
-        for (RegistryEntry<Enchantment> existing : applied) {
+        for (Holder<Enchantment> existing : applied) {
             if (existing == null) {
                 continue;
             }
@@ -3752,18 +3752,18 @@ public class ScalingSystem {
         return true;
     }
 
-    private static boolean hasRemainingEnchantOptions(NbtCompound skillData, ItemStack stack, String enchantPrefix,
+    private static boolean hasRemainingEnchantOptions(CompoundTag skillData, ItemStack stack, String enchantPrefix,
             Registry<Enchantment> registry) {
         if (skillData == null || stack == null || stack.isEmpty() || enchantPrefix == null || registry == null) {
             return false;
         }
-        List<RegistryEntry<Enchantment>> applied = new ArrayList<>();
+        List<Holder<Enchantment>> applied = new ArrayList<>();
 
         for (String key : skillData.getKeys()) {
             if (!key.startsWith(enchantPrefix)) {
                 continue;
             }
-            int level = skillData.getInt(key);
+            int level = skillData.getIntOr(key, 0);
             if (level <= 0) {
                 continue;
             }
@@ -3774,18 +3774,18 @@ public class ScalingSystem {
             if (!isEnchantmentAllowed(enchantId)) {
                 continue;
             }
-            RegistryEntry<Enchantment> entry = getEnchantmentEntry(registry, enchantId);
+            Holder<Enchantment> entry = getEnchantmentEntry(registry, enchantId);
             if (entry != null) {
                 applied.add(entry);
             }
         }
 
-        for (RegistryKey<Enchantment> enchantKey : registry.getKeys()) {
+        for (ResourceKey<Enchantment> enchantKey : registry.getKeys()) {
             Identifier id = enchantKey.getValue();
             if (!isEnchantmentAllowed(id)) {
                 continue;
             }
-            RegistryEntry<Enchantment> entry = registry.getEntry(enchantKey).orElse(null);
+            Holder<Enchantment> entry = registry.getEntry(enchantKey).orElse(null);
             if (entry == null) {
                 continue;
             }
@@ -3806,7 +3806,7 @@ public class ScalingSystem {
         return false;
     }
 
-    private static void addDynamicEnchantmentUpgrades(ItemStack stack, Registry<Enchantment> registry, NbtCompound skillData,
+    private static void addDynamicEnchantmentUpgrades(ItemStack stack, Registry<Enchantment> registry, CompoundTag skillData,
             int budget, List<UpgradeOption> affordable,
             String enchantPrefix, String slotGroup) {
 
@@ -3819,12 +3819,12 @@ public class ScalingSystem {
             return;
         }
 
-        List<RegistryEntry<Enchantment>> applied = new ArrayList<>();
+        List<Holder<Enchantment>> applied = new ArrayList<>();
         for (String key : skillData.getKeys()) {
             if (!key.startsWith(enchantPrefix)) {
                 continue;
             }
-            int level = skillData.getInt(key);
+            int level = skillData.getIntOr(key, 0);
             if (level <= 0) {
                 continue;
             }
@@ -3835,18 +3835,18 @@ public class ScalingSystem {
             if (!isEnchantmentAllowed(enchantId)) {
                 continue;
             }
-            RegistryEntry<Enchantment> entry = getEnchantmentEntry(registry, enchantId);
+            Holder<Enchantment> entry = getEnchantmentEntry(registry, enchantId);
             if (entry != null) {
                 applied.add(entry);
             }
         }
 
-        for (RegistryKey<Enchantment> enchantKey : registry.getKeys()) {
+        for (ResourceKey<Enchantment> enchantKey : registry.getKeys()) {
             Identifier id = enchantKey.getValue();
             if (!isEnchantmentAllowed(id)) {
                 continue;
             }
-            RegistryEntry<Enchantment> entry = registry.getEntry(enchantKey).orElse(null);
+            Holder<Enchantment> entry = registry.getEntry(enchantKey).orElse(null);
             if (entry == null) {
                 continue;
             }
@@ -3883,7 +3883,7 @@ public class ScalingSystem {
     private static volatile java.lang.reflect.Method ENCHANT_CAN_COMBINE_ENTRY;
     private static volatile java.lang.reflect.Method ENCHANT_IS_CURSED;
 
-    private static boolean areEnchantmentsCompatible(RegistryEntry<Enchantment> first, RegistryEntry<Enchantment> second) {
+    private static boolean areEnchantmentsCompatible(Holder<Enchantment> first, Holder<Enchantment> second) {
         if (first == null || second == null) {
             return true;
         }
@@ -3928,7 +3928,7 @@ public class ScalingSystem {
 
     private static java.lang.reflect.Method resolveEnchantCombineEntryMethod() {
         try {
-            java.lang.reflect.Method method = Enchantment.class.getMethod("canCombine", RegistryEntry.class);
+            java.lang.reflect.Method method = Enchantment.class.getMethod("canCombine", Holder.class);
             ENCHANT_CAN_COMBINE_ENTRY = method;
             return method;
         } catch (Exception ignored) {
@@ -3948,14 +3948,14 @@ public class ScalingSystem {
         }
     }
 
-    private static boolean isCurseEnchantment(RegistryEntry<Enchantment> entry) {
+    private static boolean isCurseEnchantment(Holder<Enchantment> entry) {
         if (entry == null) {
             return false;
         }
 
         // Prefer tags when available (covers modded curses too).
         try {
-            Class<?> enchantmentTags = Class.forName("net.minecraft.registry.tag.EnchantmentTags");
+            Class<?> enchantmentTags = Class.forName("net.minecraft.tags.EnchantmentTags");
             java.lang.reflect.Field curseField;
             try {
                 curseField = enchantmentTags.getField("CURSE");
@@ -3963,8 +3963,8 @@ public class ScalingSystem {
                 curseField = enchantmentTags.getField("CURSES");
             }
             Object tagKey = curseField.get(null);
-            Class<?> tagKeyClass = Class.forName("net.minecraft.registry.tag.TagKey");
-            java.lang.reflect.Method isIn = RegistryEntry.class.getMethod("isIn", tagKeyClass);
+            Class<?> tagKeyClass = Class.forName("net.minecraft.tags.TagKey");
+            java.lang.reflect.Method isIn = Holder.class.getMethod("isIn", tagKeyClass);
             Object result = isIn.invoke(entry, tagKey);
             if (result instanceof Boolean) {
                 return (Boolean) result;
@@ -4002,9 +4002,9 @@ public class ScalingSystem {
      * Apply durability mastery - set item durability based on upgrade level
      * Higher mastery = spawn with more durability (0.10 to 1.00 = 10% to 100%)
      */
-    private static void applyDurabilityMastery(ItemStack item, NbtCompound skillData, JsonObject config,
+    private static void applyDurabilityMastery(ItemStack item, CompoundTag skillData, JsonObject config,
             String skillKey, ItemStack previousStack) {
-        int masteryLevel = skillData.getInt(skillKey);
+        int masteryLevel = skillData.getIntOr(skillKey, 0);
         if (masteryLevel <= 0) return;
         
         // Get durability percentage from config
@@ -4031,7 +4031,7 @@ public class ScalingSystem {
                 targetDurability = Math.min(maxDurability, previousDurability);
             }
             int damageToSet = Math.max(0, Math.min(maxDurability, maxDurability - targetDurability));
-            item.setDamage(damageToSet);
+            item.setDamageValue(damageToSet);
         }
     }
 
@@ -4039,7 +4039,7 @@ public class ScalingSystem {
         if (stack == null || stack.isEmpty() || stack.getMaxDamage() <= 0) {
             return -1;
         }
-        return stack.getMaxDamage() - stack.getDamage();
+        return stack.getMaxDamage() - stack.getDamageValue();
     }
 
     private static boolean tryPreserveDurability(ItemStack target, ItemStack previous,
@@ -4060,7 +4060,7 @@ public class ScalingSystem {
         if (target.getMaxDamage() <= 0) {
             return false;
         }
-        target.setDamage(Math.min(target.getMaxDamage(), Math.max(0, previous.getDamage())));
+        target.setDamageValue(Math.min(target.getMaxDamage(), Math.max(0, previous.getDamageValue())));
         return true;
     }
     
@@ -4272,8 +4272,8 @@ public class ScalingSystem {
     /**
      * Get enchantment registry entry by name
      */
-    private static RegistryEntry<Enchantment> getEnchantmentByName(String name, 
-            net.minecraft.registry.Registry<Enchantment> registry) {
+    private static Holder<Enchantment> getEnchantmentByName(String name, 
+            net.minecraft.core.Registry<Enchantment> registry) {
         
         // Common enchantment name mappings
         String key = switch (name.toLowerCase()) {
@@ -4304,7 +4304,7 @@ public class ScalingSystem {
             default -> name.toLowerCase();
         };
         
-        var id = net.minecraft.util.Identifier.of("minecraft", key);
+        var id = net.minecraft.resources.Identifier.fromNamespaceAndPath("minecraft", key);
         return registry.getEntry(id).orElse(null);
     }
     
@@ -4315,14 +4315,14 @@ public class ScalingSystem {
     /**
      * Highlights mobs that are in a critical health state so players can spot them easily.
      */
-    public static void handleCriticalGlow(MobEntity mob, DamageSource source) {
+    public static void handleCriticalGlow(Mob mob, DamageSource source) {
         if (mob == null || source == null) {
             return;
         }
         if (!ModConfig.getInstance().isScalingActive()) {
             return;
         }
-        if (!(mob.getWorld() instanceof ServerWorld)) {
+        if (!(mob.level() instanceof ServerLevel)) {
             return;
         }
         float maxHealth = mob.getMaxHealth();
@@ -4333,11 +4333,11 @@ public class ScalingSystem {
         if (mob.getHealth() > threshold) {
             return;
         }
-        if (mob.hasStatusEffect(StatusEffects.GLOWING)) {
+        if (mob.hasEffect(MobEffects.GLOWING)) {
             return;
         }
-        mob.addStatusEffect(new StatusEffectInstance(
-            StatusEffects.GLOWING,
+        mob.addEffect(new MobEffectInstance(
+            MobEffects.GLOWING,
             100,
             0,
             false,
@@ -4350,13 +4350,13 @@ public class ScalingSystem {
      * Handle on-damage abilities like invisibility_on_hit
      * Call this from a damage event handler
      */
-    public static void handleDamageAbilities(MobEntity mob, MobWarData data, long currentTick) {
+    public static void handleDamageAbilities(Mob mob, MobWarData data, long currentTick) {
         if (!ModConfig.getInstance().isScalingActive()) return;
         
         JsonObject config = getConfigForMob(mob);
         if (config == null) return;
         
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         
         if (!config.has("tree")) return;
         JsonObject tree = config.getAsJsonObject("tree");
@@ -4368,7 +4368,7 @@ public class ScalingSystem {
         JsonObject effects = tree.getAsJsonObject(effectsKey);
         
         // Check invisibility_on_hit
-        int invisLevel = skillData.getInt("effect_invisibility_on_hit");
+        int invisLevel = skillData.getIntOr("effect_invisibility_on_hit", 0);
         if (invisLevel > 0 && effects.has("invisibility_on_hit")) {
             JsonArray levels = effects.getAsJsonArray("invisibility_on_hit");
             if (invisLevel <= levels.size()) {
@@ -4379,7 +4379,7 @@ public class ScalingSystem {
                 int cooldown = levelData.has("cooldown") ? levelData.get("cooldown").getAsInt() : 60;
                 
                 // Check cooldown (cooldown timer starts after invisibility expires)
-                UUID mobUuid = mob.getUuid();
+                UUID mobUuid = mob.getUUID();
                 Map<String, Long> cooldowns = ABILITY_COOLDOWNS.computeIfAbsent(mobUuid, k -> new HashMap<>());
 
                 long configuredCooldownTicks = Math.max(0L, (long)Math.max(0, cooldown) * 20L);
@@ -4396,8 +4396,8 @@ public class ScalingSystem {
                         long requestedDurationTicks = Math.max(1L, safeDurationSeconds) * 20L;
                         int invisDurationTicks = (int)Math.min(Integer.MAX_VALUE, requestedDurationTicks);
 
-                        mob.addStatusEffect(new StatusEffectInstance(
-                            StatusEffects.INVISIBILITY,
+                        mob.addEffect(new MobEffectInstance(
+                            MobEffects.INVISIBILITY,
                             invisDurationTicks,
                             0,
                             false,
@@ -4416,7 +4416,7 @@ public class ScalingSystem {
         }
         
         // Check on_damage_regen (from regeneration ability)
-        int regenerationLevel = skillData.getInt("effect_regeneration");
+        int regenerationLevel = skillData.getIntOr("effect_regeneration", 0);
         if (regenerationLevel >= 3 && effects.has("regeneration")) {
             JsonArray levels = effects.getAsJsonArray("regeneration");
             if (regenerationLevel <= levels.size()) {
@@ -4427,7 +4427,7 @@ public class ScalingSystem {
                     int duration = levelData.has("on_damage_duration") ? levelData.get("on_damage_duration").getAsInt() : 10;
                     int cooldown = levelData.has("on_damage_cooldown") ? levelData.get("on_damage_cooldown").getAsInt() : 60;
                     
-                    UUID mobUuid = mob.getUuid();
+                    UUID mobUuid = mob.getUUID();
                     Map<String, Long> cooldowns = ABILITY_COOLDOWNS.computeIfAbsent(mobUuid, k -> new HashMap<>());
                     long lastUse = cooldowns.getOrDefault("on_damage_regen", 0L);
                     
@@ -4436,8 +4436,8 @@ public class ScalingSystem {
                         // This used to apply INFINITE regeneration, so once a mob with
                         // regeneration level 3 or higher took damage it kept the effect
                         // forever instead of for the configured duration.
-                        mob.addStatusEffect(new StatusEffectInstance(
-                            StatusEffects.REGENERATION,
+                        mob.addEffect(new MobEffectInstance(
+                            MobEffects.REGENERATION,
                             Math.max(1, duration) * 20,
                             regenLevel - 1,
                             false,
@@ -4463,14 +4463,14 @@ public class ScalingSystem {
      * Handle melee attack abilities like hunger_attack
      * Call this when a mob deals melee damage to a player
      */
-    public static void handleMeleeAttackAbilities(MobEntity mob, MobWarData data, 
-            net.minecraft.entity.LivingEntity target, long currentTick) {
+    public static void handleMeleeAttackAbilities(Mob mob, MobWarData data, 
+            net.minecraft.world.entity.LivingEntity target, long currentTick) {
         if (!ModConfig.getInstance().isScalingActive()) return;
         
         JsonObject config = getConfigForMob(mob);
         if (config == null) return;
         
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (!config.has("tree")) return;
         JsonObject tree = config.getAsJsonObject("tree");
         
@@ -4478,7 +4478,7 @@ public class ScalingSystem {
         JsonObject abilities = tree.getAsJsonObject("special_abilities");
         
         // Hunger Attack - apply hunger effect on hit
-        int hungerLevel = skillData.getInt("ability_hunger_attack");
+        int hungerLevel = skillData.getIntOr("ability_hunger_attack", 0);
         if (hungerLevel > 0 && abilities.has("hunger_attack")) {
             JsonArray levels = abilities.getAsJsonArray("hunger_attack");
             if (hungerLevel <= levels.size()) {
@@ -4486,8 +4486,8 @@ public class ScalingSystem {
                 int effectLevel = levelData.has("hunger_level") ? levelData.get("hunger_level").getAsInt() : 1;
                 int duration = levelData.has("duration") ? levelData.get("duration").getAsInt() : 10;
                 
-                target.addStatusEffect(new StatusEffectInstance(
-                    StatusEffects.HUNGER, duration * 20, effectLevel - 1, false, true, true));
+                target.addEffect(new MobEffectInstance(
+                    MobEffects.HUNGER, duration * 20, effectLevel - 1, false, true, true));
             }
         }
 
@@ -4498,18 +4498,18 @@ public class ScalingSystem {
      * Handle horde summon ability - chance to summon reinforcements when damaged
      * Call this when a mob takes damage
      */
-    public static void handleHordeSummon(MobEntity mob, MobWarData data, ServerWorld world, long currentTick) {
+    public static void handleHordeSummon(Mob mob, MobWarData data, ServerLevel world, long currentTick) {
         if (!ModConfig.getInstance().isScalingActive()) return;
 
         // Horde reinforcements are not allowed to trigger horde summon (prevents recursion).
-        if (mob.getCommandTags().contains(HORDE_REINFORCEMENT_TAG) || data.getSkillData().getBoolean(NBT_HORDE_REINFORCEMENT)) {
+        if (mob.getTags().contains(HORDE_REINFORCEMENT_TAG) || data.getSkillData().getBooleanOr(NBT_HORDE_REINFORCEMENT, false)) {
             return;
         }
         
         JsonObject config = getConfigForMob(mob);
         if (config == null) return;
         
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (!config.has("tree")) return;
         JsonObject tree = config.getAsJsonObject("tree");
         
@@ -4517,7 +4517,7 @@ public class ScalingSystem {
         JsonObject abilities = tree.getAsJsonObject("special_abilities");
         
         // Horde Summon - chance to spawn reinforcements
-        int hordeLevel = skillData.getInt("ability_horde_summon");
+        int hordeLevel = skillData.getIntOr("ability_horde_summon", 0);
         if (hordeLevel > 0 && abilities.has("horde_summon")) {
             JsonArray levels = abilities.getAsJsonArray("horde_summon");
             if (hordeLevel <= levels.size()) {
@@ -4525,7 +4525,7 @@ public class ScalingSystem {
                 double chance = levelData.has("chance") ? levelData.get("chance").getAsDouble() : 0.1;
                 
                 // Check cooldown (60 seconds)
-                UUID mobUuid = mob.getUuid();
+                UUID mobUuid = mob.getUUID();
                 Map<String, Long> cooldowns = ABILITY_COOLDOWNS.computeIfAbsent(mobUuid, k -> new HashMap<>());
                 long cooldownTicks = 1200L;
                 long lastUse = cooldowns.getOrDefault("horde_summon", currentTick - cooldownTicks);
@@ -4535,15 +4535,15 @@ public class ScalingSystem {
                         // Global limiter: if too many mobs are already actively fighting nearby, don't add more.
                         // This is intentionally checked only right before spawning to avoid constant scanning.
                         int nearbyHordeCapableOrUsed = 0;
-                        for (MobEntity entity : world.getEntitiesByClass(
-                            MobEntity.class,
-                            mob.getBoundingBox().expand(HORDE_NEARBY_RADIUS),
+                        for (Mob entity : world.getEntitiesOfClass(
+                            Mob.class,
+                            mob.getBoundingBox().inflate(HORDE_NEARBY_RADIUS),
                             entity -> entity != null && entity.isAlive()
                         )) {
                             try {
                                 MobWarData otherData = MobWarData.get(entity);
-                                boolean hasHorde = otherData != null && otherData.getSkillData().getInt("ability_horde_summon") > 0;
-                                Map<String, Long> otherCooldowns = ABILITY_COOLDOWNS.get(entity.getUuid());
+                                boolean hasHorde = otherData != null && otherData.getSkillData().getIntOr("ability_horde_summon", 0) > 0;
+                                Map<String, Long> otherCooldowns = ABILITY_COOLDOWNS.get(entity.getUUID());
                                 boolean hasUsedHorde = otherCooldowns != null && otherCooldowns.containsKey("horde_summon");
 
                                 if (hasHorde || hasUsedHorde) {
@@ -4561,22 +4561,22 @@ public class ScalingSystem {
 
                         // Spawn a copy of this mob type nearby
                         try {
-                            MobEntity reinforcement = (MobEntity) mob.getType().create(world);
+                            Mob reinforcement = (Mob) mob.getType().create(world);
                             if (reinforcement != null) {
                                 double offsetX = (mob.getRandom().nextDouble() - 0.5) * 4;
                                 double offsetZ = (mob.getRandom().nextDouble() - 0.5) * 4;
-                                reinforcement.refreshPositionAndAngles(
+                                reinforcement.snapTo(
                                     mob.getX() + offsetX, mob.getY(), mob.getZ() + offsetZ,
                                     mob.getRandom().nextFloat() * 360, 0);
                                 reinforcement.initialize(
                                     world,
-                                    world.getLocalDifficulty(reinforcement.getBlockPos()),
-                                    SpawnReason.EVENT,
+                                    world.getCurrentDifficultyAt(reinforcement.blockPosition()),
+                                    EntitySpawnReason.EVENT,
                                     null
                                 );
 
                                 // Mark as horde reinforcement so it can't learn/use horde summon.
-                                reinforcement.addCommandTag(HORDE_REINFORCEMENT_TAG);
+                                reinforcement.addTag(HORDE_REINFORCEMENT_TAG);
                                 try {
                                     MobWarData reinforcementData = MobWarData.get(reinforcement);
                                     reinforcementData.getSkillData().putBoolean(NBT_HORDE_REINFORCEMENT, true);
@@ -4584,7 +4584,7 @@ public class ScalingSystem {
                                 } catch (Exception ignored) {
                                 }
 
-                                world.spawnEntity(reinforcement);
+                                world.addFreshEntity(reinforcement);
                                 cooldowns.put("horde_summon", currentTick);
                             }
                         } catch (Exception ignored) {}
@@ -4599,14 +4599,14 @@ public class ScalingSystem {
      * Call this when a mob fires a projectile
      * Returns the number of extra projectiles to fire (for multishot)
      */
-    public static int handleRangedAbilities(MobEntity mob, MobWarData data, 
-            net.minecraft.entity.LivingEntity target, long currentTick) {
+    public static int handleRangedAbilities(Mob mob, MobWarData data, 
+            net.minecraft.world.entity.LivingEntity target, long currentTick) {
         if (!ModConfig.getInstance().isScalingActive()) return 0;
         
         JsonObject config = getConfigForMob(mob);
         if (config == null) return 0;
         
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (!config.has("tree")) return 0;
         JsonObject tree = config.getAsJsonObject("tree");
         
@@ -4616,7 +4616,7 @@ public class ScalingSystem {
         int extraProjectiles = 0;
         
         // Multishot - extra projectiles
-        int multishotLevel = skillData.getInt("ability_multishot");
+        int multishotLevel = skillData.getIntOr("ability_multishot", 0);
         if (multishotLevel > 0 && abilities.has("multishot")) {
             JsonArray levels = abilities.getAsJsonArray("multishot");
             if (multishotLevel <= levels.size()) {
@@ -4632,20 +4632,20 @@ public class ScalingSystem {
     /**
      * Get piercing level for projectiles
      */
-    public static int getPiercingLevel(MobEntity mob, MobWarData data) {
+    public static int getPiercingLevel(Mob mob, MobWarData data) {
         if (!ModConfig.getInstance().isScalingActive()) return 0;
         
         JsonObject config = getConfigForMob(mob);
         if (config == null) return 0;
         
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (!config.has("tree")) return 0;
         JsonObject tree = config.getAsJsonObject("tree");
         
         if (!tree.has("special_abilities")) return 0;
         JsonObject abilities = tree.getAsJsonObject("special_abilities");
         
-        int piercingLevel = skillData.getInt("ability_piercing_shot");
+        int piercingLevel = skillData.getIntOr("ability_piercing_shot", 0);
         if (piercingLevel > 0 && abilities.has("piercing_shot")) {
             JsonArray levels = abilities.getAsJsonArray("piercing_shot");
             if (piercingLevel <= levels.size()) {
@@ -4660,21 +4660,21 @@ public class ScalingSystem {
      * Apply ranged potion effects to a hit target
      * Call this when a projectile from a mob hits a target
      */
-    public static void applyRangedPotionEffects(MobEntity mob, MobWarData data, 
-            net.minecraft.entity.LivingEntity target) {
+    public static void applyRangedPotionEffects(Mob mob, MobWarData data, 
+            net.minecraft.world.entity.LivingEntity target) {
         if (!ModConfig.getInstance().isScalingActive()) return;
         
         JsonObject config = getConfigForMob(mob);
         if (config == null) return;
         
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (!config.has("tree")) return;
         JsonObject tree = config.getAsJsonObject("tree");
         
         if (!tree.has("special_abilities")) return;
         JsonObject abilities = tree.getAsJsonObject("special_abilities");
         
-        int potionMasteryLevel = skillData.getInt("ability_ranged_potion_mastery");
+        int potionMasteryLevel = skillData.getIntOr("ability_ranged_potion_mastery", 0);
         if (potionMasteryLevel > 0 && abilities.has("ranged_potion_mastery")) {
             JsonArray levels = abilities.getAsJsonArray("ranged_potion_mastery");
             if (potionMasteryLevel <= levels.size()) {
@@ -4693,10 +4693,10 @@ public class ScalingSystem {
                         if (statusEffect != null) {
                             // Instant effects don't need duration
                             if (type.equals("instant_damage") || type.equals("instant_health")) {
-                                target.addStatusEffect(new StatusEffectInstance(
+                                target.addEffect(new MobEffectInstance(
                                     statusEffect, 1, level - 1, false, true, true));
                             } else {
-                                target.addStatusEffect(new StatusEffectInstance(
+                                target.addEffect(new MobEffectInstance(
                                     statusEffect, duration * 20, level - 1, false, true, true));
                             }
                         }
@@ -4709,20 +4709,20 @@ public class ScalingSystem {
     /**
      * Get status effect by name for ranged potion mastery
      */
-    private static net.minecraft.registry.entry.RegistryEntry<net.minecraft.entity.effect.StatusEffect> 
+    private static net.minecraft.core.Holder<net.minecraft.world.effect.MobEffect> 
             getPotionEffectByName(String name) {
         return switch (name.toLowerCase()) {
-            case "slowness" -> StatusEffects.SLOWNESS;
-            case "weakness" -> StatusEffects.WEAKNESS;
-            case "poison" -> StatusEffects.POISON;
-            case "wither" -> StatusEffects.WITHER;
-            case "instant_damage", "harming" -> StatusEffects.INSTANT_DAMAGE;
-            case "instant_health", "regeneration" -> StatusEffects.INSTANT_HEALTH;
-            case "blindness" -> StatusEffects.BLINDNESS;
-            case "nausea" -> StatusEffects.NAUSEA;
-            case "hunger" -> StatusEffects.HUNGER;
-            case "mining_fatigue" -> StatusEffects.MINING_FATIGUE;
-            case "levitation" -> StatusEffects.LEVITATION;
+            case "slowness" -> MobEffects.SLOWNESS;
+            case "weakness" -> MobEffects.WEAKNESS;
+            case "poison" -> MobEffects.POISON;
+            case "wither" -> MobEffects.WITHER;
+            case "instant_damage", "harming" -> MobEffects.INSTANT_DAMAGE;
+            case "instant_health", "regeneration" -> MobEffects.INSTANT_HEALTH;
+            case "blindness" -> MobEffects.BLINDNESS;
+            case "nausea" -> MobEffects.NAUSEA;
+            case "hunger" -> MobEffects.HUNGER;
+            case "mining_fatigue" -> MobEffects.MINING_FATIGUE;
+            case "levitation" -> MobEffects.LEVITATION;
             default -> null;
         };
     }
@@ -4735,21 +4735,21 @@ public class ScalingSystem {
      * Handle Enderman shadow_step ability - teleport and leave blindness area
      * Call this when Enderman teleports (in teleport event handler)
      */
-    public static void handleShadowStep(MobEntity mob, MobWarData data, ServerWorld world, 
-            net.minecraft.util.math.BlockPos fromPos, long currentTick) {
+    public static void handleShadowStep(Mob mob, MobWarData data, ServerLevel world, 
+            net.minecraft.core.BlockPos fromPos, long currentTick) {
         if (!ModConfig.getInstance().isScalingActive()) return;
         
         JsonObject config = getConfigForMob(mob);
         if (config == null) return;
         
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (!config.has("tree")) return;
         JsonObject tree = config.getAsJsonObject("tree");
         
         if (!tree.has("special_abilities")) return;
         JsonObject abilities = tree.getAsJsonObject("special_abilities");
         
-        int shadowStepLevel = skillData.getInt("ability_shadow_step");
+        int shadowStepLevel = skillData.getIntOr("ability_shadow_step", 0);
         if (shadowStepLevel > 0 && abilities.has("shadow_step")) {
             JsonArray levels = abilities.getAsJsonArray("shadow_step");
             if (shadowStepLevel <= levels.size()) {
@@ -4762,7 +4762,7 @@ public class ScalingSystem {
                 long cooldownTicks = 30L * 20L;
                 
                 // Check cooldown
-                UUID mobUuid = mob.getUuid();
+                UUID mobUuid = mob.getUUID();
                 Map<String, Long> cooldowns = ABILITY_COOLDOWNS.computeIfAbsent(mobUuid, k -> new HashMap<>());
                 long lastUse = cooldowns.getOrDefault("shadow_step", 0L);
                 
@@ -4771,16 +4771,16 @@ public class ScalingSystem {
                         // Apply blindness to all entities in 3 block radius of where Enderman teleported FROM
                         double radius = 3.0;
                         boolean appliedAny = false;
-                        for (net.minecraft.entity.LivingEntity entity : world.getEntitiesByClass(
-                            net.minecraft.entity.LivingEntity.class,
-                            new net.minecraft.util.math.Box(fromPos).expand(radius),
-                            entity -> entity != mob && entity instanceof net.minecraft.entity.player.PlayerEntity
+                        for (net.minecraft.world.entity.LivingEntity entity : world.getEntitiesOfClass(
+                            net.minecraft.world.entity.LivingEntity.class,
+                            new net.minecraft.world.phys.AABB(fromPos).inflate(radius),
+                            entity -> entity != mob && entity instanceof net.minecraft.world.entity.player.Player
                         )) {
                             if (isTargetImmune(entity, "shadow_step", currentTick)) {
                                 continue;
                             }
-                            entity.addStatusEffect(new StatusEffectInstance(
-                                StatusEffects.BLINDNESS, blindDuration * 20, 0, false, true, true));
+                            entity.addEffect(new MobEffectInstance(
+                                MobEffects.BLINDNESS, blindDuration * 20, 0, false, true, true));
                             markTargetAffected(entity, "shadow_step", currentTick);
                             appliedAny = true;
                         }
@@ -4798,20 +4798,20 @@ public class ScalingSystem {
      * Handle Enderman void_grasp ability - check range, roll chance, apply effects
      * Call this periodically (every few seconds) to check for nearby entities
      */
-    public static void handleVoidGrasp(MobEntity mob, MobWarData data, ServerWorld world, long currentTick) {
+    public static void handleVoidGrasp(Mob mob, MobWarData data, ServerLevel world, long currentTick) {
         if (!ModConfig.getInstance().isScalingActive()) return;
         
         JsonObject config = getConfigForMob(mob);
         if (config == null) return;
         
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (!config.has("tree")) return;
         JsonObject tree = config.getAsJsonObject("tree");
         
         if (!tree.has("special_abilities")) return;
         JsonObject abilities = tree.getAsJsonObject("special_abilities");
         
-        int voidGraspLevel = skillData.getInt("ability_void_grasp");
+        int voidGraspLevel = skillData.getIntOr("ability_void_grasp", 0);
         if (voidGraspLevel > 0 && abilities.has("void_grasp")) {
             JsonArray levels = abilities.getAsJsonArray("void_grasp");
             if (voidGraspLevel <= levels.size()) {
@@ -4824,33 +4824,33 @@ public class ScalingSystem {
                 int levitationDuration = levelData.has("levitation_duration") ? levelData.get("levitation_duration").getAsInt() : 0;
                 
                 // Check cooldown (30 seconds)
-                UUID mobUuid = mob.getUuid();
+                UUID mobUuid = mob.getUUID();
                 Map<String, Long> cooldowns = ABILITY_COOLDOWNS.computeIfAbsent(mobUuid, k -> new HashMap<>());
                 long lastUse = cooldowns.getOrDefault("void_grasp", 0L);
                 
                 if (currentTick - lastUse >= 30L * 20L) {
                     // Find entities in range
-                    var nearbyEntities = world.getEntitiesByClass(net.minecraft.entity.LivingEntity.class,
-                        mob.getBoundingBox().expand(range),
-                        entity -> entity != mob && entity instanceof net.minecraft.entity.player.PlayerEntity);
+                    var nearbyEntities = world.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
+                        mob.getBoundingBox().inflate(range),
+                        entity -> entity != mob && entity instanceof net.minecraft.world.entity.player.Player);
                     
                     if (!nearbyEntities.isEmpty()) {
                         // Roll chance
                         if (mob.getRandom().nextDouble() < chance) {
                             // Apply effects to all entities in range
                             boolean appliedAny = false;
-                            for (net.minecraft.entity.LivingEntity entity : nearbyEntities) {
+                            for (net.minecraft.world.entity.LivingEntity entity : nearbyEntities) {
                                 if (isTargetImmune(entity, "void_grasp", currentTick)) {
                                     continue;
                                 }
                                 // Always apply weakness
-                                entity.addStatusEffect(new StatusEffectInstance(
-                                    StatusEffects.WEAKNESS, weaknessDuration * 20, weaknessLevel - 1, false, true, true));
+                                entity.addEffect(new MobEffectInstance(
+                                    MobEffects.WEAKNESS, weaknessDuration * 20, weaknessLevel - 1, false, true, true));
                                 
                                 // Apply levitation if duration > 0
                                 if (levitationDuration > 0) {
-                                    entity.addStatusEffect(new StatusEffectInstance(
-                                        StatusEffects.LEVITATION, levitationDuration * 20, 0, false, true, true));
+                                    entity.addEffect(new MobEffectInstance(
+                                        MobEffects.LEVITATION, levitationDuration * 20, 0, false, true, true));
                                 }
 
                                 markTargetAffected(entity, "void_grasp", currentTick);
@@ -4867,8 +4867,8 @@ public class ScalingSystem {
         }
     }
 
-    private static boolean isTargetImmune(net.minecraft.entity.LivingEntity target, String abilityKey, long currentTick) {
-        UUID targetUuid = target.getUuid();
+    private static boolean isTargetImmune(net.minecraft.world.entity.LivingEntity target, String abilityKey, long currentTick) {
+        UUID targetUuid = target.getUUID();
         Map<String, Long> immunities = ABILITY_TARGET_IMMUNITIES.get(targetUuid);
         if (immunities == null) {
             return false;
@@ -4891,8 +4891,8 @@ public class ScalingSystem {
         return false;
     }
 
-    private static void markTargetAffected(net.minecraft.entity.LivingEntity target, String abilityKey, long currentTick) {
-        UUID targetUuid = target.getUuid();
+    private static void markTargetAffected(net.minecraft.world.entity.LivingEntity target, String abilityKey, long currentTick) {
+        UUID targetUuid = target.getUUID();
         Map<String, Long> immunities = ABILITY_TARGET_IMMUNITIES.computeIfAbsent(targetUuid, k -> new HashMap<>());
         immunities.put(abilityKey, currentTick);
     }
@@ -4905,14 +4905,14 @@ public class ScalingSystem {
      * Get poison mastery data for Cave Spider melee attacks
      * Call this when Cave Spider deals melee damage to apply poison/wither/slowness
      */
-    public static void applyCaveSpiderPoison(MobEntity mob, MobWarData data, 
-            net.minecraft.entity.LivingEntity target) {
+    public static void applyCaveSpiderPoison(Mob mob, MobWarData data, 
+            net.minecraft.world.entity.LivingEntity target) {
         if (!ModConfig.getInstance().isScalingActive()) return;
         
         JsonObject config = getConfigForMob(mob);
         if (config == null) return;
         
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (!config.has("tree")) return;
         JsonObject tree = config.getAsJsonObject("tree");
         
@@ -4922,12 +4922,12 @@ public class ScalingSystem {
         applyCaveSpiderPoisonFromAbilities(skillData, abilities, target);
     }
 
-    private static void applyCaveSpiderPoisonFromAbilities(NbtCompound skillData, JsonObject abilities, net.minecraft.entity.LivingEntity target) {
+    private static void applyCaveSpiderPoisonFromAbilities(CompoundTag skillData, JsonObject abilities, net.minecraft.world.entity.LivingEntity target) {
         if (skillData == null || abilities == null || target == null) {
             return;
         }
 
-        int poisonLevel = skillData.getInt("ability_poison_mastery");
+        int poisonLevel = skillData.getIntOr("ability_poison_mastery", 0);
         if (poisonLevel <= 0 || !abilities.has("poison_mastery")) {
             return;
         }
@@ -4942,21 +4942,21 @@ public class ScalingSystem {
         int poisonEffectLevel = levelData.has("poison_level") ? levelData.get("poison_level").getAsInt() : 1;
         int duration = levelData.has("duration") ? levelData.get("duration").getAsInt() : 7;
 
-        target.addStatusEffect(new StatusEffectInstance(
-            StatusEffects.POISON, duration * 20, poisonEffectLevel - 1, false, true, true));
+        target.addEffect(new MobEffectInstance(
+            MobEffects.POISON, duration * 20, poisonEffectLevel - 1, false, true, true));
 
         if (levelData.has("wither_level")) {
             int witherLevel = levelData.get("wither_level").getAsInt();
             int witherDuration = levelData.has("wither_duration") ? levelData.get("wither_duration").getAsInt() : 10;
-            target.addStatusEffect(new StatusEffectInstance(
-                StatusEffects.WITHER, witherDuration * 20, witherLevel - 1, false, true, true));
+            target.addEffect(new MobEffectInstance(
+                MobEffects.WITHER, witherDuration * 20, witherLevel - 1, false, true, true));
         }
 
         if (levelData.has("slowness_level")) {
             int slownessLevel = levelData.get("slowness_level").getAsInt();
             int slownessDuration = levelData.has("slowness_duration") ? levelData.get("slowness_duration").getAsInt() : 15;
-            target.addStatusEffect(new StatusEffectInstance(
-                StatusEffects.SLOWNESS, slownessDuration * 20, slownessLevel - 1, false, true, true));
+            target.addEffect(new MobEffectInstance(
+                MobEffects.SLOWNESS, slownessDuration * 20, slownessLevel - 1, false, true, true));
         }
     }
     
@@ -4968,20 +4968,20 @@ public class ScalingSystem {
      * Get Creeper explosion power multiplier
      * Call this when Creeper is about to explode
      */
-    public static float getCreeperExplosionRadius(MobEntity mob, MobWarData data) {
+    public static float getCreeperExplosionRadius(Mob mob, MobWarData data) {
         if (!ModConfig.getInstance().isScalingActive()) return 3.0f; // Default creeper explosion
         
         JsonObject config = getConfigForMob(mob);
         if (config == null) return 3.0f;
         
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (!config.has("tree")) return 3.0f;
         JsonObject tree = config.getAsJsonObject("tree");
         
         if (!tree.has("special_abilities")) return 3.0f;
         JsonObject abilities = tree.getAsJsonObject("special_abilities");
         
-        int powerLevel = skillData.getInt("ability_creeper_power");
+        int powerLevel = skillData.getIntOr("ability_creeper_power", 0);
         if (powerLevel > 0 && abilities.has("creeper_power")) {
             JsonArray levels = abilities.getAsJsonArray("creeper_power");
             if (powerLevel <= levels.size()) {
@@ -4999,21 +4999,21 @@ public class ScalingSystem {
      * Spawn potion cloud effects at Creeper explosion location
      * Call this when Creeper explodes
      */
-    public static void spawnCreeperPotionCloud(MobEntity mob, MobWarData data, ServerWorld world, 
-            net.minecraft.util.math.BlockPos pos) {
+    public static void spawnCreeperPotionCloud(Mob mob, MobWarData data, ServerLevel world, 
+            net.minecraft.core.BlockPos pos) {
         if (!ModConfig.getInstance().isScalingActive()) return;
         
         JsonObject config = getConfigForMob(mob);
         if (config == null) return;
         
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (!config.has("tree")) return;
         JsonObject tree = config.getAsJsonObject("tree");
         
         if (!tree.has("special_abilities")) return;
         JsonObject abilities = tree.getAsJsonObject("special_abilities");
         
-        int cloudLevel = skillData.getInt("ability_creeper_potion_cloud");
+        int cloudLevel = skillData.getIntOr("ability_creeper_potion_cloud", 0);
         if (cloudLevel > 0 && abilities.has("creeper_potion_cloud")) {
             JsonArray levels = abilities.getAsJsonArray("creeper_potion_cloud");
             if (cloudLevel <= levels.size()) {
@@ -5023,9 +5023,9 @@ public class ScalingSystem {
                     JsonArray effectsArray = levelData.getAsJsonArray("effects");
                     
                     // Apply effects to all entities in 5 block radius
-                    world.getEntitiesByClass(net.minecraft.entity.LivingEntity.class,
-                        new net.minecraft.util.math.Box(pos).expand(5.0),
-                        entity -> entity != mob && entity instanceof net.minecraft.entity.player.PlayerEntity)
+                    world.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
+                        new net.minecraft.world.phys.AABB(pos).inflate(5.0),
+                        entity -> entity != mob && entity instanceof net.minecraft.world.entity.player.Player)
                         .forEach(entity -> {
                             for (JsonElement effectEl : effectsArray) {
                                 JsonObject effect = effectEl.getAsJsonObject();
@@ -5035,7 +5035,7 @@ public class ScalingSystem {
                                 
                                 var statusEffect = getPotionEffectByName(type);
                                 if (statusEffect != null) {
-                                    entity.addStatusEffect(new StatusEffectInstance(
+                                    entity.addEffect(new MobEffectInstance(
                                         statusEffect, duration * 20, level - 1, false, true, true));
                                 }
                             }
@@ -5053,28 +5053,28 @@ public class ScalingSystem {
      * Handle Ender Dragon void bombardment - enhanced dragon fireballs
      * Call this when dragon shoots fireball projectile
      */
-    public static void handleVoidBombardment(MobEntity mob, MobWarData data, ServerWorld world,
-            net.minecraft.entity.projectile.DragonFireballEntity fireball, long currentTick) {
+    public static void handleVoidBombardment(Mob mob, MobWarData data, ServerLevel world,
+            net.minecraft.world.entity.projectile.hurtingprojectile.DragonFireball fireball, long currentTick) {
         if (!ModConfig.getInstance().isScalingActive()) return;
         
         JsonObject config = getConfigForMob(mob);
         if (config == null) return;
         
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (!config.has("tree")) return;
         JsonObject tree = config.getAsJsonObject("tree");
         
         if (!tree.has("special_abilities")) return;
         JsonObject abilities = tree.getAsJsonObject("special_abilities");
         
-        int bombardLevel = skillData.getInt("ability_void_bombardment");
+        int bombardLevel = skillData.getIntOr("ability_void_bombardment", 0);
         if (bombardLevel > 0 && abilities.has("void_bombardment")) {
             JsonArray levels = abilities.getAsJsonArray("void_bombardment");
             if (bombardLevel <= levels.size()) {
                 JsonObject levelData = levels.get(bombardLevel - 1).getAsJsonObject();
                 
                 // Store damage and wither data in fireball NBT for use on impact
-                NbtCompound fireballData = new NbtCompound();
+                CompoundTag fireballData = new CompoundTag();
                 if (levelData.has("projectile_damage")) {
                     fireballData.putDouble("void_damage", levelData.get("projectile_damage").getAsDouble());
                 }
@@ -5092,21 +5092,21 @@ public class ScalingSystem {
      * Apply void bombardment effects on dragon fireball impact
      * Call this when dragon fireball hits target or ground
      */
-    public static void applyVoidBombardmentEffects(MobEntity mob, MobWarData data, ServerWorld world,
-            net.minecraft.util.math.Vec3d impactPos, net.minecraft.entity.LivingEntity directHit) {
+    public static void applyVoidBombardmentEffects(Mob mob, MobWarData data, ServerLevel world,
+            net.minecraft.world.phys.Vec3 impactPos, net.minecraft.world.entity.LivingEntity directHit) {
         if (!ModConfig.getInstance().isScalingActive()) return;
         
         JsonObject config = getConfigForMob(mob);
         if (config == null) return;
         
-        NbtCompound skillData = data.getSkillData();
+        CompoundTag skillData = data.getSkillData();
         if (!config.has("tree")) return;
         JsonObject tree = config.getAsJsonObject("tree");
         
         if (!tree.has("special_abilities")) return;
         JsonObject abilities = tree.getAsJsonObject("special_abilities");
         
-        int bombardLevel = skillData.getInt("ability_void_bombardment");
+        int bombardLevel = skillData.getIntOr("ability_void_bombardment", 0);
         if (bombardLevel > 0 && abilities.has("void_bombardment")) {
             JsonArray levels = abilities.getAsJsonArray("void_bombardment");
             if (bombardLevel <= levels.size()) {
@@ -5117,16 +5117,16 @@ public class ScalingSystem {
                 int witherDuration = levelData.has("wither_duration") ? levelData.get("wither_duration").getAsInt() : 1;
                 
                 // Apply damage and wither to all entities in radius
-                world.getEntitiesByClass(net.minecraft.entity.LivingEntity.class,
-                    net.minecraft.util.math.Box.of(impactPos, radius * 2, radius * 2, radius * 2),
+                world.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
+                    net.minecraft.world.phys.AABB.ofSize(impactPos, radius * 2, radius * 2, radius * 2),
                     entity -> entity != mob)
                     .forEach(entity -> {
                         // Apply extra damage
                         entity.damage(world.getDamageSources().dragonBreath(), (float) damage);
                         
                         // Apply wither
-                        entity.addStatusEffect(new StatusEffectInstance(
-                            StatusEffects.WITHER, witherDuration * 20, 0, false, true, true));
+                        entity.addEffect(new MobEffectInstance(
+                            MobEffects.WITHER, witherDuration * 20, 0, false, true, true));
                     });
             }
         }
@@ -5179,9 +5179,9 @@ public class ScalingSystem {
         return builder.length() > 0 ? builder.toString() : rawKey;
     }
 
-    private static boolean handleWeaponBreak(MobEntity mob, MobWarData data) {
-        NbtCompound skillData = data.getSkillData();
-        int tier = skillData.getInt("weapon_tier");
+    private static boolean handleWeaponBreak(Mob mob, MobWarData data) {
+        CompoundTag skillData = data.getSkillData();
+        int tier = skillData.getIntOr("weapon_tier", 0);
         if (tier <= 0) {
             skillData.putBoolean("weapon_equipped", false);
             return false;
@@ -5191,11 +5191,11 @@ public class ScalingSystem {
         } else {
             skillData.putInt("weapon_tier", 0);
         }
-        if (skillData.getInt("weapon_tier") <= 0) {
+        if (skillData.getIntOr("weapon_tier", 0) <= 0) {
             skillData.putInt(getEnchantCostBumpKey("weapon"), 0);
         }
-        boolean scopedWeapon = skillData.getBoolean(NBT_WEAPON_ACTIVE_SCOPED);
-        String weaponKey = skillData.getString(NBT_WEAPON_ACTIVE_KEY);
+        boolean scopedWeapon = skillData.getBooleanOr(NBT_WEAPON_ACTIVE_SCOPED, false);
+        String weaponKey = skillData.getStringOr(NBT_WEAPON_ACTIVE_KEY, "");
         String enchantPrefix = getWeaponEnchantPrefix(scopedWeapon, weaponKey);
         String dropKey = getWeaponScopedKey("weapon_drop_mastery", scopedWeapon, weaponKey);
         String durabilityKey = getWeaponScopedKey("weapon_durability_mastery", scopedWeapon, weaponKey);
@@ -5209,9 +5209,9 @@ public class ScalingSystem {
         return true;
     }
 
-    private static boolean handleShieldBreak(MobEntity mob, MobWarData data) {
-        NbtCompound skillData = data.getSkillData();
-        if (skillData.getInt("has_shield") <= 0) {
+    private static boolean handleShieldBreak(Mob mob, MobWarData data) {
+        CompoundTag skillData = data.getSkillData();
+        if (skillData.getIntOr("has_shield", 0) <= 0) {
             skillData.putBoolean("shield_equipped", false);
             return false;
         }
@@ -5225,10 +5225,10 @@ public class ScalingSystem {
         return true;
     }
 
-    private static boolean handleArmorBreak(MobEntity mob, MobWarData data, String slotPrefix) {
-        NbtCompound skillData = data.getSkillData();
+    private static boolean handleArmorBreak(Mob mob, MobWarData data, String slotPrefix) {
+        CompoundTag skillData = data.getSkillData();
         String tierKey = slotPrefix + "_tier";
-        int tier = skillData.getInt(tierKey);
+        int tier = skillData.getIntOr(tierKey, 0);
         if (tier <= 0) {
             skillData.putBoolean(slotPrefix + "_equipped", false);
             return false;
@@ -5238,7 +5238,7 @@ public class ScalingSystem {
         } else {
             skillData.putInt(tierKey, 0);
         }
-        if (skillData.getInt(tierKey) <= 0) {
+        if (skillData.getIntOr(tierKey, 0) <= 0) {
             skillData.putInt(getEnchantCostBumpKey(slotPrefix), 0);
         }
         clearEnchantsWithPrefix(skillData, slotPrefix + "_enchant_");
@@ -5249,11 +5249,11 @@ public class ScalingSystem {
         return true;
     }
 
-    private static void monitorArmorSlot(MobEntity mob, MobWarData data, NbtCompound skillData, JsonObject tree, EquipmentSlot slot, String slotPrefix, ServerWorld world) {
+    private static void monitorArmorSlot(Mob mob, MobWarData data, CompoundTag skillData, JsonObject tree, EquipmentSlot slot, String slotPrefix, ServerLevel world) {
         String tierKey = slotPrefix + "_tier";
         String equippedKey = slotPrefix + "_equipped";
-        int tier = skillData.getInt(tierKey);
-        boolean markedEquipped = skillData.getBoolean(equippedKey);
+        int tier = skillData.getIntOr(tierKey, 0);
+        boolean markedEquipped = skillData.getBooleanOr(equippedKey, false);
         String overrideKey = getArmorOverrideKey(slotPrefix);
         boolean overrideActive = isPlayerOverrideActive(skillData, overrideKey);
 
@@ -5262,8 +5262,8 @@ public class ScalingSystem {
                 skillData.putBoolean(equippedKey, false);
             }
             setPlayerOverride(skillData, overrideKey, false);
-            if (!mob.getEquippedStack(slot).isEmpty()) {
-                mob.equipStack(slot, ItemStack.EMPTY);
+            if (!mob.getItemBySlot(slot).isEmpty()) {
+                mob.setItemSlot(slot, ItemStack.EMPTY);
             }
             return;
         }
@@ -5276,7 +5276,7 @@ public class ScalingSystem {
             return;
         }
 
-        ItemStack equipped = mob.getEquippedStack(slot);
+        ItemStack equipped = mob.getItemBySlot(slot);
         boolean hasItem = !equipped.isEmpty();
         boolean matchesExpected = hasItem && isArmorItemMatchingTier(equipped, armorConfig, slot, tier);
 
@@ -5321,11 +5321,11 @@ public class ScalingSystem {
         }
     }
 
-    private static boolean hasEquippedItem(MobEntity mob, EquipmentSlot slot) {
-        return !mob.getEquippedStack(slot).isEmpty();
+    private static boolean hasEquippedItem(Mob mob, EquipmentSlot slot) {
+        return !mob.getItemBySlot(slot).isEmpty();
     }
 
-    private static void clearEnchantsWithPrefix(NbtCompound skillData, String prefix) {
+    private static void clearEnchantsWithPrefix(CompoundTag skillData, String prefix) {
         if (skillData == null || prefix == null) return;
         java.util.Set<String> keys = new java.util.HashSet<>(skillData.getKeys());
         for (String key : keys) {
@@ -5335,11 +5335,11 @@ public class ScalingSystem {
         }
     }
 
-    private static void resetMasteries(NbtCompound skillData, String slotPrefix) {
+    private static void resetMasteries(CompoundTag skillData, String slotPrefix) {
         resetMasteries(skillData, slotPrefix + "_drop_mastery", slotPrefix + "_durability_mastery");
     }
 
-    private static void resetMasteries(NbtCompound skillData, String dropKey, String durabilityKey) {
+    private static void resetMasteries(CompoundTag skillData, String dropKey, String durabilityKey) {
         if (dropKey != null && !dropKey.isEmpty()) {
             skillData.putInt(dropKey, 0);
         }
@@ -5348,7 +5348,7 @@ public class ScalingSystem {
         }
     }
 
-    private static void applyDropChance(MobEntity mob, EquipmentSlot slot, int masteryLevel) {
+    private static void applyDropChance(Mob mob, EquipmentSlot slot, int masteryLevel) {
         float chance = getDropChanceForMastery(masteryLevel);
         mob.setEquipmentDropChance(slot, chance);
     }
@@ -5368,22 +5368,22 @@ public class ScalingSystem {
         return Math.min(1.0, Math.max(0.1, percent));
     }
 
-    private static boolean meetsTierUpgradePrereqs(NbtCompound skillData, String slotPrefix, JsonObject slotConfig, String enchantPrefix) {
+    private static boolean meetsTierUpgradePrereqs(CompoundTag skillData, String slotPrefix, JsonObject slotConfig, String enchantPrefix) {
         String dropKey = slotPrefix + "_drop_mastery";
         String durabilityKey = slotPrefix + "_durability_mastery";
         return meetsTierUpgradePrereqs(skillData, slotPrefix, slotConfig, null, enchantPrefix, dropKey, durabilityKey);
     }
 
-    private static boolean meetsTierUpgradePrereqs(NbtCompound skillData, String slotPrefix, JsonObject slotConfig,
+    private static boolean meetsTierUpgradePrereqs(CompoundTag skillData, String slotPrefix, JsonObject slotConfig,
             Registry<Enchantment> enchantRegistry, String enchantPrefix) {
         String dropKey = slotPrefix + "_drop_mastery";
         String durabilityKey = slotPrefix + "_durability_mastery";
         return meetsTierUpgradePrereqs(skillData, slotPrefix, slotConfig, enchantRegistry, enchantPrefix, dropKey, durabilityKey);
     }
 
-        private static boolean meetsTierUpgradePrereqs(NbtCompound skillData, String slotPrefix, JsonObject slotConfig,
+        private static boolean meetsTierUpgradePrereqs(CompoundTag skillData, String slotPrefix, JsonObject slotConfig,
             Registry<Enchantment> enchantRegistry, String enchantPrefix, String dropKey, String durabilityKey) {
-        int currentTier = skillData.getInt(slotPrefix + "_tier");
+        int currentTier = skillData.getIntOr(slotPrefix + "_tier", 0);
         if (currentTier <= 0) {
             return true; // base acquisition
         }
@@ -5396,7 +5396,7 @@ public class ScalingSystem {
 
         ItemStack currentItem = ItemStack.EMPTY;
         if ("weapon".equals(slotPrefix)) {
-            currentItem = getExpectedWeaponStack(slotConfig, skillData.getInt("weapon_tier"));
+            currentItem = getExpectedWeaponStack(slotConfig, skillData.getIntOr("weapon_tier", 0));
         } else if (isArmorSlotPrefix(slotPrefix)) {
             EquipmentSlot equipmentSlot = switch (slotPrefix) {
                 case "helmet" -> EquipmentSlot.HEAD;
@@ -5417,17 +5417,17 @@ public class ScalingSystem {
         return true;
     }
 
-    private static boolean hasMasteryAtMax(NbtCompound skillData, String skillKey, JsonObject slotConfig, String jsonKey) {
+    private static boolean hasMasteryAtMax(CompoundTag skillData, String skillKey, JsonObject slotConfig, String jsonKey) {
         int requiredLevels = 10;
         if (slotConfig != null && slotConfig.has(jsonKey)) {
             JsonArray levels = slotConfig.getAsJsonArray(jsonKey);
             requiredLevels = Math.max(1, levels.size());
         }
-        return skillData.getInt(skillKey) >= requiredLevels;
+        return skillData.getIntOr(skillKey, 0) >= requiredLevels;
     }
 
-    private static JsonObject getLockedWeaponForMob(JsonElement weaponElement, MobEntity mob) {
-        return getLockedWeaponForMob(weaponElement, mob != null ? mob.getUuid() : null);
+    private static JsonObject getLockedWeaponForMob(JsonElement weaponElement, Mob mob) {
+        return getLockedWeaponForMob(weaponElement, mob != null ? mob.getUUID() : null);
     }
 
     private static JsonObject getLockedWeaponForMob(JsonElement weaponElement, UUID mobUuid) {
@@ -5507,7 +5507,7 @@ public class ScalingSystem {
         return normalized;
     }
 
-    private static void handleTierPromotion(NbtCompound skillData, String key, int previousLevel, int newLevel) {
+    private static void handleTierPromotion(CompoundTag skillData, String key, int previousLevel, int newLevel) {
         if (skillData == null || newLevel <= previousLevel) {
             return;
         }
@@ -5530,7 +5530,7 @@ public class ScalingSystem {
             "boots".equals(slotPrefix);
     }
 
-    private static void resetWeaponProgress(NbtCompound skillData) {
+    private static void resetWeaponProgress(CompoundTag skillData) {
         clearEnchantsWithPrefix(skillData, "weapon_enchant_");
         resetNumericKeysWithPrefix(skillData, "weapon_drop_mastery");
         resetNumericKeysWithPrefix(skillData, "weapon_durability_mastery");
@@ -5540,14 +5540,14 @@ public class ScalingSystem {
         setPlayerOverride(skillData, OVERRIDE_KEY_WEAPON, false);
     }
 
-    private static void resetEquipmentProgress(NbtCompound skillData, String slotPrefix) {
+    private static void resetEquipmentProgress(CompoundTag skillData, String slotPrefix) {
         clearEnchantsWithPrefix(skillData, slotPrefix + "_enchant_");
         resetMasteries(skillData, slotPrefix);
         skillData.putBoolean(slotPrefix + "_equipped", false);
         setPlayerOverride(skillData, getArmorOverrideKey(slotPrefix), false);
     }
 
-    private static void resetNumericKeysWithPrefix(NbtCompound skillData, String prefix) {
+    private static void resetNumericKeysWithPrefix(CompoundTag skillData, String prefix) {
         if (skillData == null || prefix == null) {
             return;
         }
@@ -5604,7 +5604,7 @@ public class ScalingSystem {
         private final UUID mobUuid;
         private final JsonObject config;
         private final String mobType;
-        private final NbtCompound skillData;
+        private final CompoundTag skillData;
         private final Registry<Enchantment> enchantRegistry;
         private final int budget;
         private final double totalPoints;
@@ -5618,7 +5618,7 @@ public class ScalingSystem {
                 UUID mobUuid,
                 JsonObject config,
                 String mobType,
-                NbtCompound skillData,
+                CompoundTag skillData,
                 Registry<Enchantment> enchantRegistry,
                 int budget,
                 double totalPoints,
@@ -5727,16 +5727,16 @@ public class ScalingSystem {
 
     private static class UpgradeLogger {
         private final boolean enabled;
-        private final ServerWorld serverWorld;
+        private final ServerLevel serverWorld;
         private final String identifier;
 
-        UpgradeLogger(MobEntity mob) {
+        UpgradeLogger(Mob mob) {
             ModConfig config = ModConfig.getInstance();
-            if (config.debugUpgradeLog && mob.getWorld() instanceof ServerWorld sw) {
+            if (config.debugUpgradeLog && mob.level() instanceof ServerLevel sw) {
                 this.enabled = true;
                 this.serverWorld = sw;
                 String display = mob.getDisplayName().getString();
-                String shortId = mob.getUuid().toString().substring(0, 8);
+                String shortId = mob.getUUID().toString().substring(0, 8);
                 this.identifier = display + "#" + shortId;
             } else {
                 this.enabled = false;
@@ -5782,10 +5782,10 @@ public class ScalingSystem {
 
         void log(String message) {
             if (!enabled || serverWorld == null) return;
-            MutableText prefix = Text.literal("[MobWar][" + identifier + "] ")
-                .styled(style -> style.withColor(Formatting.DARK_AQUA).withBold(true));
-            Text finalText = prefix.append(Text.literal(message).styled(style -> style.withColor(Formatting.WHITE)));
-            serverWorld.getServer().getPlayerManager().broadcast(finalText, false);
+            MutableComponent prefix = Component.literal("[MobWar][" + identifier + "] ")
+                .withStyle(style -> style.withColor(ChatFormatting.DARK_AQUA).withBold(true));
+            Component finalText = prefix.append(Component.literal(message).withStyle(style -> style.withColor(ChatFormatting.WHITE)));
+            serverWorld.getServer().getPlayerList().broadcast(finalText, false);
         }
 
         void replay(List<String> entries) {
@@ -5818,18 +5818,18 @@ public class ScalingSystem {
             this.durabilityLevels = durabilityLevels;
         }
 
-        static EquipmentSnapshot capture(MobEntity mob, NbtCompound skillData) {
-            ItemStack main = mob != null ? mob.getEquippedStack(EquipmentSlot.MAINHAND).copy() : ItemStack.EMPTY;
-            ItemStack off = mob != null ? mob.getEquippedStack(EquipmentSlot.OFFHAND).copy() : ItemStack.EMPTY;
+        static EquipmentSnapshot capture(Mob mob, CompoundTag skillData) {
+            ItemStack main = mob != null ? mob.getItemBySlot(EquipmentSlot.MAINHAND).copy() : ItemStack.EMPTY;
+            ItemStack off = mob != null ? mob.getItemBySlot(EquipmentSlot.OFFHAND).copy() : ItemStack.EMPTY;
             EnumMap<EquipmentSlot, ItemStack> armorMap = new EnumMap<>(EquipmentSlot.class);
             for (EquipmentSlot slot : new EquipmentSlot[]{EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET}) {
-                armorMap.put(slot, mob != null ? mob.getEquippedStack(slot).copy() : ItemStack.EMPTY);
+                armorMap.put(slot, mob != null ? mob.getItemBySlot(slot).copy() : ItemStack.EMPTY);
             }
             Map<String, Integer> durability = new HashMap<>();
             if (skillData != null) {
                 for (String key : skillData.getKeys()) {
                     if (key.endsWith("_durability_mastery")) {
-                        durability.put(key, skillData.getInt(key));
+                        durability.put(key, skillData.getIntOr(key, 0));
                     }
                 }
             }
@@ -5861,7 +5861,7 @@ public class ScalingSystem {
     }
 
     private static record UpgradeComputationResult(
-        NbtCompound skillData,
+        CompoundTag skillData,
         double spentPoints,
         boolean purchasedUpgrade,
         int remainingBudget,

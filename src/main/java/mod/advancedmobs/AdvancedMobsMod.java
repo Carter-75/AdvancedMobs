@@ -30,23 +30,23 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.SpawnGroup;
-import net.minecraft.entity.ai.goal.GoalSelector;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemGroups;
-import net.minecraft.item.SpawnEggItem;
-import net.minecraft.registry.Registries;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.RegistryKeys;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
+import net.minecraft.world.entity.ai.goal.GoalSelector;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.SpawnEggItem;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.Registry;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.Identifier;
-import net.minecraft.world.GameRules;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.level.gamerules.GameRules;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,19 +60,19 @@ import java.util.function.Supplier;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 
 public class AdvancedMobsMod implements ModInitializer {
 
 	// Codec for an empty payload (for safety net)
-	private static final PacketCodec<RegistryByteBuf, CustomPayload> EMPTY_PAYLOAD_CODEC =
-		PacketCodec.ofStatic((payload, buf) -> {}, buf -> new CustomPayload() {
+	private static final StreamCodec<RegistryFriendlyByteBuf, CustomPacketPayload> EMPTY_PAYLOAD_CODEC =
+		StreamCodec.of((payload, buf) -> {}, buf -> new CustomPacketPayload() {
 			@Override
-			public Id<? extends CustomPayload> getId() {
+			public Id<? extends CustomPacketPayload> getId() {
 				return UMW_SAFETYNET_ID;
 			}
 		});
@@ -106,11 +106,11 @@ public class AdvancedMobsMod implements ModInitializer {
 		}
 	);
 
-	// Mob Warlord Boss Entity (uses HostileEntity for Iris Shaders compatibility)
+	// Mob Warlord Boss Entity (uses Monster for Iris Shaders compatibility)
 	public static final EntityType<MobWarlordEntity> MOB_WARLORD = Registry.register(
-		Registries.ENTITY_TYPE,
-		Identifier.of(MODID, "mob_warlord"),
-		EntityType.Builder.create(MobWarlordEntity::new, SpawnGroup.MONSTER)
+		BuiltInRegistries.ENTITY_TYPE,
+		Identifier.fromNamespaceAndPath(MODID, "mob_warlord"),
+		EntityType.Builder.create(MobWarlordEntity::new, MobCategory.MONSTER)
 			.dimensions(1.2f, 3.6f) // Large boss size (1.2m wide x 3.6m tall)
 			.maxTrackingRange(64)
 			// Minecraft 1.21.1 requires the entity id here; the no-arg build()
@@ -121,28 +121,28 @@ public class AdvancedMobsMod implements ModInitializer {
 	
 	// Mob Warlord Spawn Egg (same colors as witch egg)
 	public static final Item MOB_WARLORD_SPAWN_EGG = Registry.register(
-		Registries.ITEM,
-		Identifier.of(MODID, "mob_warlord_spawn_egg"),
+		BuiltInRegistries.ITEM,
+		Identifier.fromNamespaceAndPath(MODID, "mob_warlord_spawn_egg"),
 		new SpawnEggItem(MOB_WARLORD, 0x334E4C, 0x51A03E, new Item.Settings())
 	);
 
 	// Safety net payload ID for global receiver
-	public static final net.minecraft.network.packet.CustomPayload.Id<net.minecraft.network.packet.CustomPayload> UMW_SAFETYNET_ID =
-		new net.minecraft.network.packet.CustomPayload.Id<>(Identifier.of(MODID, "umw_safetynet"));
+	public static final net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<net.minecraft.network.protocol.common.custom.CustomPacketPayload> UMW_SAFETYNET_ID =
+		new net.minecraft.network.protocol.common.custom.CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath(MODID, "umw_safetynet"));
 
 	@Override
 	public void onInitialize() {
 		// Register an empty S2C payload solely so the server can verify the client has this mod.
 		// This makes "server has mod, client doesn't" a hard-fail join (as requested).
 		try {
-			PayloadTypeRegistry.playS2C().register(UmwRequiredClientPayload.ID, UmwRequiredClientPayload.CODEC);
+			PayloadTypeRegistry.clientboundPlay().register(UmwRequiredClientPayload.ID, UmwRequiredClientPayload.CODEC);
 		} catch (IllegalArgumentException alreadyRegistered) {
 			// Tolerate double-init in dev / hot reload scenarios.
 		}
 
 		// Register the C2S payload type for the safety net (required in 1.21+)
 		try {
-			PayloadTypeRegistry.playC2S().register(UMW_SAFETYNET_ID, EMPTY_PAYLOAD_CODEC);
+			PayloadTypeRegistry.serverboundPlay().register(UMW_SAFETYNET_ID, EMPTY_PAYLOAD_CODEC);
 		} catch (IllegalArgumentException alreadyRegistered) {
 			// Tolerate double-init in dev / hot reload scenarios.
 		}
@@ -169,10 +169,10 @@ public class AdvancedMobsMod implements ModInitializer {
 		// Register Mob Warlord attributes
 		FabricDefaultAttributeRegistry.register(MOB_WARLORD, MobWarlordEntity.createMobWarlordAttributes());
 		
-		// Add spawn egg to creative inventory. In 1.21.1 the ItemGroups key
+		// Add spawn egg to creative inventory. In 1.21.1 the CreativeModeTabs key
 		// fields are private in the shipped jar, so the spawn eggs group key
-		// is built from its id instead of referencing ItemGroups.SPAWN_EGGS.
-		ItemGroupEvents.modifyEntriesEvent(RegistryKey.of(RegistryKeys.ITEM_GROUP, Identifier.ofVanilla("spawn_eggs"))).register(content -> {
+		// is built from its id instead of referencing CreativeModeTabs.SPAWN_EGGS.
+		ItemGroupEvents.modifyEntriesEvent(ResourceKey.create(Registries.CREATIVE_MODE_TAB, Identifier.withDefaultNamespace("spawn_eggs"))).register(content -> {
 			content.add(MOB_WARLORD_SPAWN_EGG);
 		});
 		
@@ -186,38 +186,38 @@ public class AdvancedMobsMod implements ModInitializer {
 				// If the client doesn't have this mod installed, they won't advertise our payload,
 				// and we reject the connection with a clear message.
 				if (!ServerPlayNetworking.canSend(handler.player, UmwRequiredClientPayload.ID)) {
-					handler.disconnect(Text.literal("Advanced Mobs is required to join this server."));
+					handler.disconnect(Component.literal("Advanced Mobs is required to join this server."));
 					return;
 				}
 
-				handler.player.sendMessage(Text.literal(""), false);
+				handler.player.sendMessage(Component.literal(""), false);
 				handler.player.sendMessage(
-					Text.literal("═══════════════════════════════════════════════════").styled(style -> style.withColor(Formatting.GOLD).withBold(true)),
+					Component.literal("═══════════════════════════════════════════════════").withStyle(style -> style.withColor(ChatFormatting.GOLD).withBold(true)),
 					false
 				);
 				handler.player.sendMessage(
-					Text.literal("    ADVANCED MOBS").styled(style -> style.withColor(Formatting.RED).withBold(true))
+					Component.literal("    ADVANCED MOBS").withStyle(style -> style.withColor(ChatFormatting.RED).withBold(true))
 						,
 					false
 				);
 				handler.player.sendMessage(
-					Text.literal("═══════════════════════════════════════════════════").styled(style -> style.withColor(Formatting.GOLD).withBold(true)),
+					Component.literal("═══════════════════════════════════════════════════").withStyle(style -> style.withColor(ChatFormatting.GOLD).withBold(true)),
 					false
 				);
 			});
 		});
 
-		// Attach our targeting goal to every MobEntity when it loads into a server world.
+		// Attach our targeting goal to every Mob when it loads into a server world.
 		ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
 			runSafely(
-				"ENTITY_LOAD for " + entity.getType().getTranslationKey(),
+				"ENTITY_LOAD for " + entity.getType().getDescriptionId(),
 				() -> {
 					// Track naturally spawned mobs for spawn limiting.
-					if (world instanceof ServerWorld serverWorld && entity instanceof MobEntity mob) {
-						NaturalSpawnLimiter.onMobLoaded(serverWorld, mob.getCommandTags().contains("umw_natural_spawned"));
+					if (world instanceof ServerLevel serverWorld && entity instanceof Mob mob) {
+						NaturalSpawnLimiter.onMobLoaded(serverWorld, mob.getTags().contains("umw_natural_spawned"));
 					}
 
-					if (!(entity instanceof MobEntity mob)) return;
+					if (!(entity instanceof Mob mob)) return;
 
 					// Evolution System now handled globally via MobDataMixin + ScalingSystem
 					// Each mob automatically inherits progression logic from its JSON config
@@ -226,7 +226,7 @@ public class AdvancedMobsMod implements ModInitializer {
 					if (!ModConfig.getInstance().isTargetingActive()) return;
 
 					// Check if this mob type is excluded
-					String mobId = mob.getType().getTranslationKey();
+					String mobId = mob.getType().getDescriptionId();
 					if (ModConfig.getInstance().isMobExcluded(mobId)) return;
 
 					GoalSelector targetSelector = ((MobEntityAccessor) mob).getTargetSelector();
@@ -257,15 +257,15 @@ public class AdvancedMobsMod implements ModInitializer {
 
 		ServerEntityEvents.ENTITY_UNLOAD.register((entity, world) -> {
 			runSafely(
-				"ENTITY_UNLOAD for " + entity.getType().getTranslationKey(),
+				"ENTITY_UNLOAD for " + entity.getType().getDescriptionId(),
 				() -> {
-					if (world instanceof ServerWorld serverWorld && entity instanceof MobEntity mob) {
-						NaturalSpawnLimiter.onMobUnloaded(serverWorld, mob.getCommandTags().contains("umw_natural_spawned"));
+					if (world instanceof ServerLevel serverWorld && entity instanceof Mob mob) {
+						NaturalSpawnLimiter.onMobUnloaded(serverWorld, mob.getTags().contains("umw_natural_spawned"));
 						// Drop runtime-only per-mob state so the static maps keyed
 						// by mob UUID stop growing without bound as mobs come and
 						// go. The unregister and clear methods existed but had no
 						// callers before this.
-						UUID mobUuid = mob.getUuid();
+						UUID mobUuid = mob.getUUID();
 						ScalingSystem.cleanupMobState(mobUuid);
 						SummonerTracker.unregisterSummoned(mobUuid);
 						TargetingSystem.clearMobData(mobUuid);
@@ -281,7 +281,7 @@ public class AdvancedMobsMod implements ModInitializer {
 			runSafely("END_SERVER_TICK tick scheduler", () -> TickScheduler.tick(server));
 			runSafely("END_SERVER_TICK extra shot queue", () -> ScalingSystem.processExtraShotQueue(server));
 
-			if (server.getTicks() % 100 == 0) { // Every 5 seconds
+			if (server.getTickCount() % 100 == 0) { // Every 5 seconds
 				runSafely("END_SERVER_TICK cache cleanup", () -> {
 					TargetingUtil.cleanupCache();
 					OperationScheduler.cleanup(); // Also cleanup operation scheduler
@@ -291,14 +291,14 @@ public class AdvancedMobsMod implements ModInitializer {
 			// PERFORMANCE: Clean up non-player ground projectiles (arrows/tridents) on an interval.
 			int intervalSeconds = Math.max(5, ModConfig.getInstance().cleanupNonPlayerGroundProjectilesIntervalSeconds);
 			int intervalTicks = intervalSeconds * 20;
-			if (server.getTicks() % intervalTicks == 0) {
+			if (server.getTickCount() % intervalTicks == 0) {
 				runSafely("END_SERVER_TICK projectile cleanup", () -> EntityCleanupSystem.cleanupNonPlayerGroundProjectiles(server));
 			}
 			
 			// MEMORY LEAK FIX: Clean up dead mob UUIDs from AllianceSystem (every 60 seconds)
-			if (server.getTicks() % 1200 == 0) {
+			if (server.getTickCount() % 1200 == 0) {
 				runSafely("END_SERVER_TICK alliance cleanup", () -> {
-					for (ServerWorld world : server.getWorlds()) {
+					for (ServerLevel world : server.getAllLevels()) {
 						AllianceSystem.cleanupDeadMobs(world);
 					}
 				});

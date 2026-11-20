@@ -5,15 +5,15 @@ import mod.advancedmobs.data.IMobWarDataHolder;
 import mod.advancedmobs.data.MobWarData;
 import mod.advancedmobs.system.WitchAbilityHelper;
 import mod.advancedmobs.system.WitchAbilityHelper.ThrowStats;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.mob.WitchEntity;
-import net.minecraft.entity.projectile.thrown.PotionEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.monster.Witch;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.AbstractThrownPotion;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -21,41 +21,41 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 /**
  * Adds scaling-system special abilities to Witch potion attacks.
  */
-@Mixin(WitchEntity.class)
-public abstract class WitchAbilityMixin extends MobEntity {
+@Mixin(Witch.class)
+public abstract class WitchAbilityMixin extends Mob {
 
-    protected WitchAbilityMixin(EntityType<? extends MobEntity> entityType, World world) {
+    protected WitchAbilityMixin(EntityType<? extends Mob> entityType, Level world) {
         super(entityType, world);
     }
 
-    @Redirect(method = "shootAt(Lnet/minecraft/entity/LivingEntity;F)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;spawnEntity(Lnet/minecraft/entity/Entity;)Z"))
-    private boolean advancedmobs$augmentPotionThrows(World world, Entity entity, LivingEntity target, float pullProgress) {
+    @Redirect(method = "shootAt(Lnet/minecraft/world/entity/LivingEntity;F)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;spawnEntity(Lnet/minecraft/world/entity/Entity;)Z"))
+    private boolean advancedmobs$augmentPotionThrows(Level world, Entity entity, LivingEntity target, float pullProgress) {
         try {
-            if (!(world instanceof ServerWorld serverWorld) || !(entity instanceof PotionEntity potion)) {
-                return world.spawnEntity(entity);
+            if (!(world instanceof ServerLevel serverWorld) || !(entity instanceof AbstractThrownPotion potion)) {
+                return world.addFreshEntity(entity);
             }
 
-            MobEntity witch = (MobEntity) (Object) this;
+            Mob witch = (Mob) (Object) this;
             if (!(witch instanceof IMobWarDataHolder holder)) {
-                return world.spawnEntity(entity);
+                return world.addFreshEntity(entity);
             }
 
             MobWarData data = holder.getMobWarData();
             if (data == null) {
-                return world.spawnEntity(entity);
+                return world.addFreshEntity(entity);
             }
 
-            ItemStack resolvedStack = WitchAbilityHelper.resolvePotionStack(witch, data, potion.getStack().copy(), witch.getRandom());
+            ItemStack resolvedStack = WitchAbilityHelper.resolvePotionStack(witch, data, potion.getItem().copy(), witch.getRandom());
             potion.setItem(resolvedStack);
 
             ThrowStats stats = WitchAbilityHelper.resolveThrowStats(witch, data);
             WitchAbilityHelper.configureTrajectory(potion, witch, target, stats, 0.0f);
 
-            boolean spawned = serverWorld.spawnEntity(potion);
+            boolean spawned = serverWorld.addFreshEntity(potion);
             return spawned;
         } catch (Throwable t) {
             AdvancedMobsMod.LOGGER.error("[WitchAbilityMixin] Potion throw augmentation failed", t);
-            return world.spawnEntity(entity);
+            return world.addFreshEntity(entity);
         }
     }
 }

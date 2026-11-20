@@ -1,16 +1,16 @@
 package mod.advancedmobs.client;
 
 import mod.advancedmobs.config.ModConfig;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.tooltip.Tooltip;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.CheckboxWidget;
-import net.minecraft.client.gui.widget.ClickableWidget;
-import net.minecraft.client.gui.widget.SliderWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Checkbox;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.network.chat.Component;
+import net.minecraft.util.Mth;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -22,12 +22,12 @@ public class AdvancedMobsConfigScreen extends Screen {
     private final Screen parent;
     private ModConfig config;
     
-    private final EnumMap<Category, ButtonWidget> categoryButtons = new EnumMap<>(Category.class);
+    private final EnumMap<Category, Button> categoryButtons = new EnumMap<>(Category.class);
     private Category currentCategory = Category.GENERAL;
-    private final List<ClickableWidget> activeWidgets = new ArrayList<>();
+    private final List<AbstractWidget> activeWidgets = new ArrayList<>();
     private final List<WidgetPlacement> widgetPlacements = new ArrayList<>();
     private final List<LabelPlacement> labelPlacements = new ArrayList<>();
-    private Text categoryDescription = Text.empty();
+    private Component categoryDescription = Component.empty();
     private double scrollOffset = 0.0;
     private int contentHeight = 0;
 
@@ -70,8 +70,8 @@ public class AdvancedMobsConfigScreen extends Screen {
             this.label = label;
         }
 
-        public Text title() {
-            return Text.literal(label);
+        public Component title() {
+            return Component.literal(label);
         }
 
         public String label() {
@@ -92,7 +92,7 @@ public class AdvancedMobsConfigScreen extends Screen {
     }
 
     public AdvancedMobsConfigScreen(Screen parent) {
-        super(Text.literal("Advanced Mobs Config"));
+        super(Component.literal("Advanced Mobs Config"));
         this.parent = parent;
         this.config = ModConfig.getInstance();
     }
@@ -107,7 +107,7 @@ public class AdvancedMobsConfigScreen extends Screen {
         int navLeft = getNavLeft();
         int navY = NAV_TOP;
         for (Category category : CATEGORY_ORDER) {
-            ButtonWidget button = ButtonWidget.builder(category.title(), btn -> setCategory(category))
+            Button button = Button.builder(category.title(), btn -> setCategory(category))
                 .dimensions(navLeft, navY, NAV_WIDTH, NAV_BUTTON_HEIGHT)
                 .build();
             this.addDrawableChild(button);
@@ -115,7 +115,7 @@ public class AdvancedMobsConfigScreen extends Screen {
             navY += NAV_BUTTON_HEIGHT + NAV_BUTTON_GAP;
         }
 
-        this.addDrawableChild(ButtonWidget.builder(Text.literal("Save & Exit"), button -> {
+        this.addDrawableChild(Button.builder(Component.literal("Save & Exit"), button -> {
             ModConfig.save();
             if (this.client != null) this.client.setScreen(this.parent);
         }).dimensions(this.width / 2 - 100, this.height - 30, 200, 20).build());
@@ -130,7 +130,7 @@ public class AdvancedMobsConfigScreen extends Screen {
 
     private void refreshWidgets() {
         // Remove old widgets before drawing new ones
-        for (ClickableWidget widget : activeWidgets) {
+        for (AbstractWidget widget : activeWidgets) {
             this.remove(widget);
         }
         activeWidgets.clear();
@@ -139,7 +139,7 @@ public class AdvancedMobsConfigScreen extends Screen {
         scrollOffset = 0.0;
         contentHeight = 0;
 
-        categoryDescription = Text.empty();
+        categoryDescription = Component.empty();
 
         categoryButtons.forEach((category, button) -> button.active = category != currentCategory);
 
@@ -150,7 +150,7 @@ public class AdvancedMobsConfigScreen extends Screen {
 
         switch (currentCategory) {
             case GENERAL:
-            categoryDescription = Text.literal("Master toggles for the big Advanced Mobs systems.");
+            categoryDescription = Component.literal("Master toggles for the big Advanced Mobs systems.");
             relativeY = addCheckbox(x, relativeY, "Enable Mod", config.modEnabled, val -> config.modEnabled = val,
                 "Master switch for every system in Advanced Mobs.");
             relativeY = addCheckbox(x, relativeY, "Targeting System", config.targetingEnabled, val -> config.targetingEnabled = val,
@@ -170,7 +170,7 @@ public class AdvancedMobsConfigScreen extends Screen {
             break;
 
             case TARGETING:
-            categoryDescription = Text.literal("Fine-tune how mobs pick fights and how often the AI refreshes targets.");
+            categoryDescription = Component.literal("Fine-tune how mobs pick fights and how often the AI refreshes targets.");
             relativeY = addCheckbox(x, relativeY, "Target Players", config.targetPlayers, val -> config.targetPlayers = val,
                 "If disabled, mobs focus entirely on other mobs.");
             relativeY = addCheckbox(x, relativeY, "Ignore Same Species", config.ignoreSameSpecies, val -> config.ignoreSameSpecies = val,
@@ -189,14 +189,14 @@ public class AdvancedMobsConfigScreen extends Screen {
                 });
             relativeY = addSlider(x, relativeY, w, h, config.targetingCacheMs, 500, 5000,
                 val -> String.format("Target Cache: %.0f ms", val),
-                val -> config.targetingCacheMs = (int) MathHelper.clamp(Math.round(val), 500, 5000));
+                val -> config.targetingCacheMs = (int) Mth.clamp(Math.round(val), 500, 5000));
             relativeY = addSlider(x, relativeY, w, h, config.targetingMaxQueriesPerTick, 10, 200,
                 val -> String.format("Queries / Tick: %.0f", val),
-                val -> config.targetingMaxQueriesPerTick = (int) MathHelper.clamp(Math.round(val), 10, 200));
+                val -> config.targetingMaxQueriesPerTick = (int) Mth.clamp(Math.round(val), 10, 200));
             break;
 
             case ALLIANCE:
-            categoryDescription = Text.literal("Let mobs form temporary truces and tune how long they last.");
+            categoryDescription = Component.literal("Let mobs form temporary truces and tune how long they last.");
             relativeY = addCheckbox(x, relativeY, "Alliance System", config.allianceEnabled, val -> {
                 config.allianceEnabled = val;
                 config.allianceSystemEnabled = val;
@@ -204,21 +204,21 @@ public class AdvancedMobsConfigScreen extends Screen {
             double weakSeconds = config.weakAllianceDurationMs / 1000.0;
             relativeY = addSlider(x, relativeY, w, h, weakSeconds, 1.0, 60.0,
                 val -> String.format("Weak Alliance Duration: %.1f s", val),
-                val -> config.weakAllianceDurationMs = (int) MathHelper.clamp(Math.round(val * 1000.0), 1000, 60000));
+                val -> config.weakAllianceDurationMs = (int) Mth.clamp(Math.round(val * 1000.0), 1000, 60000));
             double strongSeconds = config.strongAllianceDurationMs / 1000.0;
             relativeY = addSlider(x, relativeY, w, h, strongSeconds, 1.0, 120.0,
                 val -> String.format("Strong Alliance Duration: %.1f s", val),
-                val -> config.strongAllianceDurationMs = (int) MathHelper.clamp(Math.round(val * 1000.0), 1000, 120000));
+                val -> config.strongAllianceDurationMs = (int) Mth.clamp(Math.round(val * 1000.0), 1000, 120000));
             relativeY = addSlider(x, relativeY, w, h, config.allianceBreakChancePercent, 0, 100,
                 val -> String.format("Weak Break Chance: %.0f%%", val),
-                val -> config.allianceBreakChancePercent = (int) MathHelper.clamp(Math.round(val), 0, 100));
+                val -> config.allianceBreakChancePercent = (int) Mth.clamp(Math.round(val), 0, 100));
             relativeY = addSlider(x, relativeY, w, h, config.strongAllianceBreakChancePercent, 0, 100,
                 val -> String.format("Strong Break Chance: %.0f%%", val),
-                val -> config.strongAllianceBreakChancePercent = (int) MathHelper.clamp(Math.round(val), 0, 100));
+                val -> config.strongAllianceBreakChancePercent = (int) Mth.clamp(Math.round(val), 0, 100));
             break;
 
             case SCALING:
-            categoryDescription = Text.literal("Make mobs scale with world age, kills, and special rules.");
+            categoryDescription = Component.literal("Make mobs scale with world age, kills, and special rules.");
             relativeY = addCheckbox(x, relativeY, "Allow Boss Scaling", config.allowBossScaling, val -> config.allowBossScaling = val,
                 "Bosses obey the same progression rules.");
             relativeY = addSlider(x, relativeY, w, h, config.getDayScalingMultiplier(), 0.0, 10.0,
@@ -243,14 +243,14 @@ public class AdvancedMobsConfigScreen extends Screen {
             relativeY = addSlider(x, relativeY, w, h, config.saveChancePercent, 0, 100,
                 val -> String.format("Save Chance: %.0f%% (Buy %.0f%%)", val, 100 - val),
                 val -> {
-                    int clamped = (int) MathHelper.clamp(Math.round(val), 0, 100);
+                    int clamped = (int) Mth.clamp(Math.round(val), 0, 100);
                     config.saveChancePercent = clamped;
                     config.buyChancePercent = 100 - clamped;
                 });
             double maxIterations = config.getMaxUpgradeIterations();
             relativeY = addSlider(x, relativeY, w, h, maxIterations, ModConfig.MIN_UPGRADE_ITERATIONS, ModConfig.MAX_UPGRADE_ITERATIONS,
                 val -> String.format("Max Upgrades / Cycle: %.0f", val),
-                val -> config.maxUpgradeIterations = (int) MathHelper.clamp(
+                val -> config.maxUpgradeIterations = (int) Mth.clamp(
                     Math.round(val),
                     ModConfig.MIN_UPGRADE_ITERATIONS,
                     ModConfig.MAX_UPGRADE_ITERATIONS
@@ -258,7 +258,7 @@ public class AdvancedMobsConfigScreen extends Screen {
             break;
 
             case WARLORD:
-            categoryDescription = Text.literal("Configure when the raid boss appears and how scary it should be.");
+            categoryDescription = Component.literal("Configure when the raid boss appears and how scary it should be.");
             relativeY = addCheckbox(x, relativeY, "Warlord System", config.warlordEnabled, val -> {
                 config.warlordEnabled = val;
                 config.enableMobWarlord = val;
@@ -268,18 +268,18 @@ public class AdvancedMobsConfigScreen extends Screen {
                 "Forces every final raid wave to include the Warlord.");
             relativeY = addSlider(x, relativeY, w, h, config.warlordSpawnChance, 0, 100,
                 val -> String.format("Spawn Chance: %.0f%%", val),
-                val -> config.warlordSpawnChance = (int) MathHelper.clamp(Math.round(val), 0, 100));
+                val -> config.warlordSpawnChance = (int) Mth.clamp(Math.round(val), 0, 100));
             relativeY = addSlider(x, relativeY, w, h, config.warlordMinRaidLevel, 1, 20,
                 val -> String.format("Min Raid Level: %.0f", val),
-                val -> config.warlordMinRaidLevel = (int) MathHelper.clamp(Math.round(val), 1, 20));
+                val -> config.warlordMinRaidLevel = (int) Mth.clamp(Math.round(val), 1, 20));
             relativeY = addSlider(x, relativeY, w, h, config.warlordMinionCount, 5, 100,
                 val -> String.format("Minion Count: %.0f", val),
-                val -> config.warlordMinionCount = (int) MathHelper.clamp(Math.round(val), 5, 100));
+                val -> config.warlordMinionCount = (int) Mth.clamp(Math.round(val), 5, 100));
             double healthMultiplier = config.warlordHealthMultiplierPercent / 100.0;
             relativeY = addSlider(x, relativeY, w, h, healthMultiplier, 1.0, 10.0,
                 val -> String.format("Health Multiplier: %.1fx", val),
                 val -> {
-                    int percent = (int) MathHelper.clamp(Math.round(val * 100.0), 100, 1000);
+                    int percent = (int) Mth.clamp(Math.round(val * 100.0), 100, 1000);
                     config.warlordHealthMultiplierPercent = percent;
                     config.warlordHealthMultiplier = val;
                 });
@@ -287,14 +287,14 @@ public class AdvancedMobsConfigScreen extends Screen {
             relativeY = addSlider(x, relativeY, w, h, damageMultiplier, 1.0, 10.0,
                 val -> String.format("Damage Multiplier: %.1fx", val),
                 val -> {
-                    int percent = (int) MathHelper.clamp(Math.round(val * 100.0), 100, 1000);
+                    int percent = (int) Mth.clamp(Math.round(val * 100.0), 100, 1000);
                     config.warlordDamageMultiplierPercent = percent;
                     config.warlordDamageMultiplier = val;
                 });
             break;
 
             case PERFORMANCE:
-            categoryDescription = Text.literal("Keep upgrade processing near the 5 second budget from skilltree.txt.");
+            categoryDescription = Component.literal("Keep upgrade processing near the 5 second budget from skilltree.txt.");
             relativeY = addCheckbox(x, relativeY, "Performance Mode", config.performanceMode, val -> config.performanceMode = val,
                 "Cuts visuals and batching for weaker machines.");
             relativeY = addCheckbox(x, relativeY, "Enable Batching", config.enableBatching, val -> config.enableBatching = val,
@@ -304,18 +304,18 @@ public class AdvancedMobsConfigScreen extends Screen {
             double concurrentJobs = config.getMaxConcurrentUpgradeJobs();
             relativeY = addSlider(x, relativeY, w, h, concurrentJobs, 1, 256,
                 val -> String.format("Concurrent Upgrades: %.0f", val),
-                val -> config.maxConcurrentUpgradeJobs = (int) MathHelper.clamp(Math.round(val), 1, 256));
+                val -> config.maxConcurrentUpgradeJobs = (int) Mth.clamp(Math.round(val), 1, 256));
             double windowSeconds = config.upgradeProcessingTimeMs / 1000.0;
             relativeY = addSlider(x, relativeY, w, h, windowSeconds, 1.0, 30.0,
                 val -> String.format("Upgrade Window: %.1fs", val),
-                val -> config.upgradeProcessingTimeMs = (int) MathHelper.clamp(Math.round(val * 1000.0), 1000, 30000));
+                val -> config.upgradeProcessingTimeMs = (int) Mth.clamp(Math.round(val * 1000.0), 1000, 30000));
             relativeY = addSlider(x, relativeY, w, h, config.mobDataSaveDebounceMs, 50, 1000,
                 val -> String.format("Mob Save Debounce: %.0f ms", val),
-                val -> config.mobDataSaveDebounceMs = (int) MathHelper.clamp(Math.round(val), 50, 1000));
+                val -> config.mobDataSaveDebounceMs = (int) Mth.clamp(Math.round(val), 50, 1000));
             break;
 
             case VISUALS:
-            categoryDescription = Text.literal("Client-side overlays that make the mob war readable.");
+            categoryDescription = Component.literal("Client-side overlays that make the mob war readable.");
             relativeY = addCheckbox(x, relativeY, "Disable Particles", config.disableParticles, val -> config.disableParticles = val,
                 "Removes most particles for better FPS.");
             relativeY = addCheckbox(x, relativeY, "Show Target Lines", config.showTargetLines, val -> config.showTargetLines = val,
@@ -324,17 +324,17 @@ public class AdvancedMobsConfigScreen extends Screen {
                 "Play particles when mobs level up.");
             relativeY = addSlider(x, relativeY, w, h, config.minFpsForVisuals, 0, 144,
                 val -> String.format("Minimum FPS: %.0f", val),
-                val -> config.minFpsForVisuals = (int) MathHelper.clamp(Math.round(val), 0, 144));
+                val -> config.minFpsForVisuals = (int) Mth.clamp(Math.round(val), 0, 144));
             relativeY = addSlider(x, relativeY, w, h, config.maxParticlesPerConnection, 1, 50,
                 val -> String.format("Particles / Connection: %.0f", val),
-                val -> config.maxParticlesPerConnection = (int) MathHelper.clamp(Math.round(val), 1, 50));
+                val -> config.maxParticlesPerConnection = (int) Mth.clamp(Math.round(val), 1, 50));
             relativeY = addSlider(x, relativeY, w, h, config.maxDrawnMinionConnections, 1, 100,
                 val -> String.format("Minion Connections Drawn: %.0f", val),
-                val -> config.maxDrawnMinionConnections = (int) MathHelper.clamp(Math.round(val), 1, 100));
+                val -> config.maxDrawnMinionConnections = (int) Mth.clamp(Math.round(val), 1, 100));
             break;
 
             case DEBUG:
-            categoryDescription = Text.literal("Advanced logging, chat spam, and anything meant just for testing.");
+            categoryDescription = Component.literal("Advanced logging, chat spam, and anything meant just for testing.");
             relativeY = addCheckbox(x, relativeY, "Upgrade Chat Log", config.debugUpgradeLog, val -> config.debugUpgradeLog = val,
                 "Print every upgrade decision in chat while testing.");
             relativeY = addCheckbox(x, relativeY, "Verbose Console Logging", config.debugLogging, val -> config.debugLogging = val,
@@ -349,11 +349,11 @@ public class AdvancedMobsConfigScreen extends Screen {
     }
 
     private int addCheckbox(int x, int relativeY, String text, boolean checked, Consumer<Boolean> onSave, String tooltip) {
-        CheckboxWidget widget = CheckboxWidget.builder(Text.literal(text), this.textRenderer)
+        Checkbox widget = Checkbox.builder(Component.literal(text), this.textRenderer)
             .pos(x, CONTENT_TOP + relativeY)
             .checked(checked)
             .callback((checkbox, isChecked) -> onSave.accept(isChecked))
-            .tooltip(Tooltip.of(Text.literal(tooltip)))
+            .tooltip(Tooltip.of(Component.literal(tooltip)))
             .build();
         registerScrollableWidget(widget, relativeY);
         return relativeY + ROW_GAP;
@@ -361,19 +361,19 @@ public class AdvancedMobsConfigScreen extends Screen {
 
     private int addSlider(int x, int relativeY, int w, int h, double value, double min, double max,
                    Function<Double, String> labelFormatter, Consumer<Double> onSave) {
-        double clampedValue = MathHelper.clamp(value, min, max);
-        SliderWidget widget = new SliderWidget(x, CONTENT_TOP + relativeY, w, h,
-                Text.literal(labelFormatter.apply(clampedValue)),
+        double clampedValue = Mth.clamp(value, min, max);
+        AbstractSliderButton widget = new AbstractSliderButton(x, CONTENT_TOP + relativeY, w, h,
+                Component.literal(labelFormatter.apply(clampedValue)),
                 (clampedValue - min) / (max - min)) {
             @Override
             protected void updateMessage() {
-                double val = MathHelper.lerp(this.value, min, max);
-                setMessage(Text.literal(labelFormatter.apply(val)));
+                double val = Mth.lerp(this.value, min, max);
+                setMessage(Component.literal(labelFormatter.apply(val)));
             }
 
             @Override
             protected void applyValue() {
-                double val = MathHelper.lerp(this.value, min, max);
+                double val = Mth.lerp(this.value, min, max);
                 onSave.accept(val);
             }
         };
@@ -383,13 +383,13 @@ public class AdvancedMobsConfigScreen extends Screen {
 
     private int addIntegerField(int x, int relativeY, int w, String label, int initialValue,
                                 int minValue, int maxValue, Consumer<Integer> onSave, String tooltip) {
-        registerLabel(Text.literal(label), relativeY);
+        registerLabel(Component.literal(label), relativeY);
         int fieldRelativeY = relativeY + LABEL_GAP;
-        TextFieldWidget field = new TextFieldWidget(this.textRenderer, x, CONTENT_TOP + fieldRelativeY, w, WIDGET_HEIGHT, Text.literal(label));
+        EditBox field = new EditBox(this.textRenderer, x, CONTENT_TOP + fieldRelativeY, w, WIDGET_HEIGHT, Component.literal(label));
         field.setText(String.valueOf(initialValue));
         field.setMaxLength(7);
-        field.setPlaceholder(Text.literal("Use -1 to follow real days"));
-        field.setTooltip(Tooltip.of(Text.literal(tooltip)));
+        field.setPlaceholder(Component.literal("Use -1 to follow real days"));
+        field.setTooltip(Tooltip.of(Component.literal(tooltip)));
         field.setTextPredicate(text -> text.isEmpty() || text.equals("-") || text.matches("-?\\d{0,6}"));
         field.setChangedListener(text -> {
             if (text == null || text.isEmpty() || text.equals("-")) {
@@ -397,7 +397,7 @@ public class AdvancedMobsConfigScreen extends Screen {
             }
             try {
                 int parsed = Integer.parseInt(text);
-                parsed = MathHelper.clamp(parsed, minValue, maxValue);
+                parsed = Mth.clamp(parsed, minValue, maxValue);
                 onSave.accept(parsed);
                 String clampedText = String.valueOf(parsed);
                 if (!clampedText.equals(text)) {
@@ -409,14 +409,14 @@ public class AdvancedMobsConfigScreen extends Screen {
         return fieldRelativeY + ROW_GAP;
     }
 
-    private void registerScrollableWidget(ClickableWidget widget, int relativeY) {
+    private void registerScrollableWidget(AbstractWidget widget, int relativeY) {
         this.addDrawableChild(widget);
         activeWidgets.add(widget);
         widgetPlacements.add(new WidgetPlacement(widget, relativeY));
         updateContentHeight(relativeY);
     }
 
-    private void registerLabel(Text text, int relativeY) {
+    private void registerLabel(Component text, int relativeY) {
         labelPlacements.add(new LabelPlacement(text, relativeY));
     }
 
@@ -428,15 +428,15 @@ public class AdvancedMobsConfigScreen extends Screen {
         int x = getContentLeft();
         int visibleHeight = getVisibleHeight();
         int maxScroll = Math.max(0, contentHeight - visibleHeight);
-        scrollOffset = MathHelper.clamp(scrollOffset, 0, maxScroll);
+        scrollOffset = Mth.clamp(scrollOffset, 0, maxScroll);
         for (WidgetPlacement placement : widgetPlacements) {
-            ClickableWidget widget = placement.widget;
+            AbstractWidget widget = placement.widget;
             int widgetY = CONTENT_TOP + placement.relativeY - (int) scrollOffset;
             widget.setX(x);
             widget.setY(widgetY);
-            if (widget instanceof SliderWidget slider) {
+            if (widget instanceof AbstractSliderButton slider) {
                 slider.setWidth(CONTENT_WIDTH);
-            } else if (widget instanceof TextFieldWidget field) {
+            } else if (widget instanceof EditBox field) {
                 field.setWidth(CONTENT_WIDTH);
             }
             widget.visible = widgetY + WIDGET_HEIGHT >= CONTENT_TOP - WIDGET_HEIGHT && widgetY <= CONTENT_TOP + visibleHeight;
@@ -458,7 +458,7 @@ public class AdvancedMobsConfigScreen extends Screen {
             return;
         }
         double delta = amount * 15;
-        scrollOffset = MathHelper.clamp(scrollOffset - delta, 0, contentHeight - visibleHeight);
+        scrollOffset = Mth.clamp(scrollOffset - delta, 0, contentHeight - visibleHeight);
         updateWidgetPositions();
     }
 
@@ -472,7 +472,7 @@ public class AdvancedMobsConfigScreen extends Screen {
     }
 
     @Override
-    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
         this.renderBackground(context, mouseX, mouseY, delta);
         int contentLeft = getContentLeft();
         int navLeft = getNavLeft();
@@ -482,7 +482,7 @@ public class AdvancedMobsConfigScreen extends Screen {
 
         int navPanelBottom = CONTENT_TOP + visibleHeight + 10;
         context.fill(navLeft - 6, NAV_TOP - 10, navLeft + NAV_WIDTH + 6, navPanelBottom, 0x33000000);
-        context.drawTextWithShadow(this.textRenderer, Text.literal("Sections"), navLeft, NAV_TOP - 16, 0xAAAAAA);
+        context.drawTextWithShadow(this.textRenderer, Component.literal("Sections"), navLeft, NAV_TOP - 16, 0xAAAAAA);
         context.drawTextWithShadow(this.textRenderer, currentCategory.title(), contentLeft, 60, 0xFFFFFF);
         if (!categoryDescription.getString().isEmpty()) {
             context.drawTextWithShadow(this.textRenderer, categoryDescription, contentLeft, 78, 0x77C0FF);
@@ -492,7 +492,7 @@ public class AdvancedMobsConfigScreen extends Screen {
         renderLabels(context);
         super.render(context, mouseX, mouseY, delta);
 
-        ButtonWidget selected = categoryButtons.get(currentCategory);
+        Button selected = categoryButtons.get(currentCategory);
         if (selected != null) {
             context.drawBorder(selected.getX() - 2, selected.getY() - 2, selected.getWidth() + 4,
                 selected.getHeight() + 4, 0xFF77C0FF);
@@ -511,7 +511,7 @@ public class AdvancedMobsConfigScreen extends Screen {
         }
     }
 
-    private void renderLabels(DrawContext context) {
+    private void renderLabels(GuiGraphicsExtractor context) {
         if (labelPlacements.isEmpty()) return;
         int x = getContentLeft();
         int visibleHeight = getVisibleHeight();
@@ -525,25 +525,25 @@ public class AdvancedMobsConfigScreen extends Screen {
     }
 
     private static class WidgetPlacement {
-        private final ClickableWidget widget;
+        private final AbstractWidget widget;
         private final int relativeY;
 
-        private WidgetPlacement(ClickableWidget widget, int relativeY) {
+        private WidgetPlacement(AbstractWidget widget, int relativeY) {
             this.widget = widget;
             this.relativeY = relativeY;
         }
     }
 
     private static class LabelPlacement {
-        private final Text text;
+        private final Component text;
         private final int relativeY;
         private final int color;
 
-        private LabelPlacement(Text text, int relativeY) {
+        private LabelPlacement(Component text, int relativeY) {
             this(text, relativeY, 0xFFC3D5FF);
         }
 
-        private LabelPlacement(Text text, int relativeY, int color) {
+        private LabelPlacement(Component text, int relativeY, int color) {
             this.text = text;
             this.relativeY = relativeY;
             this.color = color;

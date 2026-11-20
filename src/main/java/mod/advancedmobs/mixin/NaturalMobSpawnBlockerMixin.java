@@ -3,8 +3,8 @@ package mod.advancedmobs.mixin;
 import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.system.NaturalSpawnLimiter;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.MinecraftServer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /**
  * Prevents all natural mob spawns if disableNaturalMobSpawns is true in config.
  */
-@Mixin(ServerWorld.class)
+@Mixin(ServerLevel.class)
 public abstract class NaturalMobSpawnBlockerMixin {
     /**
      * This mixin blocks ALL natural mob spawns (hostile AND peaceful):
@@ -22,20 +22,20 @@ public abstract class NaturalMobSpawnBlockerMixin {
      * - Does NOT block mobs spawned by spawn eggs, mod code, or commands.
      */
     @Inject(method = "spawnEntity", at = @At("HEAD"), cancellable = true)
-    private void onSpawnEntity(net.minecraft.entity.Entity entity, CallbackInfoReturnable<Boolean> cir) {
+    private void onSpawnEntity(net.minecraft.world.entity.Entity entity, CallbackInfoReturnable<Boolean> cir) {
         AdvancedMobsMod.runSafely("NaturalMobSpawnBlockerMixin#onSpawnEntity", () -> {
             ModConfig config = ModConfig.getInstance();
-            if (!(entity instanceof MobEntity)) return;
+            if (!(entity instanceof Mob)) return;
             
             // Check if mob has special tags indicating it was spawned by player/mod/command
-            MobEntity mob = (MobEntity) entity;
+            Mob mob = (Mob) entity;
 
             // Hard block mode (existing behavior)
             if (config.disableNaturalMobSpawns) {
-                if (mob.getCommandTags().contains("umw_player_spawned")) return;
-                if (mob.getCommandTags().contains("umw_spawner_spawned")) return;
-                if (mob.getCommandTags().contains("umw_horde_reinforcement")) return;
-                if (mob.getCommandTags().contains("umw_summoned")) return;
+                if (mob.getTags().contains("umw_player_spawned")) return;
+                if (mob.getTags().contains("umw_spawner_spawned")) return;
+                if (mob.getTags().contains("umw_horde_reinforcement")) return;
+                if (mob.getTags().contains("umw_summoned")) return;
                 if (entity.hasCustomName()) return;
                 cir.setReturnValue(false);
                 return;
@@ -43,16 +43,16 @@ public abstract class NaturalMobSpawnBlockerMixin {
 
             // Soft cap mode: only applies to NATURAL spawns (not spawners, eggs, commands, etc.)
             if (!config.limitNaturalMobSpawns) return;
-            if (!mob.getCommandTags().contains("umw_natural_spawned")) return;
+            if (!mob.getTags().contains("umw_natural_spawned")) return;
 
             // Safety allowlist
-            if (mob.getCommandTags().contains("umw_player_spawned")) return;
-            if (mob.getCommandTags().contains("umw_spawner_spawned")) return;
-            if (mob.getCommandTags().contains("umw_horde_reinforcement")) return;
-            if (mob.getCommandTags().contains("umw_summoned")) return;
+            if (mob.getTags().contains("umw_player_spawned")) return;
+            if (mob.getTags().contains("umw_spawner_spawned")) return;
+            if (mob.getTags().contains("umw_horde_reinforcement")) return;
+            if (mob.getTags().contains("umw_summoned")) return;
             if (entity.hasCustomName()) return;
 
-            if (!(((Object) this) instanceof ServerWorld world)) return;
+            if (!(((Object) this) instanceof ServerLevel world)) return;
             MinecraftServer server = world.getServer();
             if (server == null) return;
 
@@ -71,9 +71,9 @@ public abstract class NaturalMobSpawnBlockerMixin {
 
     private static int getSimulationDistance(MinecraftServer server) {
         try {
-            return server.getPlayerManager().getSimulationDistance();
+            return server.getPlayerList().getSimulationDistance();
         } catch (Throwable ignored) {
-            return server.getPlayerManager().getViewDistance();
+            return server.getPlayerList().getViewDistance();
         }
     }
 }

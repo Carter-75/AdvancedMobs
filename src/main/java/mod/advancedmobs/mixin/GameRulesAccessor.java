@@ -1,7 +1,7 @@
 package mod.advancedmobs.mixin;
 
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.GameRules;
+import net.minecraft.world.level.gamerules.GameRules;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Invoker;
 

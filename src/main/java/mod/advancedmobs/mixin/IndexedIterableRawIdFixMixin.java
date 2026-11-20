@@ -1,10 +1,10 @@
 package mod.advancedmobs.mixin;
 
 import mod.advancedmobs.AdvancedMobsMod;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.collection.IndexedIterable;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.Registry;
+import net.minecraft.core.Holder;
+import net.minecraft.core.IdMap;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -20,18 +20,18 @@ import java.util.concurrent.ConcurrentHashMap;
  * Global compatibility fix for registry-entry serialization.
  *
  * Some mods (UMW included) may end up with ItemStacks whose enchantments component contains
- * {@link RegistryEntry.Reference} instances that are valid but originate from a different
+ * {@link Holder.Reference} instances that are valid but originate from a different
  * registry wrapper than the one used by the networking buffer.
  *
  * When another mod (e.g. AdvancedLootInfo + Polymer) encodes an ItemStack during world load,
- * Minecraft may call {@link IndexedIterable#getRawIdOrThrow(Object)} and throw:
+ * Minecraft may call {@link IdMap#getRawIdOrThrow(Object)} and throw:
  * "Can't find id for 'Reference{...}'".
  *
  * This mixin intercepts that method and, if the raw id lookup fails for a reference entry,
- * attempts to resolve an equivalent reference by {@link RegistryKey} against the current
+ * attempts to resolve an equivalent reference by {@link ResourceKey} against the current
  * iterable implementation before retrying.
  */
-@Mixin(IndexedIterable.class)
+@Mixin(IdMap.class)
 public interface IndexedIterableRawIdFixMixin {
 
     // getRawIdOrThrow sits on the packet encoding path, so the reflective
@@ -44,7 +44,7 @@ public interface IndexedIterableRawIdFixMixin {
     @Inject(method = "getRawIdOrThrow(Ljava/lang/Object;)I", at = @At("HEAD"), cancellable = true)
     private void umw$fixForeignRegistryEntry(Object value, CallbackInfoReturnable<Integer> cir) {
         AdvancedMobsMod.runSafely("IndexedIterableRawIdFixMixin#fixForeignRegistryEntry", () -> {
-            IndexedIterable self = (IndexedIterable) (Object) this;
+            IdMap self = (IdMap) (Object) this;
 
             // Fast path: if this iterable can already resolve it, do nothing.
             Integer rawId = tryGetRawId(self, value);
@@ -53,11 +53,11 @@ public interface IndexedIterableRawIdFixMixin {
                 return;
             }
 
-            if (!(value instanceof RegistryEntry.Reference<?> reference)) {
+            if (!(value instanceof Holder.Reference<?> reference)) {
                 return;
             }
 
-            RegistryKey<?> key;
+            ResourceKey<?> key;
             try {
                 key = reference.getKey().orElse(null);
             } catch (Exception ignored) {
@@ -67,7 +67,7 @@ public interface IndexedIterableRawIdFixMixin {
                 return;
             }
 
-            RegistryEntry.Reference<?> resolved = tryResolveReference(self, key);
+            Holder.Reference<?> resolved = tryResolveReference(self, key);
             if (resolved == null) {
                 return;
             }
@@ -80,7 +80,7 @@ public interface IndexedIterableRawIdFixMixin {
     }
 
     @SuppressWarnings({"rawtypes"})
-    private static Integer tryGetRawId(IndexedIterable self, Object value) {
+    private static Integer tryGetRawId(IdMap self, Object value) {
         if (self == null || value == null) {
             return null;
         }
@@ -99,7 +99,7 @@ public interface IndexedIterableRawIdFixMixin {
         }
 
         try {
-            // IndexedIterable has a getRawId(T) method; use reflection to avoid signature churn.
+            // IdMap has a getRawId(T) method; use reflection to avoid signature churn.
             Method method = self.getClass().getMethod("getRawId", Object.class);
             RAW_ID_METHOD_CACHE.put(self.getClass(), method);
             Object result = method.invoke(self, value);
@@ -133,15 +133,15 @@ public interface IndexedIterableRawIdFixMixin {
     }
 
     @SuppressWarnings({"rawtypes"})
-    private static RegistryEntry.Reference<?> tryResolveReference(IndexedIterable self, RegistryKey<?> key) {
+    private static Holder.Reference<?> tryResolveReference(IdMap self, ResourceKey<?> key) {
         if (self == null || key == null) {
             return null;
         }
 
-        // Many registry wrappers used in networking expose getEntry(RegistryKey) -> Optional.
+        // Many registry wrappers used in networking expose getEntry(ResourceKey) -> Optional.
         for (String methodName : new String[] {"getEntry", "getOptional", "get", "getOrEmpty"}) {
             try {
-                Method method = self.getClass().getMethod(methodName, RegistryKey.class);
+                Method method = self.getClass().getMethod(methodName, ResourceKey.class);
                 if (!Optional.class.isAssignableFrom(method.getReturnType())) {
                     continue;
                 }
@@ -150,7 +150,7 @@ public interface IndexedIterableRawIdFixMixin {
                     continue;
                 }
                 Object entry = optional.get();
-                if (entry instanceof RegistryEntry.Reference<?> reference) {
+                if (entry instanceof Holder.Reference<?> reference) {
                     return reference;
                 }
             } catch (NoSuchMethodException ignored) {
@@ -164,7 +164,7 @@ public interface IndexedIterableRawIdFixMixin {
         try {
             Registry<?> outerRegistry = tryGetOuterRegistry(self);
             if (outerRegistry != null) {
-                Optional<? extends RegistryEntry.Reference<?>> resolved = outerRegistry.getEntry((RegistryKey) key);
+                Optional<? extends Holder.Reference<?>> resolved = outerRegistry.getEntry((ResourceKey) key);
                 return resolved.orElse(null);
             }
         } catch (Exception ignored) {
@@ -174,7 +174,7 @@ public interface IndexedIterableRawIdFixMixin {
         return null;
     }
 
-    private static Registry<?> tryGetOuterRegistry(IndexedIterable self) {
+    private static Registry<?> tryGetOuterRegistry(IdMap self) {
         try {
             for (Field field : self.getClass().getDeclaredFields()) {
                 if (!Registry.class.isAssignableFrom(field.getType())) {

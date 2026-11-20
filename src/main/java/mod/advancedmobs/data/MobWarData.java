@@ -1,7 +1,7 @@
 package mod.advancedmobs.data;
 
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.nbt.NbtCompound;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.nbt.CompoundTag;
 
 import java.util.*;
 
@@ -29,7 +29,7 @@ public class MobWarData {
     // Skill Tree Data
     private double skillPoints = 0;
     private double spentPoints = 0;
-    private NbtCompound skillData = new NbtCompound();
+    private CompoundTag skillData = new CompoundTag();
 
     public MobWarData() {}
 
@@ -38,8 +38,8 @@ public class MobWarData {
     public void setSkillPoints(double points) { this.skillPoints = points; }
     public double getSpentPoints() { return spentPoints; }
     public void setSpentPoints(double points) { this.spentPoints = points; }
-    public NbtCompound getSkillData() { return skillData; }
-    public void setSkillData(NbtCompound data) { this.skillData = data; }
+    public CompoundTag getSkillData() { return skillData; }
+    public void setSkillData(CompoundTag data) { this.skillData = data; }
     
     public PowerProfile getPowerProfile() {
         if (skillData == null || skillData.isEmpty()) return null;
@@ -151,8 +151,8 @@ public class MobWarData {
     }
     
     // NBT serialization
-    public NbtCompound writeNbt() {
-        NbtCompound nbt = new NbtCompound();
+    public CompoundTag writeNbt() {
+        CompoundTag nbt = new CompoundTag();
         
         nbt.putInt("killCount", killCount);
         nbt.putInt("level", level);
@@ -165,7 +165,7 @@ public class MobWarData {
         nbt.put("skillData", skillData);
         
         if (currentTarget != null) {
-            nbt.putUuid("currentTarget", currentTarget);
+            nbt.store("currentTarget", net.minecraft.core.UUIDUtil.CODEC, currentTarget);
             nbt.putLong("lastTargetChangeTime", lastTargetChangeTime);
         }
         
@@ -183,24 +183,24 @@ public class MobWarData {
         return nbt;
     }
     
-    public void readNbt(NbtCompound nbt) {
-        killCount = nbt.getInt("killCount");
-        level = nbt.getInt("level");
-        damageDealt = nbt.getDouble("damageDealt");
-        damageTaken = nbt.getDouble("damageTaken");
+    public void readNbt(CompoundTag nbt) {
+        killCount = nbt.getIntOr("killCount", 0);
+        level = nbt.getIntOr("level", 0);
+        damageDealt = nbt.getDoubleOr("damageDealt", 0.0);
+        damageTaken = nbt.getDoubleOr("damageTaken", 0.0);
         
         // Skill Tree Persistence
-        if (nbt.contains("skillPoints")) skillPoints = nbt.getDouble("skillPoints");
-        if (nbt.contains("spentPoints")) spentPoints = nbt.getDouble("spentPoints");
-        if (nbt.contains("skillData")) skillData = nbt.getCompound("skillData");
+        if (nbt.contains("skillPoints")) skillPoints = nbt.getDoubleOr("skillPoints", 0.0);
+        if (nbt.contains("spentPoints")) spentPoints = nbt.getDoubleOr("spentPoints", 0.0);
+        if (nbt.contains("skillData")) skillData = nbt.getCompoundOrEmpty("skillData");
         
-        if (nbt.containsUuid("currentTarget")) {
-            currentTarget = nbt.getUuid("currentTarget");
-            lastTargetChangeTime = nbt.getLong("lastTargetChangeTime");
+        if (nbt.contains("currentTarget")) {
+            currentTarget = nbt.read("currentTarget", net.minecraft.core.UUIDUtil.CODEC).orElse(null);
+            lastTargetChangeTime = nbt.getLongOr("lastTargetChangeTime", 0L);
         }
         
         if (nbt.contains("allies")) {
-            long[] allyArray = nbt.getLongArray("allies");
+            long[] allyArray = nbt.getLongArray("allies").orElse(new long[0]);
             allies.clear();
             // The i + 1 bound guards against a corrupt odd-length array.
             for (int i = 0; i + 1 < allyArray.length; i += 2) {
@@ -213,32 +213,39 @@ public class MobWarData {
     // Static helper to get or create data for a mob
     private static final String NBT_KEY = "UniversalMobWarData";
     
-    public static MobWarData get(MobEntity mob) {
+    public static MobWarData get(Mob mob) {
         if (mob instanceof IMobWarDataHolder holder) {
             return holder.getMobWarData();
         }
         
         // Fallback (Should not happen with Mixin)
-        NbtCompound nbt = mob.writeNbt(new NbtCompound());
+        net.minecraft.world.level.storage.TagValueOutput output =
+            net.minecraft.world.level.storage.TagValueOutput.createWithoutContext(net.minecraft.util.ProblemReporter.DISCARDING);
+        mob.saveWithoutId(output);
+        CompoundTag nbt = output.buildResult();
         MobWarData data = new MobWarData();
         
         if (nbt.contains(NBT_KEY)) {
-            data.readNbt(nbt.getCompound(NBT_KEY));
+            data.readNbt(nbt.getCompoundOrEmpty(NBT_KEY));
         }
         
         return data;
     }
     
-    public static void save(MobEntity mob, MobWarData data) {
+    public static void save(Mob mob, MobWarData data) {
         if (mob instanceof IMobWarDataHolder holder) {
             holder.setMobWarData(data);
             return;
         }
         
         // Fallback
-        NbtCompound nbt = mob.writeNbt(new NbtCompound());
+        net.minecraft.world.level.storage.TagValueOutput output =
+            net.minecraft.world.level.storage.TagValueOutput.createWithoutContext(net.minecraft.util.ProblemReporter.DISCARDING);
+        mob.saveWithoutId(output);
+        CompoundTag nbt = output.buildResult();
         nbt.put(NBT_KEY, data.writeNbt());
-        mob.readNbt(nbt);
+        mob.load(net.minecraft.world.level.storage.TagValueInput.create(
+            net.minecraft.util.ProblemReporter.DISCARDING, mob.level().registryAccess(), nbt));
     }
 }
 

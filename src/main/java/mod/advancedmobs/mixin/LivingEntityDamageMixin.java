@@ -4,10 +4,10 @@ import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.data.IMobWarDataHolder;
 import mod.advancedmobs.data.MobWarData;
 import mod.advancedmobs.system.ScalingSystem;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Handles damage-triggered scaling abilities on the LivingEntity level so all mobs stay compatible
- * even when Mojang changes MobEntity's overrides.
+ * even when Mojang changes Mob's overrides.
  */
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityDamageMixin {
@@ -27,7 +27,7 @@ public abstract class LivingEntityDamageMixin {
                 return;
             }
 
-            if (!((Object) this instanceof MobEntity mobEntity)) {
+            if (!((Object) this instanceof Mob mobEntity)) {
                 return;
             }
 
@@ -39,9 +39,9 @@ public abstract class LivingEntityDamageMixin {
                 return;
             }
 
-            long currentTick = mobEntity.getWorld().getTime();
+            long currentTick = mobEntity.level().getGameTime();
             ScalingSystem.handleDamageAbilities(mobEntity, data, currentTick);
-            if (mobEntity.getWorld() instanceof ServerWorld serverWorld) {
+            if (mobEntity.level() instanceof ServerLevel serverWorld) {
                 ScalingSystem.handleHordeSummon(mobEntity, data, serverWorld, currentTick);
             }
         });

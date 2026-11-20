@@ -1,10 +1,10 @@
 package mod.advancedmobs.mixin;
 
-import net.minecraft.entity.projectile.ExplosiveProjectileEntity;
+import net.minecraft.world.entity.projectile.hurtingprojectile.AbstractHurtingProjectile;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(ExplosiveProjectileEntity.class)
+@Mixin(AbstractHurtingProjectile.class)
 public interface ExplosiveProjectileEntityAccessor {
     @Accessor("accelerationPower")
     double advancedmobs$getAccelerationPower();

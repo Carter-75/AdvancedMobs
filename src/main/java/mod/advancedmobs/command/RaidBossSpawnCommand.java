@@ -1,11 +1,11 @@
 package mod.advancedmobs.command;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
-import net.minecraft.command.CommandRegistryAccess;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.CommandSourceStack;
 
 /**
  * Command to force-spawn the Mob Warlord in the next raid.
@@ -14,30 +14,30 @@ public class RaidBossSpawnCommand {
     
     private static boolean forceNextRaidBoss = false;
     
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher, CommandRegistryAccess registryAccess, CommandManager.RegistrationEnvironment environment) {
-        dispatcher.register(CommandManager.literal("advancedmobs")
-            .then(CommandManager.literal("raid")
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext registryAccess, Commands.RegistrationEnvironment environment) {
+        dispatcher.register(Commands.literal("advancedmobs")
+            .then(Commands.literal("raid")
                 .requires(source -> source.hasPermissionLevel(2))
-                .then(CommandManager.literal("forceboss")
+                .then(Commands.literal("forceboss")
                     .executes(RaidBossSpawnCommand::executeForceBoss))
             )
         );
     }
     
-    private static int executeForceBoss(CommandContext<ServerCommandSource> context) {
-        ServerCommandSource source = context.getSource();
+    private static int executeForceBoss(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getDirectEntity();
         
         forceNextRaidBoss = true;
         
         source.sendFeedback(() -> 
-            Text.literal("[SUCCESS] Next raid will GUARANTEE a Mob Warlord spawn on the final wave!")
-                .styled(style -> style.withColor(Formatting.GREEN).withBold(true)), 
+            Component.literal("[SUCCESS] Next raid will GUARANTEE a Mob Warlord spawn on the final wave!")
+                .withStyle(style -> style.withColor(ChatFormatting.GREEN).withBold(true)), 
             true
         );
         
         source.sendFeedback(() ->
-            Text.literal("  Start a raid to summon the boss!")
-                .styled(style -> style.withColor(Formatting.GRAY)),
+            Component.literal("  Start a raid to summon the boss!")
+                .withStyle(style -> style.withColor(ChatFormatting.GRAY)),
             false
         );
         

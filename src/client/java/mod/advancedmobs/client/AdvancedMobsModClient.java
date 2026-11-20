@@ -18,7 +18,7 @@ public class AdvancedMobsModClient implements ClientModInitializer {
     public void onInitializeClient() {
         // Register the payload type so this client advertises "I have AdvancedMobs" to servers.
         try {
-            PayloadTypeRegistry.playS2C().register(UmwRequiredClientPayload.ID, UmwRequiredClientPayload.CODEC);
+            PayloadTypeRegistry.clientboundPlay().register(UmwRequiredClientPayload.ID, UmwRequiredClientPayload.CODEC);
         } catch (IllegalArgumentException alreadyRegistered) {
             // ok
         }

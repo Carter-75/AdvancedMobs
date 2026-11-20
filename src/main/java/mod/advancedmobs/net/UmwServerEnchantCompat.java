@@ -7,12 +7,12 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.minecraft.enchantment.Enchantment;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.RegistryKeys;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.resources.Identifier;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -31,7 +31,7 @@ public final class UmwServerEnchantCompat {
     public static void init() {
         // Register payload type (can be invoked in both client+server runtimes; tolerate double init)
         try {
-            PayloadTypeRegistry.playC2S().register(UmwClientEnchantmentsPayload.ID, UmwClientEnchantmentsPayload.CODEC);
+            PayloadTypeRegistry.serverboundPlay().register(UmwClientEnchantmentsPayload.ID, UmwClientEnchantmentsPayload.CODEC);
         } catch (IllegalArgumentException alreadyRegistered) {
             AdvancedMobsMod.LOGGER.debug(
                 "[EnchantCompat] Payload type already registered: {}",
@@ -54,14 +54,14 @@ public final class UmwServerEnchantCompat {
         ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
             SERVER = server;
             try {
-                ServerPlayerEntity player = handler.player;
+                ServerPlayer player = handler.player;
                 if (player == null) {
                     AdvancedMobsMod.LOGGER.warn("[EnchantCompat] JOIN fired with null player; skipping");
                     recomputeAllowlist(null);
                     return;
                 }
 
-                UUID uuid = player.getUuid();
+                UUID uuid = player.getUUID();
                 if (uuid == null) {
                     AdvancedMobsMod.LOGGER.warn("[EnchantCompat] Player UUID is null for {}; skipping", player.getName().getString());
                     recomputeAllowlist(player);
@@ -81,13 +81,13 @@ public final class UmwServerEnchantCompat {
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
             SERVER = server;
             try {
-                ServerPlayerEntity player = handler.player;
+                ServerPlayer player = handler.player;
                 if (player == null) {
                     recomputeAllowlist(null);
                     return;
                 }
 
-                UUID uuid = player.getUuid();
+                UUID uuid = player.getUUID();
                 if (uuid != null) {
                     CLIENT_ENCHANTMENTS.remove(uuid);
                 }
@@ -99,12 +99,12 @@ public final class UmwServerEnchantCompat {
 
         ServerPlayNetworking.registerGlobalReceiver(UmwClientEnchantmentsPayload.ID, (payload, context) -> {
             try {
-                ServerPlayerEntity player = context.player();
+                ServerPlayer player = context.player();
                 if (player == null) {
                     return;
                 }
 
-                UUID uuid = player.getUuid();
+                UUID uuid = player.getUUID();
                 if (uuid == null) {
                     return;
                 }
@@ -119,10 +119,10 @@ public final class UmwServerEnchantCompat {
         });
     }
 
-    private static void recomputeAllowlist(ServerPlayerEntity debugPlayer) {
+    private static void recomputeAllowlist(ServerPlayer debugPlayer) {
         ModConfig config = ModConfig.getInstance();
 
-        MinecraftServer server = debugPlayer != null ? debugPlayer.getServer() : SERVER;
+        MinecraftServer server = debugPlayer != null ? debugPlayer.level().getServer() : SERVER;
         if (server == null) {
             ScalingSystem.setEnchantmentNetworkAllowlist(Collections.emptySet());
             return;
@@ -130,8 +130,8 @@ public final class UmwServerEnchantCompat {
 
         // If modded enchants are disabled, restrict to minecraft namespace via ScalingSystem.
         // (We still publish a superset allowlist so the filtering is centralized.)
-        Registry<Enchantment> enchantRegistry = server.getRegistryManager().get(RegistryKeys.ENCHANTMENT);
-        Set<Identifier> serverIds = new HashSet<>(enchantRegistry.getIds());
+        Registry<Enchantment> enchantRegistry = server.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
+        Set<Identifier> serverIds = new HashSet<>(enchantRegistry.keySet());
 
         // Intersect with each client's reported ids. If client hasn't reported yet (null), treat as vanilla-only.
         Set<Identifier> intersection = new HashSet<>(serverIds);

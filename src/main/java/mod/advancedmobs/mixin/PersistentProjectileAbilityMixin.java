@@ -5,14 +5,14 @@ import mod.advancedmobs.bridge.ProjectileAbilityBridge;
 import mod.advancedmobs.data.IMobWarDataHolder;
 import mod.advancedmobs.data.MobWarData;
 import mod.advancedmobs.system.ScalingSystem;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.projectile.PersistentProjectileEntity;
-import net.minecraft.entity.projectile.ProjectileEntity;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
+import net.minecraft.world.entity.projectile.Projectile;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.server.level.ServerLevel;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -24,13 +24,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * Applies scaling-system ranged abilities (piercing, multishot, potion mastery)
  * to every persistent projectile fired by a mob.
  */
-@Mixin(PersistentProjectileEntity.class)
+@Mixin(AbstractArrow.class)
 public abstract class PersistentProjectileAbilityMixin implements ProjectileAbilityBridge {
     @Unique
     private boolean advancedmobs$abilitiesApplied;
 
-    // This mixin used to extend ProjectileEntity with a constructor calling
-    // super(entityType, world), but in 1.21.1 ProjectileEntity's constructor
+    // This mixin used to extend Projectile with a constructor calling
+    // super(entityType, world), but in 1.21.1 Projectile's constructor
     // is package-private in the shipped jar, so the class never compiled.
     // It now follows the same cast pattern as ProjectileAbilityMixin; mixin
     // constructors are never invoked at runtime, so behavior is unchanged.
@@ -43,13 +43,13 @@ public abstract class PersistentProjectileAbilityMixin implements ProjectileAbil
     @Inject(method = "tick", at = @At("HEAD"))
     private void advancedmobs$applyProjectileAbilities(CallbackInfo ci) {
         AdvancedMobsMod.runSafely("PersistentProjectileAbilityMixin#applyProjectileAbilities", () -> {
-            ProjectileEntity self = (ProjectileEntity) (Object) this;
-            if (self.getWorld().isClient() || advancedmobs$abilitiesApplied) {
+            Projectile self = (Projectile) (Object) this;
+            if (self.level().isClient() || advancedmobs$abilitiesApplied) {
                 return;
             }
 
             Entity owner = self.getOwner();
-            if (!(owner instanceof MobEntity mob)) {
+            if (!(owner instanceof Mob mob)) {
                 advancedmobs$abilitiesApplied = true;
                 return;
             }
@@ -74,13 +74,13 @@ public abstract class PersistentProjectileAbilityMixin implements ProjectileAbil
     @Inject(method = "onEntityHit", at = @At("TAIL"))
     private void advancedmobs$applyPotionMastery(EntityHitResult hitResult, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("PersistentProjectileAbilityMixin#applyPotionMastery", () -> {
-            ProjectileEntity self = (ProjectileEntity) (Object) this;
-            if (self.getWorld().isClient()) {
+            Projectile self = (Projectile) (Object) this;
+            if (self.level().isClient()) {
                 return;
             }
 
             Entity owner = self.getOwner();
-            if (!(owner instanceof MobEntity mob)) {
+            if (!(owner instanceof Mob mob)) {
                 return;
             }
 
@@ -98,7 +98,7 @@ public abstract class PersistentProjectileAbilityMixin implements ProjectileAbil
         });
     }
 
-    private MobWarData advancedmobs$getData(MobEntity mob) {
+    private MobWarData advancedmobs$getData(Mob mob) {
         if (mob instanceof IMobWarDataHolder holder) {
             return holder.getMobWarData();
         }

@@ -1,23 +1,23 @@
 package mod.advancedmobs.net;
 
 import mod.advancedmobs.AdvancedMobsMod;
-import net.minecraft.network.RegistryByteBuf;
-import net.minecraft.network.codec.PacketCodec;
-import net.minecraft.network.packet.CustomPayload;
-import net.minecraft.util.Identifier;
+import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import net.minecraft.resources.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public record UmwClientEnchantmentsPayload(List<Identifier> enchantmentIds) implements CustomPayload {
+public record UmwClientEnchantmentsPayload(List<Identifier> enchantmentIds) implements CustomPacketPayload {
 
-    public static final CustomPayload.Id<UmwClientEnchantmentsPayload> ID =
-        new CustomPayload.Id<>(Identifier.of(AdvancedMobsMod.MODID, "client_enchantments"));
+    public static final CustomPacketPayload.Type<UmwClientEnchantmentsPayload> ID =
+        new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath(AdvancedMobsMod.MODID, "client_enchantments"));
 
-    public static final PacketCodec<RegistryByteBuf, UmwClientEnchantmentsPayload> CODEC =
-        PacketCodec.ofStatic(UmwClientEnchantmentsPayload::write, UmwClientEnchantmentsPayload::read);
+    public static final StreamCodec<RegistryFriendlyByteBuf, UmwClientEnchantmentsPayload> CODEC =
+        StreamCodec.of(UmwClientEnchantmentsPayload::write, UmwClientEnchantmentsPayload::read);
 
-    public static UmwClientEnchantmentsPayload read(RegistryByteBuf buf) {
+    public static UmwClientEnchantmentsPayload read(RegistryFriendlyByteBuf buf) {
         int count = buf.readVarInt();
         List<Identifier> ids = new ArrayList<>(Math.max(0, count));
         for (int i = 0; i < count; i++) {
@@ -26,7 +26,7 @@ public record UmwClientEnchantmentsPayload(List<Identifier> enchantmentIds) impl
         return new UmwClientEnchantmentsPayload(ids);
     }
 
-    public static void write(RegistryByteBuf buf, UmwClientEnchantmentsPayload payload) {
+    public static void write(RegistryFriendlyByteBuf buf, UmwClientEnchantmentsPayload payload) {
         List<Identifier> ids = payload.enchantmentIds();
         buf.writeVarInt(ids.size());
         for (Identifier id : ids) {
@@ -35,7 +35,7 @@ public record UmwClientEnchantmentsPayload(List<Identifier> enchantmentIds) impl
     }
 
     @Override
-    public Id<? extends CustomPayload> getId() {
+    public Type<? extends CustomPacketPayload> type() {
         return ID;
     }
 }

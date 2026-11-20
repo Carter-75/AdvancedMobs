@@ -1,8 +1,8 @@
 package mod.advancedmobs.system;
 
 import mod.advancedmobs.config.ModConfig;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.server.level.ServerLevel;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,7 +56,7 @@ public class WarlordSystem {
     /**
      * Check if warlord system is enabled (with world context for future gamerule support)
      */
-    public static boolean isEnabled(ServerWorld world) {
+    public static boolean isEnabled(ServerLevel world) {
         return ModConfig.getInstance().isWarlordActive();
     }
     
@@ -148,8 +148,8 @@ public class WarlordSystem {
      * @param mob The mob entity
      * @return true if the mob is a minion
      */
-    public static boolean isMinion(MobEntity mob) {
-        return isMinion(mob.getUuid());
+    public static boolean isMinion(Mob mob) {
+        return isMinion(mob.getUUID());
     }
     
     /**
@@ -282,9 +282,9 @@ public class WarlordSystem {
      * @param targetMob The potential target
      * @return true if the target is valid (not protected)
      */
-    public static boolean isValidMinionTarget(MobEntity attackerMob, MobEntity targetMob) {
+    public static boolean isValidMinionTarget(Mob attackerMob, Mob targetMob) {
         if (!isMinion(attackerMob)) return true; // Non-minions can target anything
         
-        return !isProtectedFromMinion(attackerMob.getUuid(), targetMob.getUuid());
+        return !isProtectedFromMinion(attackerMob.getUUID(), targetMob.getUUID());
     }
 }

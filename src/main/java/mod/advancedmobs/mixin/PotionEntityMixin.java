@@ -4,15 +4,15 @@ import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.data.IMobWarDataHolder;
 import mod.advancedmobs.data.MobWarData;
 import mod.advancedmobs.system.ScalingSystem;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.entity.projectile.thrown.PotionEntity;
-import net.minecraft.entity.projectile.thrown.ThrownItemEntity;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.AbstractThrownPotion;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.ThrowableItemProjectile;
+import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.level.Level;
 
 import java.util.List;
 import org.spongepowered.asm.mixin.Mixin;
@@ -23,17 +23,17 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * Applies ranged potion mastery effects when custom potion projectiles land.
  */
-@Mixin(PotionEntity.class)
-public abstract class PotionEntityMixin extends ThrownItemEntity {
+@Mixin(AbstractThrownPotion.class)
+public abstract class PotionEntityMixin extends ThrowableItemProjectile {
 
-    protected PotionEntityMixin(EntityType<? extends ThrownItemEntity> entityType, World world) {
+    protected PotionEntityMixin(EntityType<? extends ThrowableItemProjectile> entityType, Level world) {
         super(entityType, world);
     }
 
     @Inject(method = "onCollision", at = @At("TAIL"))
     private void advancedmobs$applyRangedPotionEffects(HitResult hitResult, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("PotionEntityMixin#applyRangedPotionEffects", () -> {
-            if (this.getWorld().isClient()) {
+            if (this.level().isClient()) {
                 return;
             }
 
@@ -42,7 +42,7 @@ public abstract class PotionEntityMixin extends ThrownItemEntity {
             }
 
             Entity owner = this.getOwner();
-            if (!(owner instanceof MobEntity mobOwner)) {
+            if (!(owner instanceof Mob mobOwner)) {
                 return;
             }
 
@@ -69,9 +69,9 @@ public abstract class PotionEntityMixin extends ThrownItemEntity {
                 return;
             }
 
-            World world = this.getWorld();
-            List<LivingEntity> nearby = world.getEntitiesByClass(LivingEntity.class,
-                hit.getBoundingBox().expand(2.5),
+            Level world = this.level();
+            List<LivingEntity> nearby = world.getEntitiesOfClass(LivingEntity.class,
+                hit.getBoundingBox().inflate(2.5),
                 entity -> entity != livingTarget && entity != mobOwner && entity.isAlive());
 
             int applied = 0;

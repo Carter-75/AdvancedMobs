@@ -1,26 +1,26 @@
 package mod.advancedmobs.system;
 
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.World;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class NaturalSpawnLimiter {
 
-    private static final ConcurrentHashMap<World, AtomicInteger> NATURAL_MOB_COUNTS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Level, AtomicInteger> NATURAL_MOB_COUNTS = new ConcurrentHashMap<>();
 
     private NaturalSpawnLimiter() {
     }
 
-    public static void onMobLoaded(ServerWorld world, boolean isNaturalSpawnedMob) {
+    public static void onMobLoaded(ServerLevel world, boolean isNaturalSpawnedMob) {
         if (!isNaturalSpawnedMob) {
             return;
         }
         NATURAL_MOB_COUNTS.computeIfAbsent(world, w -> new AtomicInteger()).incrementAndGet();
     }
 
-    public static void onMobUnloaded(ServerWorld world, boolean isNaturalSpawnedMob) {
+    public static void onMobUnloaded(ServerLevel world, boolean isNaturalSpawnedMob) {
         if (!isNaturalSpawnedMob) {
             return;
         }
@@ -30,7 +30,7 @@ public final class NaturalSpawnLimiter {
         }
     }
 
-    public static int getNaturalMobCount(ServerWorld world) {
+    public static int getNaturalMobCount(ServerLevel world) {
         AtomicInteger counter = NATURAL_MOB_COUNTS.get(world);
         return counter != null ? Math.max(0, counter.get()) : 0;
     }

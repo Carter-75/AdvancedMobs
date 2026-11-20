@@ -2,13 +2,13 @@ package mod.advancedmobs.mixin;
 
 import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.util.SummonerTracker;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityData;
-import net.minecraft.entity.SpawnReason;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.LocalDifficulty;
-import net.minecraft.world.ServerWorldAccess;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.SpawnGroupData;
+import net.minecraft.world.entity.EntitySpawnReason;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.DifficultyInstance;
+import net.minecraft.world.level.ServerLevelAccessor;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -16,9 +16,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Automatically tracks summoner-summoned relationships for ALL mobs.
- * Works for vanilla and modded mobs that use SpawnReason.MOB_SUMMONED.
+ * Works for vanilla and modded mobs that use EntitySpawnReason.MOB_SUMMONED.
  */
-@Mixin(MobEntity.class)
+@Mixin(Mob.class)
 public abstract class UniversalSummonerTrackingMixin {
     
     /**
@@ -30,18 +30,18 @@ public abstract class UniversalSummonerTrackingMixin {
      */
     @Inject(method = "initialize", at = @At("RETURN"))
     private void advancedmobs$trackSummonedMob(
-        ServerWorldAccess world, 
-        LocalDifficulty difficulty, 
-        SpawnReason spawnReason, 
-        EntityData entityData,
-        CallbackInfoReturnable<EntityData> cir
+        ServerLevelAccessor world, 
+        DifficultyInstance difficulty, 
+        EntitySpawnReason spawnReason, 
+        SpawnGroupData entityData,
+        CallbackInfoReturnable<SpawnGroupData> cir
     ) {
         AdvancedMobsMod.runSafely("UniversalSummonerTrackingMixin#trackSummonedMob", () -> {
-            MobEntity self = (MobEntity)(Object)this;
+            Mob self = (Mob)(Object)this;
             
-            // Only track if this mob was summoned AND we're in a ServerWorld
-            if ((spawnReason == SpawnReason.MOB_SUMMONED || spawnReason == SpawnReason.EVENT) 
-                && world instanceof ServerWorld serverWorld) {
+            // Only track if this mob was summoned AND we're in a ServerLevel
+            if ((spawnReason == EntitySpawnReason.MOB_SUMMONED || spawnReason == EntitySpawnReason.EVENT) 
+                && world instanceof ServerLevel serverWorld) {
                 // Tag summoned mobs so NaturalMobSpawnBlockerMixin lets them
                 // through when natural spawns are disabled or capped. Its
                 // allowlist has always checked for "umw_summoned", but nothing
@@ -49,25 +49,25 @@ public abstract class UniversalSummonerTrackingMixin {
                 // were blocked by the hard block mode. initialize() runs before
                 // spawnEntity in the standard spawn paths, so the tag is in
                 // place when the blocker checks it.
-                self.addCommandTag("umw_summoned");
+                self.addTag("umw_summoned");
 
                 // Try to find the summoner by looking for nearby mobs that could have summoned this one
                 // Common summoners: Evoker, Illusioner, Warlord, etc.
                 
                 // Look for potential summoners within 16 blocks
-                MobEntity closestSummoner = serverWorld.getEntitiesByClass(
-                    MobEntity.class,
-                    self.getBoundingBox().expand(16.0),
+                Mob closestSummoner = serverWorld.getEntitiesOfClass(
+                    Mob.class,
+                    self.getBoundingBox().inflate(16.0),
                     entity -> entity != self && 
                              entity.isAlive() &&
-                             entity.squaredDistanceTo(self) < 256.0 && // Within 16 blocks
+                             entity.distanceToSqr(self) < 256.0 && // Within 16 blocks
                              couldSummon(entity)
                 ).stream()
-                    .min((a, b) -> Double.compare(a.squaredDistanceTo(self), b.squaredDistanceTo(self)))
+                    .min((a, b) -> Double.compare(a.distanceToSqr(self), b.distanceToSqr(self)))
                     .orElse(null);
                 
                 if (closestSummoner != null) {
-                    SummonerTracker.registerSummoned(self.getUuid(), closestSummoner.getUuid());
+                    SummonerTracker.registerSummoned(self.getUUID(), closestSummoner.getUUID());
                 }
             }
         });
@@ -92,7 +92,7 @@ public abstract class UniversalSummonerTrackingMixin {
         
         // For safety, assume any hostile mob with high max health could be a summoner
         // This catches modded bosses
-        if (entity instanceof MobEntity mob) {
+        if (entity instanceof Mob mob) {
             return mob.getMaxHealth() > 100.0f; // Likely a boss or special mob
         }
         

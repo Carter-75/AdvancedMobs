@@ -2,9 +2,9 @@ package mod.advancedmobs.mixin;
 
 import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.config.ModConfig;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -24,9 +24,9 @@ public abstract class MobRevengeBlockerMixin {
 			Entity self = (Entity)(Object)this;
 
 			// Only apply to mobs in server worlds
-			if (self.getWorld().isClient()) return;
-			if (!(self.getWorld() instanceof ServerWorld serverWorld)) return;
-			if (!(self instanceof MobEntity selfMob)) return;
+			if (self.level().isClient()) return;
+			if (!(self.level() instanceof ServerLevel serverWorld)) return;
+			if (!(self instanceof Mob selfMob)) return;
 			if (attacker == null) return;
 
 			// Check if ignore same species gamerule is enabled

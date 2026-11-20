@@ -1,10 +1,10 @@
 package mod.advancedmobs.mixin;
 
 import mod.advancedmobs.AdvancedMobsMod;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.registry.Registry;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.util.collection.IndexedIterable;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.core.Registry;
+import net.minecraft.core.Holder;
+import net.minecraft.core.IdMap;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
@@ -15,15 +15,15 @@ import java.util.Optional;
 
 /**
  * Compatibility fix for cases where another mod constructs ItemStacks containing
- * {@link RegistryEntry.Reference} instances originating from a different registry wrapper.
+ * {@link Holder.Reference} instances originating from a different registry wrapper.
  *
  * During packet encoding, Minecraft encodes reference entries by raw id via
- * {@link IndexedIterable#getRawIdOrThrow(Object)}. If the reference object isn't the exact
+ * {@link IdMap#getRawIdOrThrow(Object)}. If the reference object isn't the exact
  * instance held by the current buffer's registry wrapper, encoding throws:
  * "Can't find id for 'Reference{...}'".
  *
  * This mixin redirects the raw-id lookup and, on failure, attempts to resolve an equivalent
- * reference entry by {@link RegistryKey} from the current wrapper before retrying.
+ * reference entry by {@link ResourceKey} from the current wrapper before retrying.
  */
 @Mixin(targets = "net.minecraft.network.codec.PacketCodecs$16")
 public final class RegistryEntryEncodingFixMixin {
@@ -32,21 +32,21 @@ public final class RegistryEntryEncodingFixMixin {
         method = "encode",
         at = @At(
             value = "INVOKE",
-            target = "Lnet/minecraft/util/collection/IndexedIterable;getRawIdOrThrow(Ljava/lang/Object;)I"
+            target = "Lnet/minecraft/util/collection/IdMap;getRawIdOrThrow(Ljava/lang/Object;)I"
         ),
         require = 0
     )
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private int umw$resolveRawIdOrThrow(IndexedIterable iterable, Object value) {
+    private int umw$resolveRawIdOrThrow(IdMap iterable, Object value) {
         try {
             return iterable.getRawIdOrThrow(value);
         } catch (IllegalArgumentException original) {
             try {
-                if (!(value instanceof RegistryEntry.Reference<?> reference)) {
+                if (!(value instanceof Holder.Reference<?> reference)) {
                     throw original;
                 }
 
-                RegistryKey<?> key;
+                ResourceKey<?> key;
                 try {
                     key = reference.getKey().orElse(null);
                 } catch (Exception ignored) {
@@ -56,7 +56,7 @@ public final class RegistryEntryEncodingFixMixin {
                     throw original;
                 }
 
-                RegistryEntry.Reference<?> resolved = tryResolveReference(iterable, key);
+                Holder.Reference<?> resolved = tryResolveReference(iterable, key);
                 if (resolved == null) {
                     throw original;
                 }
@@ -77,17 +77,17 @@ public final class RegistryEntryEncodingFixMixin {
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private static RegistryEntry.Reference<?> tryResolveReference(IndexedIterable iterable, RegistryKey<?> key) {
+    private static Holder.Reference<?> tryResolveReference(IdMap iterable, ResourceKey<?> key) {
         if (iterable == null || key == null) {
             return null;
         }
 
         // The concrete iterable used by the play-phase buffer is typically a registry wrapper
-        // that exposes a "getEntry(RegistryKey)" or similar method returning Optional.
+        // that exposes a "getEntry(ResourceKey)" or similar method returning Optional.
         // Use reflection to stay resilient to minor mapping / API differences.
         for (String methodName : new String[] {"getEntry", "getOptional", "get", "getOrEmpty"}) {
             try {
-                Method method = iterable.getClass().getMethod(methodName, RegistryKey.class);
+                Method method = iterable.getClass().getMethod(methodName, ResourceKey.class);
                 if (!Optional.class.isAssignableFrom(method.getReturnType())) {
                     continue;
                 }
@@ -96,7 +96,7 @@ public final class RegistryEntryEncodingFixMixin {
                     continue;
                 }
                 Object entry = optional.get();
-                if (entry instanceof RegistryEntry.Reference<?> reference) {
+                if (entry instanceof Holder.Reference<?> reference) {
                     return reference;
                 }
             } catch (NoSuchMethodException ignored) {
@@ -111,7 +111,7 @@ public final class RegistryEntryEncodingFixMixin {
         try {
             Registry<?> outerRegistry = tryGetOuterRegistry(iterable);
             if (outerRegistry != null) {
-                Optional<? extends RegistryEntry.Reference<?>> resolved = outerRegistry.getEntry((RegistryKey) key);
+                Optional<? extends Holder.Reference<?>> resolved = outerRegistry.getEntry((ResourceKey) key);
                 return resolved.orElse(null);
             }
         } catch (Exception ignored) {
@@ -121,7 +121,7 @@ public final class RegistryEntryEncodingFixMixin {
         return null;
     }
 
-    private static Registry<?> tryGetOuterRegistry(IndexedIterable iterable) {
+    private static Registry<?> tryGetOuterRegistry(IdMap iterable) {
         try {
             for (Field field : iterable.getClass().getDeclaredFields()) {
                 if (!Registry.class.isAssignableFrom(field.getType())) {

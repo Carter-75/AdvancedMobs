@@ -3,11 +3,11 @@ package mod.advancedmobs.system;
 import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.mixin.PersistentProjectileEntityAccessor;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.PersistentProjectileEntity;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.level.ServerLevel;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,16 +32,16 @@ public final class EntityCleanupSystem {
 		final int maxPerWorld = Math.max(0, config.cleanupNonPlayerGroundProjectilesMaxPerWorldPerRun);
 
 		int removedTotal = 0;
-		for (ServerWorld world : server.getWorlds()) {
+		for (ServerLevel world : server.getAllLevels()) {
 			int removedThisWorld = 0;
-			List<PersistentProjectileEntity> candidates = new ArrayList<>();
+			List<AbstractArrow> candidates = new ArrayList<>();
 			try {
 				for (Entity entity : world.iterateEntities()) {
 					if (maxPerWorld > 0 && candidates.size() >= maxPerWorld) {
 						break;
 					}
 
-					if (!(entity instanceof PersistentProjectileEntity projectile)) {
+					if (!(entity instanceof AbstractArrow projectile)) {
 						continue;
 					}
 
@@ -51,11 +51,11 @@ public final class EntityCleanupSystem {
 
 					// Keep any player-shot/thrown projectiles.
 					Entity owner = projectile.getOwner();
-					if (owner instanceof PlayerEntity) {
+					if (owner instanceof Player) {
 						continue;
 					}
 
-					if (projectile.age < minAgeTicks) {
+					if (projectile.tickCount < minAgeTicks) {
 						continue;
 					}
 
@@ -65,7 +65,7 @@ public final class EntityCleanupSystem {
 						inGround = ((PersistentProjectileEntityAccessor) projectile).advancedmobs$isInGround();
 					} catch (Throwable t) {
 						// If mappings ever change and the accessor fails, fall back to a conservative check.
-						inGround = projectile.isOnGround();
+						inGround = projectile.onGround();
 					}
 
 					if (!inGround) {
@@ -75,11 +75,11 @@ public final class EntityCleanupSystem {
 					candidates.add(projectile);
 				}
 			} catch (RuntimeException ex) {
-				AdvancedMobsMod.LOGGER.warn("Entity cleanup skipped in world {} due to iterator failure", world.getRegistryKey().getValue(), ex);
+				AdvancedMobsMod.LOGGER.warn("Entity cleanup skipped in world {} due to iterator failure", world.dimension().getValue(), ex);
 				continue;
 			}
 
-			for (PersistentProjectileEntity projectile : candidates) {
+			for (AbstractArrow projectile : candidates) {
 				if (maxPerWorld > 0 && removedThisWorld >= maxPerWorld) {
 					break;
 				}

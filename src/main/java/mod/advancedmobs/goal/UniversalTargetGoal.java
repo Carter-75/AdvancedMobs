@@ -7,13 +7,13 @@ import mod.advancedmobs.system.AllianceSystem;
 import mod.advancedmobs.system.TargetingSystem;
 import mod.advancedmobs.system.WarlordSystem;
 import mod.advancedmobs.util.TargetingUtil;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.ai.goal.TrackTargetGoal;
-import net.minecraft.entity.attribute.EntityAttributeInstance;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.mob.Angerable;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.goal.target.TargetGoal;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.NeutralMob;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.server.level.ServerLevel;
 
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
@@ -34,13 +34,13 @@ import java.util.function.DoubleSupplier;
  * 
  * Does NOT depend on: Scaling system
  */
-public class UniversalTargetGoal extends TrackTargetGoal {
+public class UniversalTargetGoal extends TargetGoal {
 
 	// ==========================================================================
 	//                              CONFIGURATION
 	// ==========================================================================
 	
-	private final MobEntity mob;
+	private final Mob mob;
 	private final BooleanSupplier modEnabledSupplier;
 	private final BooleanSupplier ignoreSameSpeciesSupplier;
 	private final BooleanSupplier targetPlayersSupplier;
@@ -61,7 +61,7 @@ public class UniversalTargetGoal extends TrackTargetGoal {
 		if (config.neutralMobsAlwaysAggressive) {
 			return true;
 		}
-		return !(mob instanceof Angerable);
+		return !(mob instanceof NeutralMob);
 	}
 
 	// ==========================================================================
@@ -69,7 +69,7 @@ public class UniversalTargetGoal extends TrackTargetGoal {
 	// ==========================================================================
 	
 	public UniversalTargetGoal(
-		MobEntity mob,
+		Mob mob,
 		BooleanSupplier modEnabledSupplier,
 		BooleanSupplier ignoreSameSpeciesSupplier,
 		BooleanSupplier targetPlayersSupplier,
@@ -84,7 +84,7 @@ public class UniversalTargetGoal extends TrackTargetGoal {
 		this.allianceEnabledSupplier = allianceEnabledSupplier;
 		this.rangeMultiplierSupplier = rangeMultiplierSupplier;
 		// OPTIMIZATION: Calculate UUID-based offset for staggering alliance updates (0-2000ms)
-		this.allianceCheckOffset = Math.abs(mob.getUuid().hashCode()) % 2000L;
+		this.allianceCheckOffset = Math.abs(mob.getUUID().hashCode()) % 2000L;
 	}
 
 	// ==========================================================================
@@ -116,7 +116,7 @@ public class UniversalTargetGoal extends TrackTargetGoal {
 	private UUID getMasterUuidIfMinion() {
 		// Only check if warlord system is enabled
 		if (!WarlordSystem.isEnabled()) return null;
-		return WarlordSystem.getMasterUuid(mob.getUuid());
+		return WarlordSystem.getMasterUuid(mob.getUUID());
 	}
 
 	// ==========================================================================
@@ -136,11 +136,11 @@ public class UniversalTargetGoal extends TrackTargetGoal {
 			return false;
 		}
 		// Spread updates over 10 ticks using UUID-based offset
-		updateCooldown = 10 + (Math.abs(mob.getUuid().hashCode()) % 10);
+		updateCooldown = 10 + (Math.abs(mob.getUUID().hashCode()) % 10);
 
 		// Check if targeting system is enabled
 		if (!isTargetingEnabled()) return false;
-		if (!(mob.getWorld() instanceof ServerWorld)) return false;
+		if (!(mob.level() instanceof ServerLevel)) return false;
 		if (!mob.isAlive()) return false;
 		if (!allowNeutralAggression()) {
 			return false;
@@ -154,13 +154,13 @@ public class UniversalTargetGoal extends TrackTargetGoal {
 			LivingEntity currentTarget = mob.getTarget();
 			if (currentTarget != null) {
 				// Don't target the warlord master
-				if (currentTarget instanceof MobWarlordEntity warlord && warlord.getUuid().equals(masterUuid)) {
+				if (currentTarget instanceof MobWarlordEntity warlord && warlord.getUUID().equals(masterUuid)) {
 					mob.setTarget(null);
 					return false;
 				}
 				// Don't target fellow minions (same master) - use WarlordSystem
-				if (currentTarget instanceof MobEntity targetMob) {
-					if (WarlordSystem.isMinionOf(targetMob.getUuid(), masterUuid)) {
+				if (currentTarget instanceof Mob targetMob) {
+					if (WarlordSystem.isMinionOf(targetMob.getUUID(), masterUuid)) {
 						mob.setTarget(null);
 						return false;
 					}
@@ -173,7 +173,7 @@ public class UniversalTargetGoal extends TrackTargetGoal {
 		if (currentTarget != null && currentTarget.isAlive()) {
 			MobWarData data = MobWarData.get(mob);
 			// Prioritize current target if we've been fighting them recently
-			if (data.getCurrentTarget() != null && data.getCurrentTarget().equals(currentTarget.getUuid())) {
+			if (data.getCurrentTarget() != null && data.getCurrentTarget().equals(currentTarget.getUUID())) {
 				if (data.getTimeSinceTargetChange() < 5000) { // 5 seconds
 					return false; // Keep current target
 				}
@@ -185,7 +185,7 @@ public class UniversalTargetGoal extends TrackTargetGoal {
 		final double rangeMultiplier = rangeMultiplierSupplier.getAsDouble();
 
 		double followRange = 16.0;
-		EntityAttributeInstance inst = mob.getAttributeInstance(EntityAttributes.GENERIC_FOLLOW_RANGE);
+		AttributeInstance inst = mob.getAttribute(Attributes.FOLLOW_RANGE);
 		if (inst != null) followRange = inst.getValue();
 		followRange *= rangeMultiplier;
 
@@ -222,13 +222,13 @@ public class UniversalTargetGoal extends TrackTargetGoal {
 			if (masterUuid != null) {
 				// This is a minion - validate the candidate
 				// Don't target the warlord master
-				if (this.candidate instanceof MobWarlordEntity warlord && warlord.getUuid().equals(masterUuid)) {
+				if (this.candidate instanceof MobWarlordEntity warlord && warlord.getUUID().equals(masterUuid)) {
 					this.candidate = null;
 					return;
 				}
 				// Don't target fellow minions (same master) - use WarlordSystem
-				if (this.candidate instanceof MobEntity targetMob) {
-					if (WarlordSystem.isMinionOf(targetMob.getUuid(), masterUuid)) {
+				if (this.candidate instanceof Mob targetMob) {
+					if (WarlordSystem.isMinionOf(targetMob.getUUID(), masterUuid)) {
 						this.candidate = null;
 						return;
 					}
@@ -238,7 +238,7 @@ public class UniversalTargetGoal extends TrackTargetGoal {
 			// Track target change - use TargetingSystem helper
 			TargetingSystem.updateTargetData(mob, this.candidate);
 			// ALLIANCE INTEGRATION: Update alliances if enabled
-			if (isAllianceIntegrationEnabled() && mob.getWorld() instanceof ServerWorld serverWorld) {
+			if (isAllianceIntegrationEnabled() && mob.level() instanceof ServerLevel serverWorld) {
 				AllianceSystem.updateAlliances(mob, serverWorld);
 			}
 		}
@@ -263,7 +263,7 @@ public class UniversalTargetGoal extends TrackTargetGoal {
 			long timeSinceLastCheck = currentTime - lastAllianceCheck;
 			// OPTIMIZATION: Use offset to stagger alliance updates across all mobs
 			if (timeSinceLastCheck > (allianceCheckInterval + allianceCheckOffset)) {
-				if (mob.getWorld() instanceof ServerWorld serverWorld) {
+				if (mob.level() instanceof ServerLevel serverWorld) {
 					// Check if in active combat (recently attacked)
 					boolean inCombat = (currentTime - mob.getLastAttackTime() < 3000);
 					// Adjust interval: 2s in combat, 4s when calm

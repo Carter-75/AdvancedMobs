@@ -3,11 +3,11 @@ package mod.advancedmobs.system;
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.data.MobWarData;
 import mod.advancedmobs.util.TargetingUtil;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.attribute.EntityAttributeInstance;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.server.level.ServerLevel;
 
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -54,7 +54,7 @@ public class TargetingSystem {
     /**
      * Check if targeting system is enabled (config + gamerule)
      */
-    public static boolean isEnabled(ServerWorld world) {
+    public static boolean isEnabled(ServerLevel world) {
         ModConfig config = ModConfig.getInstance();
         return config.isTargetingActive();
     }
@@ -62,14 +62,14 @@ public class TargetingSystem {
     /**
      * Check if a mob should ignore same-species targets
      */
-    public static boolean shouldIgnoreSameSpecies(ServerWorld world) {
+    public static boolean shouldIgnoreSameSpecies(ServerLevel world) {
         return ModConfig.getInstance().ignoreSameSpecies;
     }
     
     /**
      * Check if players should be targeted
      */
-    public static boolean shouldTargetPlayers(ServerWorld world) {
+    public static boolean shouldTargetPlayers(ServerLevel world) {
         return ModConfig.getInstance().targetPlayers;
     }
     
@@ -89,8 +89,8 @@ public class TargetingSystem {
      * @param mob The mob looking for a target
      * @return A valid target or null if none found
      */
-    public static LivingEntity findTarget(MobEntity mob) {
-        if (!(mob.getWorld() instanceof ServerWorld world)) return null;
+    public static LivingEntity findTarget(Mob mob) {
+        if (!(mob.level() instanceof ServerLevel world)) return null;
         if (!isEnabled(world)) return null;
         if (!mob.isAlive()) return null;
         
@@ -117,9 +117,9 @@ public class TargetingSystem {
      * @param mob The mob to check
      * @return true if the mob should search for a target this tick
      */
-    public static boolean shouldUpdateThisTick(MobEntity mob) {
-        UUID uuid = mob.getUuid();
-        int currentTick = (int)(mob.getWorld().getTime() % Integer.MAX_VALUE);
+    public static boolean shouldUpdateThisTick(Mob mob) {
+        UUID uuid = mob.getUUID();
+        int currentTick = (int)(mob.level().getGameTime() % Integer.MAX_VALUE);
         
         Integer nextUpdate = updateCooldowns.get(uuid);
         if (nextUpdate == null || currentTick >= nextUpdate) {
@@ -135,9 +135,9 @@ public class TargetingSystem {
     /**
      * Set a longer cooldown for mobs that found no target
      */
-    public static void setLongCooldown(MobEntity mob) {
-        UUID uuid = mob.getUuid();
-        int currentTick = (int)(mob.getWorld().getTime() % Integer.MAX_VALUE);
+    public static void setLongCooldown(Mob mob) {
+        UUID uuid = mob.getUUID();
+        int currentTick = (int)(mob.level().getGameTime() % Integer.MAX_VALUE);
         // Wait 2 seconds before searching again
         updateCooldowns.put(uuid, currentTick + 40);
     }
@@ -152,8 +152,8 @@ public class TargetingSystem {
      * @param target The potential target
      * @return true if the target is valid
      */
-    public static boolean isValidTarget(MobEntity mob, LivingEntity target) {
-        if (!(mob.getWorld() instanceof ServerWorld world)) return false;
+    public static boolean isValidTarget(Mob mob, LivingEntity target) {
+        if (!(mob.level() instanceof ServerLevel world)) return false;
         if (!isEnabled(world)) return false;
         if (target == null || !target.isAlive()) return false;
         
@@ -168,12 +168,12 @@ public class TargetingSystem {
      * @param mob The mob with the target
      * @return true if current target should be kept
      */
-    public static boolean shouldKeepCurrentTarget(MobEntity mob) {
+    public static boolean shouldKeepCurrentTarget(Mob mob) {
         LivingEntity currentTarget = mob.getTarget();
         if (currentTarget == null || !currentTarget.isAlive()) return false;
         
         MobWarData data = MobWarData.get(mob);
-        if (data.getCurrentTarget() != null && data.getCurrentTarget().equals(currentTarget.getUuid())) {
+        if (data.getCurrentTarget() != null && data.getCurrentTarget().equals(currentTarget.getUUID())) {
             // Keep current target if we've been fighting them recently (5 seconds)
             return data.getTimeSinceTargetChange() < 5000;
         }
@@ -190,15 +190,15 @@ public class TargetingSystem {
      * @param mob The mob
      * @param target The new target
      */
-    public static void updateTargetData(MobEntity mob, LivingEntity target) {
+    public static void updateTargetData(Mob mob, LivingEntity target) {
         if (target == null) return;
         
         MobWarData data = MobWarData.get(mob);
-        data.setCurrentTarget(target.getUuid());
+        data.setCurrentTarget(target.getUUID());
         MobWarData.save(mob, data);
         
         // Update alliances if enabled
-        if (mob.getWorld() instanceof ServerWorld world && AllianceSystem.isEnabled(world)) {
+        if (mob.level() instanceof ServerLevel world && AllianceSystem.isEnabled(world)) {
             AllianceSystem.updateAlliances(mob, world);
         }
     }
@@ -207,8 +207,8 @@ public class TargetingSystem {
      * Update alliance checks during combat (call periodically)
      * @param mob The mob in combat
      */
-    public static void updateCombatAlliances(MobEntity mob) {
-        if (!(mob.getWorld() instanceof ServerWorld world)) return;
+    public static void updateCombatAlliances(Mob mob) {
+        if (!(mob.level() instanceof ServerLevel world)) return;
         if (!AllianceSystem.isEnabled(world)) return;
         
         AllianceSystem.updateAlliances(mob, world);
@@ -222,8 +222,8 @@ public class TargetingSystem {
     /**
      * Get the follow range for a mob
      */
-    public static double getFollowRange(MobEntity mob) {
-        EntityAttributeInstance inst = mob.getAttributeInstance(EntityAttributes.GENERIC_FOLLOW_RANGE);
+    public static double getFollowRange(Mob mob) {
+        AttributeInstance inst = mob.getAttribute(Attributes.FOLLOW_RANGE);
         return inst != null ? inst.getValue() : DEFAULT_FOLLOW_RANGE;
     }
     

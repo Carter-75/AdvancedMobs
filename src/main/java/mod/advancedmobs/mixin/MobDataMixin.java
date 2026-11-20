@@ -5,14 +5,14 @@ import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.data.IMobWarDataHolder;
 import mod.advancedmobs.data.MobWarData;
 import mod.advancedmobs.system.ScalingSystem;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.mob.MobEntity;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Mob;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -33,13 +33,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * To add scaling for a new mob:
  *   Just create mob_configs/[mobname].json - no mixin needed!
  */
-@Mixin(MobEntity.class)
+@Mixin(Mob.class)
 public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHolder {
 
     @Unique
     private MobWarData advancedMobsData = new MobWarData();
 
-    protected MobDataMixin(EntityType<? extends LivingEntity> entityType, World world) {
+    protected MobDataMixin(EntityType<? extends LivingEntity> entityType, Level world) {
         super(entityType, world);
     }
 
@@ -54,7 +54,7 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
     }
 
     @Inject(method = "writeCustomDataToNbt", at = @At("TAIL"))
-    private void onWriteNbt(NbtCompound nbt, CallbackInfo ci) {
+    private void onWriteNbt(CompoundTag nbt, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("MobDataMixin#writeCustomDataToNbt", () -> {
             if (advancedMobsData != null) {
                 nbt.put("UniversalMobWarData", advancedMobsData.writeNbt());
@@ -63,11 +63,11 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
     }
 
     @Inject(method = "readCustomDataFromNbt", at = @At("TAIL"))
-    private void onReadNbt(NbtCompound nbt, CallbackInfo ci) {
+    private void onReadNbt(CompoundTag nbt, CallbackInfo ci) {
         AdvancedMobsMod.runSafely("MobDataMixin#readCustomDataFromNbt", () -> {
             if (nbt.contains("UniversalMobWarData")) {
                 advancedMobsData = new MobWarData();
-                advancedMobsData.readNbt(nbt.getCompound("UniversalMobWarData"));
+                advancedMobsData.readNbt(nbt.getCompoundOrEmpty("UniversalMobWarData"));
             }
         });
     }
@@ -89,25 +89,25 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
             if (!ModConfig.getInstance().modEnabled) {
                 return;
             }
-            MobEntity self = (MobEntity)(Object)this;
+            Mob self = (Mob)(Object)this;
             ScalingSystem.monitorEquipmentState(self, advancedMobsData);
-            ScalingSystem.processMobTick(self, self.getWorld(), advancedMobsData);
+            ScalingSystem.processMobTick(self, self.level(), advancedMobsData);
         });
     }
 
-    @Inject(method = "tryAttack(Lnet/minecraft/entity/Entity;)Z", at = @At("TAIL"))
+    @Inject(method = "tryAttack(Lnet/minecraft/world/entity/Entity;)Z", at = @At("TAIL"))
     private void advancedmobs$handleMeleeAbilities(Entity target, CallbackInfoReturnable<Boolean> cir) {
         AdvancedMobsMod.runSafely("MobDataMixin#handleMeleeAbilities", () -> {
             if (!cir.getReturnValueZ() || !(target instanceof LivingEntity livingTarget)) {
                 return;
             }
 
-            MobEntity self = (MobEntity)(Object)this;
+            Mob self = (Mob)(Object)this;
             if (advancedMobsData == null) {
                 return;
             }
 
-            ScalingSystem.handleMeleeAttackAbilities(self, advancedMobsData, livingTarget, self.getWorld().getTime());
+            ScalingSystem.handleMeleeAttackAbilities(self, advancedMobsData, livingTarget, self.level().getGameTime());
         });
     }
     
@@ -115,41 +115,41 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
     // Using @At("RETURN") ensures we strip equipment AFTER Minecraft adds it in initEquipment()
     @Inject(method = "initialize", at = @At("RETURN"))
     private void advancedmobs$stripAllEquipmentOnSpawn(
-        net.minecraft.world.ServerWorldAccess world,
-        net.minecraft.world.LocalDifficulty difficulty,
-        net.minecraft.entity.SpawnReason spawnReason,
-        net.minecraft.entity.EntityData entityData,
-        org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<net.minecraft.entity.EntityData> cir
+        net.minecraft.world.level.ServerLevelAccessor world,
+        net.minecraft.world.DifficultyInstance difficulty,
+        net.minecraft.world.entity.EntitySpawnReason spawnReason,
+        net.minecraft.world.entity.SpawnGroupData entityData,
+        org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable<net.minecraft.world.entity.SpawnGroupData> cir
     ) {
         AdvancedMobsMod.runSafely("MobDataMixin#stripAllEquipmentOnSpawn", () -> {
             if (!ModConfig.getInstance().modEnabled) {
                 return; // Leave vanilla gear untouched when mod is disabled
             }
-            MobEntity self = (MobEntity)(Object)this;
+            Mob self = (Mob)(Object)this;
             
             // Tag spawn eggs so they aren't blocked by natural spawn blocker
-            if (spawnReason == net.minecraft.entity.SpawnReason.SPAWN_EGG) {
-                self.addCommandTag("umw_player_spawned");
+            if (spawnReason == net.minecraft.world.entity.EntitySpawnReason.SPAWN_EGG) {
+                self.addTag("umw_player_spawned");
             }
 
             // Tag spawner spawns so they're excluded from natural spawn caps.
-            if (spawnReason == net.minecraft.entity.SpawnReason.SPAWNER) {
-                self.addCommandTag("umw_spawner_spawned");
+            if (spawnReason == net.minecraft.world.entity.EntitySpawnReason.SPAWNER) {
+                self.addTag("umw_spawner_spawned");
             }
 
             // Tag natural spawns so we can apply a cap only to natural spawning.
-            if (spawnReason == net.minecraft.entity.SpawnReason.NATURAL) {
-                self.addCommandTag("umw_natural_spawned");
+            if (spawnReason == net.minecraft.world.entity.EntitySpawnReason.NATURAL) {
+                self.addTag("umw_natural_spawned");
             }
             
             // Remove armor (head, chest, legs, boots)
-            self.equipStack(net.minecraft.entity.EquipmentSlot.HEAD, net.minecraft.item.ItemStack.EMPTY);
-            self.equipStack(net.minecraft.entity.EquipmentSlot.CHEST, net.minecraft.item.ItemStack.EMPTY);
-            self.equipStack(net.minecraft.entity.EquipmentSlot.LEGS, net.minecraft.item.ItemStack.EMPTY);
-            self.equipStack(net.minecraft.entity.EquipmentSlot.FEET, net.minecraft.item.ItemStack.EMPTY);
+            self.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, net.minecraft.world.item.ItemStack.EMPTY);
+            self.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, net.minecraft.world.item.ItemStack.EMPTY);
+            self.setItemSlot(net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.item.ItemStack.EMPTY);
+            self.setItemSlot(net.minecraft.world.entity.EquipmentSlot.FEET, net.minecraft.world.item.ItemStack.EMPTY);
             // Remove weapons/tools
-            self.equipStack(net.minecraft.entity.EquipmentSlot.MAINHAND, net.minecraft.item.ItemStack.EMPTY);
-            self.equipStack(net.minecraft.entity.EquipmentSlot.OFFHAND, net.minecraft.item.ItemStack.EMPTY);
+            self.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, net.minecraft.world.item.ItemStack.EMPTY);
+            self.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, net.minecraft.world.item.ItemStack.EMPTY);
 
             ScalingSystem.handleSpawnBootstrap(self, spawnReason, advancedMobsData);
         });

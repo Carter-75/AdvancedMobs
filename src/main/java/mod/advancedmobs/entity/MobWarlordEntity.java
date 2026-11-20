@@ -5,35 +5,36 @@ import mod.advancedmobs.mixin.MobEntityAccessor;
 import mod.advancedmobs.system.WarlordSystem;
 import mod.advancedmobs.util.SummonerTracker;
 import mod.advancedmobs.util.TickScheduler;
-import net.minecraft.entity.*;
-import net.minecraft.entity.ai.goal.*;
-import net.minecraft.entity.attribute.DefaultAttributeContainer;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.mob.Angerable;
-import net.minecraft.entity.boss.BossBar;
-import net.minecraft.entity.boss.ServerBossBar;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.data.DataTracker;
-import net.minecraft.entity.data.TrackedData;
-import net.minecraft.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.entity.mob.*;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.projectile.thrown.PotionEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.particle.ParticleTypes;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.PotionContentsComponent;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.sound.SoundEvents;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.world.entity.*;
+import net.minecraft.world.entity.ai.goal.*;
+import net.minecraft.world.entity.ai.goal.target.*;
+import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.NeutralMob;
+import net.minecraft.world.BossEvent;
+import net.minecraft.server.level.ServerBossEvent;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.world.entity.monster.*;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.throwableitemprojectile.AbstractThrownPotion;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.world.item.alchemy.PotionContents;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.network.chat.Component;
+import net.minecraft.ChatFormatting;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.Level;
 import mod.advancedmobs.config.ModConfig;
 import java.util.ArrayList;
 
@@ -44,7 +45,7 @@ import java.util.*;
  * 
  * The Mob Warlord - A giant boss that summons and commands armies of mobs.
  * All spawned minions are loyal to the warlord and never attack it or each other.
- * Uses HostileEntity for maximum compatibility with Iris Shaders and rendering mods.
+ * Uses Monster for maximum compatibility with Iris Shaders and rendering mods.
  * 
  * Minion tracking is handled by WarlordSystem.java for centralized management.
  * 
@@ -60,15 +61,15 @@ import java.util.*;
  * 
  * Does NOT depend on: Targeting, Alliance, or Scaling systems
  */
-public class MobWarlordEntity extends HostileEntity {
+public class MobWarlordEntity extends Monster {
     
-    private static final TrackedData<Integer> MINION_COUNT = DataTracker.registerData(MobWarlordEntity.class, TrackedDataHandlerRegistry.INTEGER);
-    private static final TrackedData<Boolean> IS_RAID_BOSS = DataTracker.registerData(MobWarlordEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
+    private static final EntityDataAccessor<Integer> MINION_COUNT = SynchedEntityData.defineId(MobWarlordEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> IS_RAID_BOSS = SynchedEntityData.defineId(MobWarlordEntity.class, EntityDataSerializers.BOOLEAN);
     
     // Local tracking of this warlord's minions (for quick access, syncs with WarlordSystem)
     private final Set<UUID> minionUuids = new HashSet<>();
     
-    private final ServerBossBar bossBar;
+    private final ServerBossEvent bossBar;
     private int attackCooldown = 0;
     
     // OPTIMIZATION: UUID-based tick offsets for staggering operations across multiple Warlords
@@ -86,19 +87,19 @@ public class MobWarlordEntity extends HostileEntity {
     private static final int CLEANUP_COOLDOWN = 100; // 5 seconds - performance optimization for large modpacks
     private static final int PARTICLE_COOLDOWN = 30; // 1.5 seconds - optimized particle connections
     
-    public MobWarlordEntity(EntityType<? extends HostileEntity> entityType, World world) {
+    public MobWarlordEntity(EntityType<? extends Monster> entityType, Level world) {
         super(entityType, world);
         this.experiencePoints = 500; // Massive XP drop
-        this.bossBar = new ServerBossBar(
-            Text.literal("🔮 Mob Warlord 🔮").styled(style -> style.withColor(Formatting.DARK_PURPLE).withBold(true)),
-            BossBar.Color.PURPLE,
-            BossBar.Style.NOTCHED_10
+        this.bossBar = new ServerBossEvent(
+            Component.literal("🔮 Mob Warlord 🔮").withStyle(style -> style.withColor(ChatFormatting.DARK_PURPLE).withBold(true)),
+            BossEvent.Color.PURPLE,
+            BossEvent.Style.NOTCHED_10
         );
         // FIX: Start with summon cooldown at 0 so boss summons immediately after initialization
         // (Field removed in cleanup; if cooldown logic is needed, re-add as appropriate)
         
         // OPTIMIZATION: Calculate UUID-based offsets for staggering operations
-        int hash = Math.abs(this.getUuid().hashCode());
+        int hash = Math.abs(this.getUUID().hashCode());
         this.particleOffset = hash % 30;
         this.cleanupOffset = hash % 100;
         this.validationOffset = hash % 60;
@@ -106,8 +107,8 @@ public class MobWarlordEntity extends HostileEntity {
     }
     
     @Override
-    public Text getName() {
-        return Text.literal("Mob Warlord").styled(style -> style.withColor(Formatting.DARK_PURPLE).withBold(true));
+    public Component getName() {
+        return Component.literal("Mob Warlord").withStyle(style -> style.withColor(ChatFormatting.DARK_PURPLE).withBold(true));
     }
     
     @Override
@@ -116,10 +117,10 @@ public class MobWarlordEntity extends HostileEntity {
         // Note: We can't clear() in this API version, but our high-priority goals will override witch's goals
         
         // Add custom warlord goals with highest priorities
-        this.goalSelector.add(0, new SwimGoal(this));
+        this.goalSelector.add(0, new FloatGoal(this));
         this.goalSelector.add(1, new MobWarlordAttackGoal(this));
-        this.goalSelector.add(2, new WanderAroundFarGoal(this, 0.8));
-        this.goalSelector.add(3, new LookAtEntityGoal(this, PlayerEntity.class, 16.0f));
+        this.goalSelector.add(2, new WaterAvoidingRandomStrollGoal(this, 0.8));
+        this.goalSelector.add(3, new LookAtPlayerGoal(this, Player.class, 16.0f));
         this.goalSelector.add(3, new LookAroundGoal(this));
         
         // Targeting priorities (context-aware based on raid status):
@@ -129,12 +130,12 @@ public class MobWarlordEntity extends HostileEntity {
         // 3. RAID MODE: Villagers (priority 2) → Iron Golems (priority 3) → Players (priority 5)
         // 3. NORMAL MODE: Players (priority 3) → Other mobs (priority 4)
         this.targetSelector.add(0, new ProtectMinionsGoal(this));
-        this.targetSelector.add(1, new RevengeGoal(this) {
+        this.targetSelector.add(1, new HurtByTargetGoal(this) {
             @Override
             public boolean canStart() {
                 // Don't retaliate against our own minions (forgive friendly fire)
                 LivingEntity attacker = this.mob.getAttacker();
-                if (attacker instanceof MobEntity attackerMob && isMinionOf(attackerMob)) {
+                if (attacker instanceof Mob attackerMob && isMinionOf(attackerMob)) {
                     return false;
                 }
                 return super.canStart();
@@ -142,29 +143,29 @@ public class MobWarlordEntity extends HostileEntity {
         });
         
         // PRIORITY 2: Target OTHER WARLORDS FIRST in chaos mode (kill boss = kill all minions!)
-        this.targetSelector.add(2, new ActiveTargetGoal<>(this, MobWarlordEntity.class, 1, true, false,
+        this.targetSelector.add(2, new NearestAttackableTargetGoal<>(this, MobWarlordEntity.class, 1, true, false,
             entity -> {
                 if (entity == this) return false; // Don't target self
                 
                 // Only target other warlords in chaos mode
-                boolean ignoreSame = entity.getWorld().getGameRules().getBoolean(AdvancedMobsMod.IGNORE_SAME_SPECIES_RULE);
+                boolean ignoreSame = entity.level().getGameRules().getBooleanOr(AdvancedMobsMod.IGNORE_SAME_SPECIES_RULE, false);
                 return !ignoreSame; // Only in chaos mode
             }
         ));
         
         // PRIORITY 3: RAID-SPECIFIC TARGETING - Villagers (when in raid)
-        this.targetSelector.add(3, new RaidAwareTargetGoal<>(this, net.minecraft.entity.passive.VillagerEntity.class, true));
+        this.targetSelector.add(3, new RaidAwareTargetGoal<>(this, net.minecraft.world.entity.npc.villager.Villager.class, true));
         
         // PRIORITY 4: RAID-SPECIFIC TARGETING - Iron Golems (when in raid)
-        this.targetSelector.add(4, new RaidAwareTargetGoal<>(this, net.minecraft.entity.passive.IronGolemEntity.class, true));
+        this.targetSelector.add(4, new RaidAwareTargetGoal<>(this, net.minecraft.world.entity.animal.golem.IronGolem.class, true));
         
         // PRIORITY 5: PLAYERS - Always target players aggressively
-        this.targetSelector.add(5, new ActiveTargetGoal<PlayerEntity>(this, PlayerEntity.class, 1, true, false, null));
+        this.targetSelector.add(5, new NearestAttackableTargetGoal<Player>(this, Player.class, 1, true, false, null));
         
         // PRIORITY 6: ALL hostile mobs (including enemy minions, but NOT other warlords)
-        this.targetSelector.add(6, new ActiveTargetGoal<>(this, HostileEntity.class, 1, true, false,
+        this.targetSelector.add(6, new NearestAttackableTargetGoal<>(this, Monster.class, 1, true, false,
             entity -> {
-                if (!(entity instanceof MobEntity mob)) return false;
+                if (!(entity instanceof Mob mob)) return false;
                 if (isMinionOf(mob)) return false; // Never target own minions
                 if (entity instanceof MobWarlordEntity) return false; // Warlords handled by priority 2
                 
@@ -173,21 +174,21 @@ public class MobWarlordEntity extends HostileEntity {
         ));
         
         // PRIORITY 7: Passive mobs and animals (lowest priority)
-        this.targetSelector.add(7, new ActiveTargetGoal<net.minecraft.entity.passive.AnimalEntity>(this, net.minecraft.entity.passive.AnimalEntity.class, 10, true, false, null));
+        this.targetSelector.add(7, new NearestAttackableTargetGoal<net.minecraft.world.entity.animal.Animal>(this, net.minecraft.world.entity.animal.Animal.class, 10, true, false, null));
     }
     
-    public static DefaultAttributeContainer.Builder createMobWarlordAttributes() {
-        return HostileEntity.createHostileAttributes()
-            .add(EntityAttributes.GENERIC_MAX_HEALTH, 1500.0) // 750 hearts!
-            .add(EntityAttributes.GENERIC_MOVEMENT_SPEED, 0.35) // Normal/fast speed
-            .add(EntityAttributes.GENERIC_ATTACK_DAMAGE, 12.0)
-            .add(EntityAttributes.GENERIC_ARMOR, 10.0)
-            .add(EntityAttributes.GENERIC_KNOCKBACK_RESISTANCE, 0.8)
-            .add(EntityAttributes.GENERIC_FOLLOW_RANGE, 64.0);
+    public static AttributeSupplier.Builder createMobWarlordAttributes() {
+        return Monster.createHostileAttributes()
+            .add(Attributes.MAX_HEALTH, 1500.0) // 750 hearts!
+            .add(Attributes.MOVEMENT_SPEED, 0.35) // Normal/fast speed
+            .add(Attributes.ATTACK_DAMAGE, 12.0)
+            .add(Attributes.ARMOR, 10.0)
+            .add(Attributes.KNOCKBACK_RESISTANCE, 0.8)
+            .add(Attributes.FOLLOW_RANGE, 64.0);
     }
     
     @Override
-    protected void initDataTracker(DataTracker.Builder builder) {
+    protected void initDataTracker(SynchedEntityData.Builder builder) {
         super.initDataTracker(builder);
         builder.add(MINION_COUNT, 0);
         builder.add(IS_RAID_BOSS, false);
@@ -215,7 +216,7 @@ public class MobWarlordEntity extends HostileEntity {
         if (minionUuids.contains(minionUuid)) {
             minionUuids.remove(minionUuid);
             // Use WarlordSystem for centralized betrayer tracking
-            WarlordSystem.markBetrayer(minionUuid, this.getUuid());
+            WarlordSystem.markBetrayer(minionUuid, this.getUUID());
         }
     }
     
@@ -224,17 +225,17 @@ public class MobWarlordEntity extends HostileEntity {
      * Uses WarlordSystem for centralized tracking.
      */
     public boolean isBetrayer(UUID minionUuid) {
-        return WarlordSystem.isBetrayer(minionUuid, this.getUuid());
+        return WarlordSystem.isBetrayer(minionUuid, this.getUUID());
     }
     
     @Override
     public void tick() {
         // CRITICAL: Safety checks before calling super.tick()
         // This prevents crashes during chunk loading / world initialization
-        if (this.getWorld() == null) return;
+        if (this.level() == null) return;
         
         // Client-side rendering: wrap in try-catch for Iris Shaders compatibility
-        if (this.getWorld().isClient) {
+        if (this.level().isClient) {
             try {
                 super.tick();
             } catch (Exception e) {
@@ -243,7 +244,7 @@ public class MobWarlordEntity extends HostileEntity {
             return;
         }
         
-        if (!(this.getWorld() instanceof ServerWorld serverWorld)) {
+        if (!(this.level() instanceof ServerLevel serverWorld)) {
             try {
                 super.tick();
             } catch (Exception e) {
@@ -254,7 +255,7 @@ public class MobWarlordEntity extends HostileEntity {
         
         // Additional safety: ensure entity is fully initialized
         // Wait longer (40 ticks = 2 seconds) to ensure all rendering systems are ready
-        if (this.age < 40) {
+        if (this.tickCount < 40) {
             try {
                 super.tick();
             } catch (Exception e) {
@@ -263,7 +264,7 @@ public class MobWarlordEntity extends HostileEntity {
             return; // Skip first 2 seconds to ensure world/rendering is ready
         }
         
-        // Wrap super.tick() to catch any particle/rendering errors from WitchEntity
+        // Wrap super.tick() to catch any particle/rendering errors from Witch
         try {
             super.tick();
         } catch (Exception e) {
@@ -283,17 +284,17 @@ public class MobWarlordEntity extends HostileEntity {
         if (attackCooldown > 0) attackCooldown--;
         
         // OPTIMIZED: Clean up dead minions with UUID offset (spreads multiple Warlords over 100 ticks)
-        if ((this.age + cleanupOffset) % CLEANUP_COOLDOWN == 0 && this.age > 60) {
+        if ((this.tickCount + cleanupOffset) % CLEANUP_COOLDOWN == 0 && this.tickCount > 60) {
             cleanupDeadMinions();
         }
         
         // OPTIMIZED: Draw particle connections with UUID offset (spreads multiple Warlords over 30 ticks)
-        if ((this.age + particleOffset) % PARTICLE_COOLDOWN == 0 && this.age > 60) {
+        if ((this.tickCount + particleOffset) % PARTICLE_COOLDOWN == 0 && this.tickCount > 60) {
             drawParticleConnections();
         }
         
         // OPTIMIZED: Auto-summon with UUID offset (spreads summon checks across 40 ticks)
-        if ((this.age + summonOffset) % SUMMON_COOLDOWN == 0 && this.age > 60) {
+        if ((this.tickCount + summonOffset) % SUMMON_COOLDOWN == 0 && this.tickCount > 60) {
             int currentMinions = minionUuids.size();
             float healthPercent = this.getHealth() / this.getMaxHealth();
             
@@ -316,16 +317,16 @@ public class MobWarlordEntity extends HostileEntity {
         // DEBUG: Log if boss has no target but should be looking for one.
         // The 64-block entity scan below only feeds this debug line, so skip
         // the scan entirely unless debug logging is actually enabled.
-        if (this.age % 100 == 0 && this.age > 60 && AdvancedMobsMod.LOGGER.isDebugEnabled()) { // Every 5 seconds
+        if (this.tickCount % 100 == 0 && this.tickCount > 60 && AdvancedMobsMod.LOGGER.isDebugEnabled()) { // Every 5 seconds
             LivingEntity currentTarget = this.getTarget();
             if (currentTarget == null && serverWorld != null) {
                 // Count nearby hostile entities
-                List<LivingEntity> nearbyHostiles = serverWorld.getEntitiesByClass(
+                List<LivingEntity> nearbyHostiles = serverWorld.getEntitiesOfClass(
                     LivingEntity.class,
-                    this.getBoundingBox().expand(64.0),
+                    this.getBoundingBox().inflate(64.0),
                     entity -> entity != this && entity.isAlive() && 
                              !(entity instanceof MobWarlordEntity) &&
-                             !(entity instanceof MobEntity mob && isMinionOf(mob))
+                             !(entity instanceof Mob mob && isMinionOf(mob))
                 );
                 AdvancedMobsMod.LOGGER.debug("Mob Warlord has NO TARGET! {} potential targets nearby within 64 blocks", 
                     nearbyHostiles.size());
@@ -336,23 +337,23 @@ public class MobWarlordEntity extends HostileEntity {
         // This is handled in the damage method, not here
         
         // Particle effects (skip if world not ready, wait 60 ticks = 3 seconds)
-        if (this.age % 20 == 0 && this.age > 60) {
+        if (this.tickCount % 20 == 0 && this.tickCount > 60) {
             spawnParticles();
         }
         
         // OPTIMIZED: Periodically validate minion targets with UUID offset (spreads validation across 60 ticks)
-        if ((this.age + validationOffset) % 60 == 0 && this.age > 60) {
+        if ((this.tickCount + validationOffset) % 60 == 0 && this.tickCount > 60) {
             validateMinionTargets();
         }
         
         // FIX: Make minions copy boss's target every 2 seconds for coordinated attacks
-        if (this.age % 40 == 0 && this.age > 60) {
+        if (this.tickCount % 40 == 0 && this.tickCount > 60) {
             LivingEntity bossTarget = this.getTarget();
             if (bossTarget != null && bossTarget.isAlive() && serverWorld != null) {
                 for (UUID minionUuid : minionUuids) {
                     try {
                         Entity entity = serverWorld.getEntity(minionUuid);
-                        if (entity instanceof MobEntity minion && minion.isAlive()) {
+                        if (entity instanceof Mob minion && minion.isAlive()) {
                             // Only set target if minion doesn't already have one
                             if (minion.getTarget() == null || !minion.getTarget().isAlive()) {
                                 minion.setTarget(bossTarget);
@@ -373,7 +374,7 @@ public class MobWarlordEntity extends HostileEntity {
      * Uses WarlordSystem for centralized minion tracking.
      */
     private void validateMinionTargets() {
-        if (!(this.getWorld() instanceof ServerWorld serverWorld)) return;
+        if (!(this.level() instanceof ServerLevel serverWorld)) return;
         
         // OPTIMIZATION: Only validate 3 random minions per cycle
         List<UUID> minionsList = new ArrayList<>(minionUuids);
@@ -384,7 +385,7 @@ public class MobWarlordEntity extends HostileEntity {
             for (int i = 0; i < checksThisCycle; i++) {
                 UUID minionUuid = minionsList.get(i);
                 Entity entity = serverWorld.getEntity(minionUuid);
-                if (entity instanceof MobEntity minion && minion.isAlive()) {
+                if (entity instanceof Mob minion && minion.isAlive()) {
                     LivingEntity target = minion.getTarget();
                     
                     if (target != null) {
@@ -397,18 +398,18 @@ public class MobWarlordEntity extends HostileEntity {
                         
                         // Check if targeting another minion (BETRAYAL DETECTION)
                         // Uses WarlordSystem for centralized tracking
-                        if (target instanceof MobEntity targetMob) {
-                            if (WarlordSystem.isMinionOf(targetMob.getUuid(), this.getUuid())) {
+                        if (target instanceof Mob targetMob) {
+                            if (WarlordSystem.isMinionOf(targetMob.getUUID(), this.getUUID())) {
                                 // BETRAYAL! Mark this minion as traitor
                                 markBetrayer(minionUuid);
                                 invalidTarget = false; // Allow targeting - they're now an enemy
                                 
                                 // Send message to nearby players
                                 serverWorld.getPlayers().forEach(player -> {
-                                    if (player.squaredDistanceTo(minion) <= 1024) // 32 block range
+                                    if (player.distanceToSqr(minion) <= 1024) // 32 block range
                                         player.sendMessage(
-                                            Text.literal("A minion has betrayed the Warlord!")
-                                                .styled(style -> style.withColor(Formatting.RED).withBold(true)),
+                                            Component.literal("A minion has betrayed the Warlord!")
+                                                .withStyle(style -> style.withColor(ChatFormatting.RED).withBold(true)),
                                             true // Action bar
                                         );
                                 });
@@ -435,11 +436,11 @@ public class MobWarlordEntity extends HostileEntity {
      */
     private void drawParticleConnections() {
         if (WarlordSystem.areParticlesDisabled()) return; // Performance optimization
-        if (!(this.getWorld() instanceof ServerWorld serverWorld)) return;
-        if (this.age < 60) return; // Wait for full initialization
+        if (!(this.level() instanceof ServerLevel serverWorld)) return;
+        if (this.tickCount < 60) return; // Wait for full initialization
         
         try {
-            Vec3d bossPos = this.getPos().add(0, this.getHeight() / 2, 0); // Center of boss
+            Vec3 bossPos = this.position().add(0, this.getHeight() / 2, 0); // Center of boss
             
             // OPTIMIZATION: Limit connections drawn based on minion count
             int drawnCount = 0;
@@ -450,8 +451,8 @@ public class MobWarlordEntity extends HostileEntity {
                 
                 try {
                     Entity entity = serverWorld.getEntity(minionUuid);
-                    if (entity instanceof MobEntity minion && minion.isAlive()) {
-                        Vec3d minionPos = minion.getPos().add(0, minion.getHeight() / 2, 0);
+                    if (entity instanceof Mob minion && minion.isAlive()) {
+                        Vec3 minionPos = minion.position().add(0, minion.getHeight() / 2, 0);
                         
                         // OPTIMIZATION: Skip particles if minion is very close
                         double distance = minionPos.distanceTo(bossPos);
@@ -461,14 +462,14 @@ public class MobWarlordEntity extends HostileEntity {
                         boolean isBetrayerMinion = isBetrayer(minionUuid);
                         
                         // Draw particle line from boss to minion
-                        Vec3d direction = minionPos.subtract(bossPos);
-                        Vec3d step = direction.normalize().multiply(1.5); // OPTIMIZED: Particle every 1.5 blocks (was 1.0)
+                        Vec3 direction = minionPos.subtract(bossPos);
+                        Vec3 step = direction.normalize().multiply(1.5); // OPTIMIZED: Particle every 1.5 blocks (was 1.0)
                         
                         // OPTIMIZATION: Fewer particles per connection, scale with minion count
                         int maxParticles = minionUuids.size() > 10 ? 5 : 10; // Reduced from 8/15
                         int particleCount = Math.min((int)(distance / 1.5), maxParticles);
                         for (int i = 0; i < particleCount; i++) {
-                            Vec3d particlePos = bossPos.add(step.multiply(i));
+                            Vec3 particlePos = bossPos.add(step.multiply(i));
                             
                             // Choose particle type based on status
                             if (isBetrayerMinion) {
@@ -503,8 +504,8 @@ public class MobWarlordEntity extends HostileEntity {
      * 50% chance to convert the mob into a loyal minion.
      * Uses WarlordSystem for centralized minion tracking.
      */
-    public void tryConvertKilledMob(MobEntity killedMob) {
-        if (!(this.getWorld() instanceof ServerWorld serverWorld)) return;
+    public void tryConvertKilledMob(Mob killedMob) {
+        if (!(this.level() instanceof ServerLevel serverWorld)) return;
         if (minionUuids.size() >= getMaxMinions()) return;
         if (killedMob == null || !killedMob.isAlive()) return;
         
@@ -513,8 +514,8 @@ public class MobWarlordEntity extends HostileEntity {
         
         // CRITICAL: Never convert another warlord's minions (prevents ownership conflicts)
         // Uses WarlordSystem for centralized tracking
-        UUID existingMaster = WarlordSystem.getMasterUuid(killedMob.getUuid());
-        if (existingMaster != null && !existingMaster.equals(this.getUuid())) {
+        UUID existingMaster = WarlordSystem.getMasterUuid(killedMob.getUUID());
+        if (existingMaster != null && !existingMaster.equals(this.getUUID())) {
             // This mob belongs to another warlord - can't steal them!
             return;
         }
@@ -526,11 +527,11 @@ public class MobWarlordEntity extends HostileEntity {
         killedMob.setHealth(killedMob.getMaxHealth());
         
         // Add to minion tracking via WarlordSystem
-        WarlordSystem.registerMinion(killedMob.getUuid(), this.getUuid());
-        minionUuids.add(killedMob.getUuid());
+        WarlordSystem.registerMinion(killedMob.getUUID(), this.getUUID());
+        minionUuids.add(killedMob.getUUID());
         
         // Register with universal summoner tracker
-        SummonerTracker.registerSummoned(killedMob.getUuid(), this.getUuid());
+        SummonerTracker.registerSummoned(killedMob.getUUID(), this.getUUID());
         
         // Make minion persistent
         killedMob.setPersistent();
@@ -545,7 +546,7 @@ public class MobWarlordEntity extends HostileEntity {
         killedMob.setAttacker(null);
         
         // Force the mob to be aggressive by setting it to angry state if it's angerable
-        if (killedMob instanceof Angerable angerable) {
+        if (killedMob instanceof NeutralMob angerable) {
             angerable.setAttacker(null); // Clear any anger at the boss
             angerable.stopAnger(); // Reset anger
         }
@@ -553,8 +554,8 @@ public class MobWarlordEntity extends HostileEntity {
         LivingEntity warlordTarget = this.getTarget();
         if (warlordTarget != null && warlordTarget.isAlive() && warlordTarget != killedMob) {
             // Validate target isn't another minion - use WarlordSystem
-            if (warlordTarget instanceof MobEntity targetMob) {
-                if (WarlordSystem.isMinionOf(targetMob.getUuid(), this.getUuid())) {
+            if (warlordTarget instanceof Mob targetMob) {
+                if (WarlordSystem.isMinionOf(targetMob.getUUID(), this.getUUID())) {
                     // Skip - don't set fellow minion as target
                 } else {
                     killedMob.setTarget(warlordTarget);
@@ -566,7 +567,7 @@ public class MobWarlordEntity extends HostileEntity {
         
         // OPTIMIZED: Conversion particles - reduced count for better performance on kill events
         try {
-            if (this.age > 60) {
+            if (this.tickCount > 60) {
                 serverWorld.spawnParticles(ParticleTypes.SOUL,
                     killedMob.getX(), killedMob.getY() + killedMob.getHeight() / 2, killedMob.getZ(),
                     20, 0.5, 0.5, 0.5, 0.1); // Reduced from 50 to 20
@@ -588,8 +589,8 @@ public class MobWarlordEntity extends HostileEntity {
         
         //noinspection deprecation
         AdvancedMobsMod.LOGGER.debug("Mob Warlord converted {} into a minion! (UUID: {})", 
-            net.minecraft.registry.Registries.ENTITY_TYPE.getId(killedMob.getType()), 
-            killedMob.getUuid());
+            net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getId(killedMob.getType()), 
+            killedMob.getUUID());
     }
     
     /**
@@ -597,46 +598,46 @@ public class MobWarlordEntity extends HostileEntity {
      * Uses WarlordSystem for centralized minion tracking.
      */
     private void summonMinions(int count) {
-        if (!(this.getWorld() instanceof ServerWorld serverWorld)) return;
+        if (!(this.level() instanceof ServerLevel serverWorld)) return;
         
         // Check if neutral mobs should be aggressive
-        boolean neutralAggressive = serverWorld.getGameRules().getBoolean(AdvancedMobsMod.NEUTRAL_MOBS_AGGRESSIVE_RULE);
+        boolean neutralAggressive = serverWorld.getGameRules().getBooleanOr(AdvancedMobsMod.NEUTRAL_MOBS_AGGRESSIVE_RULE, false);
         
         for (int i = 0; i < count && minionUuids.size() < getMaxMinions(); i++) {
             EntityType<?> minionType = getRandomMobType(neutralAggressive);
             if (minionType == null) continue;
             
             // Spawn near the warlord
-            Vec3d spawnPos = this.getPos().add(
+            Vec3 spawnPos = this.position().add(
                 (this.random.nextDouble() - 0.5) * 6,
                 1,
                 (this.random.nextDouble() - 0.5) * 6
             );
             
             Entity entity = minionType.create(serverWorld);
-            if (entity instanceof MobEntity minion) {
-                minion.refreshPositionAndAngles(spawnPos.x, spawnPos.y, spawnPos.z, this.random.nextFloat() * 360f, 0);
-                minion.initialize(serverWorld, serverWorld.getLocalDifficulty(minion.getBlockPos()), SpawnReason.MOB_SUMMONED, null);
+            if (entity instanceof Mob minion) {
+                minion.snapTo(spawnPos.x, spawnPos.y, spawnPos.z, this.random.nextFloat() * 360f, 0);
+                minion.initialize(serverWorld, serverWorld.getCurrentDifficultyAt(minion.blockPosition()), EntitySpawnReason.MOB_SUMMONED, null);
                 
                 // Ensure minion doesn't despawn
                 minion.setPersistent();
                 
                 // Spawn the entity first
-                boolean spawned = serverWorld.spawnEntity(minion);
+                boolean spawned = serverWorld.addFreshEntity(minion);
                 
                 if (spawned) {
                     // AFTER spawning, register as minion via WarlordSystem
-                    WarlordSystem.registerMinion(minion.getUuid(), this.getUuid());
-                    minionUuids.add(minion.getUuid());
+                    WarlordSystem.registerMinion(minion.getUUID(), this.getUUID());
+                    minionUuids.add(minion.getUUID());
                     
                     // ALSO register with universal summoner tracker
-                    SummonerTracker.registerSummoned(minion.getUuid(), this.getUuid());
+                    SummonerTracker.registerSummoned(minion.getUUID(), this.getUUID());
                     
                     // Add tethering goal with HIGHEST priority - keeps minion within 14 blocks of warlord
                     ((MobEntityAccessor) minion).getGoalSelector().add(0, new StayNearWarlordGoal(minion, this));
                     
                     // Special AI for creepers - make them avoid allies when exploding
-                    if (minion instanceof net.minecraft.entity.mob.CreeperEntity creeper) {
+                    if (minion instanceof net.minecraft.world.entity.monster.Creeper creeper) {
                         // Add smart creeper goal that checks for allies before exploding
                         ((MobEntityAccessor) creeper).getGoalSelector().add(1, new SmartCreeperGoal(creeper, this));
                     }
@@ -646,8 +647,8 @@ public class MobWarlordEntity extends HostileEntity {
                     if (warlordTarget != null && warlordTarget.isAlive()) {
                         // Don't target other minions - use WarlordSystem
                         boolean targetIsMinion = false;
-                        if (warlordTarget instanceof MobEntity targetMob) {
-                            targetIsMinion = WarlordSystem.isMinionOf(targetMob.getUuid(), this.getUuid());
+                        if (warlordTarget instanceof Mob targetMob) {
+                            targetIsMinion = WarlordSystem.isMinionOf(targetMob.getUUID(), this.getUUID());
                         }
                         
                         // Only set valid targets
@@ -658,7 +659,7 @@ public class MobWarlordEntity extends HostileEntity {
                     
                     // Spawn effects (after initialization delay for Iris Shaders compatibility)
                     try {
-                        if (this.age > 60) { // Wait 3 seconds to ensure rendering is ready
+                        if (this.tickCount > 60) { // Wait 3 seconds to ensure rendering is ready
                             serverWorld.spawnParticles(ParticleTypes.PORTAL, 
                                 spawnPos.x, spawnPos.y, spawnPos.z, 
                                 20, 0.5, 0.5, 0.5, 0.1);
@@ -746,8 +747,8 @@ public class MobWarlordEntity extends HostileEntity {
      * Uses WarlordSystem for centralized minion tracking.
      */
     private void cleanupDeadMinions() {
-        if (this.getWorld() == null || !(this.getWorld() instanceof ServerWorld serverWorld)) return;
-        if (this.age < 60) return; // Skip during initialization (3 seconds)
+        if (this.level() == null || !(this.level() instanceof ServerLevel serverWorld)) return;
+        if (this.tickCount < 60) return; // Skip during initialization (3 seconds)
         
         // OPTIMIZATION: Skip cleanup if no minions
         if (minionUuids.isEmpty()) {
@@ -797,8 +798,8 @@ public class MobWarlordEntity extends HostileEntity {
      * Checks if a mob is a minion of this warlord.
      * Uses WarlordSystem for centralized tracking.
      */
-    public boolean isMinionOf(MobEntity mob) {
-        return WarlordSystem.isMinionOf(mob.getUuid(), this.getUuid());
+    public boolean isMinionOf(Mob mob) {
+        return WarlordSystem.isMinionOf(mob.getUUID(), this.getUUID());
     }
     
     /**
@@ -827,16 +828,16 @@ public class MobWarlordEntity extends HostileEntity {
      * Finds a low-health minion that needs healing.
      * Returns null if no minions need healing.
      */
-    private MobEntity findLowHealthMinion() {
-        if (!(this.getWorld() instanceof ServerWorld serverWorld)) return null;
+    private Mob findLowHealthMinion() {
+        if (!(this.level() instanceof ServerLevel serverWorld)) return null;
         
-        MobEntity lowestHealthMinion = null;
+        Mob lowestHealthMinion = null;
         float lowestHealthPercent = 1.0f;
         
         for (UUID minionUuid : minionUuids) {
             try {
                 Entity entity = serverWorld.getEntity(minionUuid);
-                if (entity instanceof MobEntity minion && minion.isAlive()) {
+                if (entity instanceof Mob minion && minion.isAlive()) {
                     float healthPercent = minion.getHealth() / minion.getMaxHealth();
                     
                     // Find minion with lowest health below 50%
@@ -857,11 +858,11 @@ public class MobWarlordEntity extends HostileEntity {
      * Checks if there are minions near the target that would be hit by splash damage.
      */
     private boolean minionsNearTarget(LivingEntity target, double radius) {
-        if (!(this.getWorld() instanceof ServerWorld serverWorld)) return false;
+        if (!(this.level() instanceof ServerLevel serverWorld)) return false;
         
-        List<MobEntity> nearbyMobs = serverWorld.getEntitiesByClass(
-            MobEntity.class,
-            target.getBoundingBox().expand(radius),
+        List<Mob> nearbyMobs = serverWorld.getEntitiesOfClass(
+            Mob.class,
+            target.getBoundingBox().inflate(radius),
             mob -> mob != target && isMinionOf(mob)
         );
         
@@ -879,7 +880,7 @@ public class MobWarlordEntity extends HostileEntity {
      */
     public void performRangedAttack(LivingEntity target) {
         if (attackCooldown > 0) return;
-        if (!(this.getWorld() instanceof ServerWorld serverWorld)) return;
+        if (!(this.level() instanceof ServerLevel serverWorld)) return;
         
         // PRIORITY 0: SELF-HEALING - Boss heals itself when health is below 70%
         float healthPercent = this.getHealth() / this.getMaxHealth();
@@ -900,7 +901,7 @@ public class MobWarlordEntity extends HostileEntity {
             if (minionsInSplashRange) {
                 // Don't throw harmful potion if it would hit minions
                 // Try melee instead or skip this attack
-                if (this.squaredDistanceTo(target) <= 6.0) {
+                if (this.distanceToSqr(target) <= 6.0) {
                     // Close enough for melee, let melee goal handle it
                     return;
                 } else {
@@ -917,19 +918,19 @@ public class MobWarlordEntity extends HostileEntity {
         }
         
         // PRIORITY 2: Heal low-health minions
-        MobEntity lowHealthMinion = findLowHealthMinion();
+        Mob lowHealthMinion = findLowHealthMinion();
         if (lowHealthMinion != null) {
-            double distanceToMinion = this.squaredDistanceTo(lowHealthMinion);
+            double distanceToMinion = this.distanceToSqr(lowHealthMinion);
             
             // Check if we're in range to throw healing potion
             if (distanceToMinion <= 256.0) // 16 block range
                 {
                 // Check if enemies are nearby that would also get healed
-                List<LivingEntity> nearbyEnemies = serverWorld.getEntitiesByClass(
+                List<LivingEntity> nearbyEnemies = serverWorld.getEntitiesOfClass(
                     LivingEntity.class,
-                    lowHealthMinion.getBoundingBox().expand(4.0),
+                    lowHealthMinion.getBoundingBox().inflate(4.0),
                     entity -> entity != this && entity != lowHealthMinion && 
-                             !(entity instanceof MobEntity mob && isMinionOf(mob)) &&
+                             !(entity instanceof Mob mob && isMinionOf(mob)) &&
                              entity.isAlive()
                 );
                 
@@ -950,14 +951,14 @@ public class MobWarlordEntity extends HostileEntity {
         
         // PRIORITY 3: Buff minions (if we have target but can't safely attack)
         // Find nearest minion to buff
-        MobEntity nearestMinion = null;
+        Mob nearestMinion = null;
         double nearestDistance = Double.MAX_VALUE;
         
         for (UUID minionUuid : minionUuids) {
             try {
                 Entity entity = serverWorld.getEntity(minionUuid);
-                if (entity instanceof MobEntity minion && minion.isAlive()) {
-                    double distance = this.squaredDistanceTo(minion);
+                if (entity instanceof Mob minion && minion.isAlive()) {
+                    double distance = this.distanceToSqr(minion);
                     if (distance < nearestDistance && distance <= 256.0) {
                         nearestDistance = distance;
                         nearestMinion = minion;
@@ -970,10 +971,10 @@ public class MobWarlordEntity extends HostileEntity {
         
         if (nearestMinion != null) {
             // Check if enemies would also get buffed
-            List<LivingEntity> nearbyEnemies = serverWorld.getEntitiesByClass(
+            List<LivingEntity> nearbyEnemies = serverWorld.getEntitiesOfClass(
                 LivingEntity.class,
-                nearestMinion.getBoundingBox().expand(4.0),
-                entity -> entity != this && !(entity instanceof MobEntity mob && isMinionOf(mob)) && entity.isAlive()
+                nearestMinion.getBoundingBox().inflate(4.0),
+                entity -> entity != this && !(entity instanceof Mob mob && isMinionOf(mob)) && entity.isAlive()
             );
             
             if (nearbyEnemies.isEmpty()) {
@@ -992,26 +993,26 @@ public class MobWarlordEntity extends HostileEntity {
      * Throws a harmful potion at an enemy.
      */
     private void throwHarmfulPotion(LivingEntity target) {
-        PotionEntity potionEntity = new PotionEntity(this.getWorld(), this);
+        AbstractThrownPotion potionEntity = new AbstractThrownPotion(this.level(), this);
         ItemStack potion = new ItemStack(Items.SPLASH_POTION);
         
-        List<StatusEffectInstance> harmfulEffects = List.of(
-            new StatusEffectInstance(StatusEffects.POISON, 200, 1),     // 10 seconds, Poison II
-            new StatusEffectInstance(StatusEffects.WEAKNESS, 300, 1),   // 15 seconds, Weakness II
-            new StatusEffectInstance(StatusEffects.SLOWNESS, 200, 1),   // 10 seconds, Slowness II
-            new StatusEffectInstance(StatusEffects.WITHER, 100, 0)      // 5 seconds, Wither I
+        List<MobEffectInstance> harmfulEffects = List.of(
+            new MobEffectInstance(MobEffects.POISON, 200, 1),     // 10 seconds, Poison II
+            new MobEffectInstance(MobEffects.WEAKNESS, 300, 1),   // 15 seconds, Weakness II
+            new MobEffectInstance(MobEffects.SLOWNESS, 200, 1),   // 10 seconds, Slowness II
+            new MobEffectInstance(MobEffects.WITHER, 100, 0)      // 5 seconds, Wither I
         );
         
-        potion.set(DataComponentTypes.POTION_CONTENTS, 
-            new PotionContentsComponent(java.util.Optional.empty(), java.util.Optional.of(0x330033), harmfulEffects));
+        potion.set(DataComponents.POTION_CONTENTS, 
+            new PotionContents(java.util.Optional.empty(), java.util.Optional.of(0x330033), harmfulEffects));
         
-        Vec3d vec3d = target.getEyePos().subtract(this.getEyePos());
+        Vec3 vec3d = target.getEyePosition().subtract(this.getEyePosition());
         potionEntity.setItem(potion);
-        potionEntity.setVelocity(vec3d.x, vec3d.y + vec3d.length() * 0.2, vec3d.z, 0.75f, 8.0f);
-        this.getWorld().spawnEntity(potionEntity);
+        potionEntity.setDeltaMovement(vec3d.x, vec3d.y + vec3d.length() * 0.2, vec3d.z, 0.75f, 8.0f);
+        this.level().addFreshEntity(potionEntity);
         
         // Dark purple particles
-        if (this.getWorld() instanceof ServerWorld serverWorld && this.age > 60) {
+        if (this.level() instanceof ServerLevel serverWorld && this.tickCount > 60) {
             try {
                 serverWorld.spawnParticles(ParticleTypes.WITCH,
                     this.getX(), this.getY() + 1.5, this.getZ(),
@@ -1029,26 +1030,26 @@ public class MobWarlordEntity extends HostileEntity {
      * Much stronger than regular healing potions.
      */
     private void throwSuperHealingPotion(LivingEntity target) {
-        PotionEntity potionEntity = new PotionEntity(this.getWorld(), this);
+        AbstractThrownPotion potionEntity = new AbstractThrownPotion(this.level(), this);
         ItemStack potion = new ItemStack(Items.SPLASH_POTION);
         
-        List<StatusEffectInstance> superHealingEffects = List.of(
-            new StatusEffectInstance(StatusEffects.INSTANT_HEALTH, 1, 3),      // Instant Health IV (8 hearts)
-            new StatusEffectInstance(StatusEffects.REGENERATION, 400, 2),      // 20 seconds, Regeneration III
-            new StatusEffectInstance(StatusEffects.RESISTANCE, 600, 2),        // 30 seconds, Resistance III
-            new StatusEffectInstance(StatusEffects.ABSORPTION, 600, 2)         // 30 seconds, Absorption III (6 extra hearts)
+        List<MobEffectInstance> superHealingEffects = List.of(
+            new MobEffectInstance(MobEffects.INSTANT_HEALTH, 1, 3),      // Instant Health IV (8 hearts)
+            new MobEffectInstance(MobEffects.REGENERATION, 400, 2),      // 20 seconds, Regeneration III
+            new MobEffectInstance(MobEffects.RESISTANCE, 600, 2),        // 30 seconds, Resistance III
+            new MobEffectInstance(MobEffects.ABSORPTION, 600, 2)         // 30 seconds, Absorption III (6 extra hearts)
         );
         
-        potion.set(DataComponentTypes.POTION_CONTENTS,
-            new PotionContentsComponent(java.util.Optional.empty(), java.util.Optional.of(0xFFD700), superHealingEffects)); // Golden
+        potion.set(DataComponents.POTION_CONTENTS,
+            new PotionContents(java.util.Optional.empty(), java.util.Optional.of(0xFFD700), superHealingEffects)); // Golden
         
-        Vec3d vec3d = target.getEyePos().subtract(this.getEyePos());
+        Vec3 vec3d = target.getEyePosition().subtract(this.getEyePosition());
         potionEntity.setItem(potion);
-        potionEntity.setVelocity(vec3d.x, vec3d.y + vec3d.length() * 0.2, vec3d.z, 0.75f, 8.0f);
-        this.getWorld().spawnEntity(potionEntity);
+        potionEntity.setDeltaMovement(vec3d.x, vec3d.y + vec3d.length() * 0.2, vec3d.z, 0.75f, 8.0f);
+        this.level().addFreshEntity(potionEntity);
         
         // Golden healing particles
-        if (this.getWorld() instanceof ServerWorld serverWorld && this.age > 60) {
+        if (this.level() instanceof ServerLevel serverWorld && this.tickCount > 60) {
             try {
                 serverWorld.spawnParticles(ParticleTypes.ENCHANTED_HIT,
                     this.getX(), this.getY() + 1.5, this.getZ(),
@@ -1064,26 +1065,26 @@ public class MobWarlordEntity extends HostileEntity {
     /**
      * Throws a healing potion at a low-health minion.
      */
-    private void throwHealingPotion(MobEntity minion) {
-        PotionEntity potionEntity = new PotionEntity(this.getWorld(), this);
+    private void throwHealingPotion(Mob minion) {
+        AbstractThrownPotion potionEntity = new AbstractThrownPotion(this.level(), this);
         ItemStack potion = new ItemStack(Items.SPLASH_POTION);
         
-        List<StatusEffectInstance> healingEffects = List.of(
-            new StatusEffectInstance(StatusEffects.INSTANT_HEALTH, 1, 1),     // Instant Health II
-            new StatusEffectInstance(StatusEffects.REGENERATION, 200, 1),      // 10 seconds, Regeneration II
-            new StatusEffectInstance(StatusEffects.RESISTANCE, 300, 1)         // 15 seconds, Resistance II
+        List<MobEffectInstance> healingEffects = List.of(
+            new MobEffectInstance(MobEffects.INSTANT_HEALTH, 1, 1),     // Instant Health II
+            new MobEffectInstance(MobEffects.REGENERATION, 200, 1),      // 10 seconds, Regeneration II
+            new MobEffectInstance(MobEffects.RESISTANCE, 300, 1)         // 15 seconds, Resistance II
         );
         
-        potion.set(DataComponentTypes.POTION_CONTENTS,
-            new PotionContentsComponent(java.util.Optional.empty(), java.util.Optional.of(0xFF1493), healingEffects)); // Deep pink
+        potion.set(DataComponents.POTION_CONTENTS,
+            new PotionContents(java.util.Optional.empty(), java.util.Optional.of(0xFF1493), healingEffects)); // Deep pink
         
-        Vec3d vec3d = minion.getEyePos().subtract(this.getEyePos());
+        Vec3 vec3d = minion.getEyePosition().subtract(this.getEyePosition());
         potionEntity.setItem(potion);
-        potionEntity.setVelocity(vec3d.x, vec3d.y + vec3d.length() * 0.2, vec3d.z, 0.75f, 8.0f);
-        this.getWorld().spawnEntity(potionEntity);
+        potionEntity.setDeltaMovement(vec3d.x, vec3d.y + vec3d.length() * 0.2, vec3d.z, 0.75f, 8.0f);
+        this.level().addFreshEntity(potionEntity);
         
         // Pink/healing particles
-        if (this.getWorld() instanceof ServerWorld serverWorld && this.age > 60) {
+        if (this.level() instanceof ServerLevel serverWorld && this.tickCount > 60) {
             try {
                 serverWorld.spawnParticles(ParticleTypes.HEART,
                     this.getX(), this.getY() + 1.5, this.getZ(),
@@ -1099,26 +1100,26 @@ public class MobWarlordEntity extends HostileEntity {
     /**
      * Throws a buff potion at minions.
      */
-    private void throwBuffPotion(MobEntity minion) {
-        PotionEntity potionEntity = new PotionEntity(this.getWorld(), this);
+    private void throwBuffPotion(Mob minion) {
+        AbstractThrownPotion potionEntity = new AbstractThrownPotion(this.level(), this);
         ItemStack potion = new ItemStack(Items.SPLASH_POTION);
         
-        List<StatusEffectInstance> buffEffects = List.of(
-            new StatusEffectInstance(StatusEffects.STRENGTH, 400, 1),      // 20 seconds, Strength II
-            new StatusEffectInstance(StatusEffects.SPEED, 400, 1),         // 20 seconds, Speed II
-            new StatusEffectInstance(StatusEffects.RESISTANCE, 400, 0)     // 20 seconds, Resistance I
+        List<MobEffectInstance> buffEffects = List.of(
+            new MobEffectInstance(MobEffects.STRENGTH, 400, 1),      // 20 seconds, Strength II
+            new MobEffectInstance(MobEffects.SPEED, 400, 1),         // 20 seconds, Speed II
+            new MobEffectInstance(MobEffects.RESISTANCE, 400, 0)     // 20 seconds, Resistance I
         );
         
-        potion.set(DataComponentTypes.POTION_CONTENTS,
-            new PotionContentsComponent(java.util.Optional.empty(), java.util.Optional.of(0xFF00FF), buffEffects)); // Bright purple
+        potion.set(DataComponents.POTION_CONTENTS,
+            new PotionContents(java.util.Optional.empty(), java.util.Optional.of(0xFF00FF), buffEffects)); // Bright purple
         
-        Vec3d vec3d = minion.getEyePos().subtract(this.getEyePos());
+        Vec3 vec3d = minion.getEyePosition().subtract(this.getEyePosition());
         potionEntity.setItem(potion);
-        potionEntity.setVelocity(vec3d.x, vec3d.y + vec3d.length() * 0.2, vec3d.z, 0.75f, 8.0f);
-        this.getWorld().spawnEntity(potionEntity);
+        potionEntity.setDeltaMovement(vec3d.x, vec3d.y + vec3d.length() * 0.2, vec3d.z, 0.75f, 8.0f);
+        this.level().addFreshEntity(potionEntity);
         
         // Purple particles
-        if (this.getWorld() instanceof ServerWorld serverWorld && this.age > 60) {
+        if (this.level() instanceof ServerLevel serverWorld && this.tickCount > 60) {
             try {
                 serverWorld.spawnParticles(ParticleTypes.ENCHANT,
                     this.getX(), this.getY() + 1.5, this.getZ(),
@@ -1140,8 +1141,8 @@ public class MobWarlordEntity extends HostileEntity {
         
         // Check if this attack would kill the target (mob only, not players)
         boolean wouldKill = false;
-        if (target instanceof MobEntity mobTarget && !(target instanceof MobWarlordEntity)) {
-            float damage = (float)this.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE);
+        if (target instanceof Mob mobTarget && !(target instanceof MobWarlordEntity)) {
+            float damage = (float)this.getAttributeValue(Attributes.ATTACK_DAMAGE);
             wouldKill = (mobTarget.getHealth() <= damage);
         }
         
@@ -1149,18 +1150,18 @@ public class MobWarlordEntity extends HostileEntity {
         this.tryAttack(target);
         
         // If we would have killed a mob, try to convert it
-        if (wouldKill && target instanceof MobEntity mobTarget && mobTarget.isAlive()) {
+        if (wouldKill && target instanceof Mob mobTarget && mobTarget.isAlive()) {
             tryConvertKilledMob(mobTarget);
         }
         
         // Knockback effect
-        Vec3d direction = target.getPos().subtract(this.getPos()).normalize();
+        Vec3 direction = target.position().subtract(this.position()).normalize();
         target.takeKnockback(2.0, -direction.x, -direction.z);
         
         // Attack particles (purple magic burst)
-        if (this.getWorld() instanceof ServerWorld serverWorld && this.age > 60) {
+        if (this.level() instanceof ServerLevel serverWorld && this.tickCount > 60) {
             try {
-                Vec3d targetPos = target.getPos();
+                Vec3 targetPos = target.position();
                 serverWorld.spawnParticles(ParticleTypes.WITCH,
                     targetPos.x, targetPos.y + 1.0, targetPos.z,
                     20, 0.5, 0.5, 0.5, 0.1);
@@ -1179,9 +1180,9 @@ public class MobWarlordEntity extends HostileEntity {
     
     private void spawnParticles() {
         if (ModConfig.getInstance().disableParticles) return; // Performance optimization
-        if (this.getWorld() == null) return;
-        if (this.age < 60) return; // Wait 3 seconds for full initialization
-        if (!(this.getWorld() instanceof ServerWorld serverWorld)) return;
+        if (this.level() == null) return;
+        if (this.tickCount < 60) return; // Wait 3 seconds for full initialization
+        if (!(this.level() instanceof ServerLevel serverWorld)) return;
         
         try {
             // Additional null check for serverWorld's particle manager
@@ -1196,7 +1197,7 @@ public class MobWarlordEntity extends HostileEntity {
     }
     
     @Override
-    public void onStartedTrackingBy(ServerPlayerEntity player) {
+    public void onStartedTrackingBy(ServerPlayer player) {
         super.onStartedTrackingBy(player);
         
         try {
@@ -1209,7 +1210,7 @@ public class MobWarlordEntity extends HostileEntity {
     }
     
     @Override
-    public void onStoppedTrackingBy(ServerPlayerEntity player) {
+    public void onStoppedTrackingBy(ServerPlayer player) {
         super.onStoppedTrackingBy(player);
         
         try {
@@ -1222,7 +1223,7 @@ public class MobWarlordEntity extends HostileEntity {
     }
     
     @Override
-    public void writeCustomDataToNbt(NbtCompound nbt) {
+    public void writeCustomDataToNbt(CompoundTag nbt) {
         super.writeCustomDataToNbt(nbt);
         
         long[] minionArray = new long[minionUuids.size() * 2];
@@ -1240,7 +1241,7 @@ public class MobWarlordEntity extends HostileEntity {
     }
     
     @Override
-    public void readCustomDataFromNbt(NbtCompound nbt) {
+    public void readCustomDataFromNbt(CompoundTag nbt) {
         super.readCustomDataFromNbt(nbt);
         
         if (nbt.contains("Minions")) {
@@ -1254,7 +1255,7 @@ public class MobWarlordEntity extends HostileEntity {
                 // is never saved, so without this a reloaded warlord's minions
                 // lose their minion protections (they could attack the warlord
                 // and each other, and targeting checks would not skip them).
-                WarlordSystem.registerMinion(uuid, this.getUuid());
+                WarlordSystem.registerMinion(uuid, this.getUUID());
             }
         }
         
@@ -1262,7 +1263,7 @@ public class MobWarlordEntity extends HostileEntity {
         
         // Load raid status
         if (nbt.contains("IsRaidBoss")) {
-            this.setRaidBoss(nbt.getBoolean("IsRaidBoss"));
+            this.setRaidBoss(nbt.getBooleanOr("IsRaidBoss", false));
         }
     }
     
@@ -1272,7 +1273,7 @@ public class MobWarlordEntity extends HostileEntity {
         
         // Update boss bar safely
         try {
-            if (this.bossBar != null && this.age > 2) {
+            if (this.bossBar != null && this.tickCount > 2) {
                 this.bossBar.setPercent(this.getHealth() / this.getMaxHealth());
             }
         } catch (Exception e) {
@@ -1295,7 +1296,7 @@ public class MobWarlordEntity extends HostileEntity {
         super.onDeath(damageSource);
         
         // OPTIMIZED: Stagger minion deaths to prevent lag spike (5 per tick, cascading death effect)
-        if (!this.getWorld().isClient && this.getWorld() instanceof ServerWorld serverWorld) {
+        if (!this.level().isClient && this.level() instanceof ServerLevel serverWorld) {
             List<UUID> minionList = new ArrayList<>(minionUuids);
             
             // Schedule staggered minion deaths on the tick scheduler. The old
@@ -1314,8 +1315,8 @@ public class MobWarlordEntity extends HostileEntity {
             
             // Victory message
             serverWorld.getPlayers().forEach(player -> {
-                player.sendMessage(Text.literal("The Mob Warlord has been defeated! Their army crumbles!")
-                    .styled(style -> style.withColor(Formatting.GOLD).withBold(true)), false);
+                player.sendMessage(Component.literal("The Mob Warlord has been defeated! Their army crumbles!")
+                    .withStyle(style -> style.withColor(ChatFormatting.GOLD).withBold(true)), false);
             });
         }
     }
@@ -1323,7 +1324,7 @@ public class MobWarlordEntity extends HostileEntity {
     /**
      * Kills a minion with particles.
      */
-    private void killMinion(ServerWorld serverWorld, UUID minionUuid) {
+    private void killMinion(ServerLevel serverWorld, UUID minionUuid) {
         Entity entity = serverWorld.getEntity(minionUuid);
         if (entity instanceof LivingEntity minion && minion.isAlive()) {
             minion.damage(minion.getDamageSources().magic(), Float.MAX_VALUE);
@@ -1371,7 +1372,7 @@ public class MobWarlordEntity extends HostileEntity {
             }
             
             // Check if any minions are being attacked
-            if (!(this.warlord.getWorld() instanceof ServerWorld serverWorld)) return false;
+            if (!(this.warlord.level() instanceof ServerLevel serverWorld)) return false;
             
             // Performance optimization: limit how many minions we check at once
             int checkedCount = 0;
@@ -1382,13 +1383,13 @@ public class MobWarlordEntity extends HostileEntity {
                 
                 try {
                     Entity entity = serverWorld.getEntity(minionUuid);
-                    if (entity instanceof MobEntity minion && minion.isAlive()) {
+                    if (entity instanceof Mob minion && minion.isAlive()) {
                         LivingEntity minionAttacker = minion.getAttacker();
                         
                         // Found someone attacking our minion!
                         if (minionAttacker != null && minionAttacker.isAlive() && minionAttacker != this.warlord) {
                             // Don't attack other minions
-                            if (minionAttacker instanceof MobEntity && this.warlord.isMinionOf((MobEntity) minionAttacker)) {
+                            if (minionAttacker instanceof Mob && this.warlord.isMinionOf((Mob) minionAttacker)) {
                                 continue;
                             }
                             
@@ -1413,7 +1414,7 @@ public class MobWarlordEntity extends HostileEntity {
             this.warlord.playSound(SoundEvents.ENTITY_RAVAGER_ROAR, 1.0f, 0.8f);
             
             // Spawn angry particles
-            if (this.warlord.getWorld() instanceof ServerWorld serverWorld && this.warlord.age > 60) {
+            if (this.warlord.level() instanceof ServerLevel serverWorld && this.warlord.tickCount > 60) {
                 try {
                     serverWorld.spawnParticles(ParticleTypes.ANGRY_VILLAGER,
                         this.warlord.getX(), this.warlord.getY() + 2.5, this.warlord.getZ(),
@@ -1453,7 +1454,7 @@ public class MobWarlordEntity extends HostileEntity {
             LivingEntity target = this.warlord.getTarget();
             if (target != null && target.isAlive()) {
                 // CRITICAL: Never target our own minions
-                if (target instanceof MobEntity targetMob && this.warlord.isMinionOf(targetMob)) {
+                if (target instanceof Mob targetMob && this.warlord.isMinionOf(targetMob)) {
                     this.warlord.setTarget(null);
                     return false;
                 }
@@ -1479,7 +1480,7 @@ public class MobWarlordEntity extends HostileEntity {
             if (this.target == null) return;
             
             this.warlord.getLookControl().lookAt(this.target, 30.0f, 30.0f);
-            double distance = this.warlord.squaredDistanceTo(this.target);
+            double distance = this.warlord.distanceToSqr(this.target);
             
             --this.updateCountdownTicks;
             
@@ -1509,11 +1510,11 @@ public class MobWarlordEntity extends HostileEntity {
      * Creepers will only explode if there are 2 or fewer allies nearby.
      */
     private static class SmartCreeperGoal extends Goal {
-        private final net.minecraft.entity.mob.CreeperEntity creeper;
+        private final net.minecraft.world.entity.monster.Creeper creeper;
         private final MobWarlordEntity warlord;
         private int checkCooldown = 0;
         
-        public SmartCreeperGoal(net.minecraft.entity.mob.CreeperEntity creeper, MobWarlordEntity warlord) {
+        public SmartCreeperGoal(net.minecraft.world.entity.monster.Creeper creeper, MobWarlordEntity warlord) {
             this.creeper = creeper;
             this.warlord = warlord;
         }
@@ -1530,11 +1531,11 @@ public class MobWarlordEntity extends HostileEntity {
             // Check if creeper is about to explode (fuse time > 0)
             if (this.creeper.getFuseSpeed() > 0) {
                 // Count nearby allies (within explosion radius of 3 blocks)
-                if (!(this.creeper.getWorld() instanceof ServerWorld serverWorld)) return false;
+                if (!(this.creeper.level() instanceof ServerLevel serverWorld)) return false;
                 
-                List<MobEntity> nearbyAllies = serverWorld.getEntitiesByClass(
-                    MobEntity.class,
-                    this.creeper.getBoundingBox().expand(4.0), // Slightly larger than explosion radius
+                List<Mob> nearbyAllies = serverWorld.getEntitiesOfClass(
+                    Mob.class,
+                    this.creeper.getBoundingBox().inflate(4.0), // Slightly larger than explosion radius
                     mob -> mob != this.creeper && (this.warlord.isMinionOf(mob) || mob == this.warlord)
                 );
                 
@@ -1546,8 +1547,8 @@ public class MobWarlordEntity extends HostileEntity {
                         LivingEntity target = this.creeper.getTarget();
                         if (target != null) {
                             // Move away from target to avoid explosion near allies
-                            Vec3d awayDirection = this.creeper.getPos().subtract(target.getPos()).normalize();
-                            Vec3d fleePos = this.creeper.getPos().add(awayDirection.multiply(5.0));
+                            Vec3 awayDirection = this.creeper.position().subtract(target.position()).normalize();
+                            Vec3 fleePos = this.creeper.position().add(awayDirection.multiply(5.0));
                             this.creeper.getNavigation().startMovingTo(fleePos.x, fleePos.y, fleePos.z, 1.5);
                             return true;
                         }
@@ -1571,7 +1572,7 @@ public class MobWarlordEntity extends HostileEntity {
      * Raid-aware targeting goal that only activates when boss is in raid mode.
      * Used for prioritizing villagers and iron golems during raids.
      */
-    private static class RaidAwareTargetGoal<T extends LivingEntity> extends ActiveTargetGoal<T> {
+    private static class RaidAwareTargetGoal<T extends LivingEntity> extends NearestAttackableTargetGoal<T> {
         private final MobWarlordEntity warlord;
         
         public RaidAwareTargetGoal(MobWarlordEntity warlord, Class<T> targetClass, boolean checkVisibility) {
@@ -1596,12 +1597,12 @@ public class MobWarlordEntity extends HostileEntity {
      * This prevents minions from wandering off and getting separated from their master.
      */
     public static class StayNearWarlordGoal extends Goal {
-        private final MobEntity minion;
+        private final Mob minion;
         private final MobWarlordEntity warlord;
         private static final double RETURN_DISTANCE = 14.0; // Minions start returning at this distance
         private int checkCooldown = 0;
         
-        public StayNearWarlordGoal(MobEntity minion, MobWarlordEntity warlord) {
+        public StayNearWarlordGoal(Mob minion, MobWarlordEntity warlord) {
             this.minion = minion;
             this.warlord = warlord;
             this.setControls(EnumSet.of(Control.MOVE, Control.TARGET));
@@ -1622,7 +1623,7 @@ public class MobWarlordEntity extends HostileEntity {
             }
             
             // Check if minion is too far from warlord
-            double distance = this.minion.squaredDistanceTo(this.warlord);
+            double distance = this.minion.distanceToSqr(this.warlord);
             return distance > (RETURN_DISTANCE * RETURN_DISTANCE);
         }
         
@@ -1631,7 +1632,7 @@ public class MobWarlordEntity extends HostileEntity {
             // Continue until we're close enough to the warlord
             if (!this.warlord.isAlive()) return false;
             
-            double distance = this.minion.squaredDistanceTo(this.warlord);
+            double distance = this.minion.distanceToSqr(this.warlord);
             // Stop when within 12 blocks to prevent bouncing
             return distance > (12.0 * 12.0);
         }
@@ -1647,7 +1648,7 @@ public class MobWarlordEntity extends HostileEntity {
         @Override
         public void tick() {
             // Keep navigating to warlord's current position
-            if (this.minion.age % 10 == 0) { // Update path every 0.5 seconds
+            if (this.minion.tickCount % 10 == 0) { // Update path every 0.5 seconds
                 this.minion.getNavigation().startMovingTo(this.warlord, 1.2);
             }
             
