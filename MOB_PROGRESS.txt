@@ -4,7 +4,7 @@
 
 - DO NOT CREATE EXTRA ABILITIES BESIDE THE ONES ALREADY LISTED, AND READ THE JSON FILE THAT WAS CREATED TO UNDERSTAND THE FORMAT AND REVIEW THE FULL SKILL TREE.
 
-PROGRESS: 70 / 80 mobs completed
+PROGRESS: 81 / 81 mobs completed
 
 ================================================================================
                               RECENT SYSTEM UPDATES
@@ -62,49 +62,49 @@ PROGRESS: 70 / 80 mobs completed
 7.  [X] Bogged             
 8.  [X] Breeze             
 9.  [X] Camel              
-10. [X] Cat               
-11. [X] Cave_Spider       
-12. [X] Chicken           
-13. [X] Cod               
-14. [X] Cow               
-15. [X] Creaking          
-16. [X] Creeper           
-17. [X] Dolphin           
-18. [X] Donkey            
-19. [X] Drowned           
-20. [X] Elder_Guardian    
-21. [X] Ender_Dragon     
-22. [X] Enderman         
-23. [X] Endermite        
-24. [X] Evoker           
-25. [X] Fox              
-26. [X] Frog             
-27. [X] Giant            
-28. [X] Glow_Squid      
-29. [X] Goat             
-30. [X] Guardian        
-31. [X] Hoglin          
-32. [X] Horse           
-33. [X] Husk            
-34. [X] Illusioner      
-35. [X] Iron_Golem      
-36. [X] Llama           
-37. [X] Magma_Cube      
-38. [X] Mooshroom       
-39. [X] Mule            
-40. [X] Ocelot          
-41. [X] Panda           
-42. [X] Parrot          
-43. [X] Phantom         
-44. [X] Pig             
-45. [X] Piglin          
-46. [X] Piglin_Brute    
-47. [X] Pillager        
-48. [X] Polar_Bear      
-49. [X] Pufferfish      
-50. [X] Rabbit          
-51. [X] Ravager         
-52. [X] Salmon          
+10. [X] Cat
+11. [X] Cave_Spider
+12. [X] Chicken
+13. [X] Cod
+14. [X] Cow
+15. [X] Creaking
+16. [X] Creeper
+17. [X] Dolphin
+18. [X] Donkey
+19. [X] Drowned
+20. [X] Elder_Guardian
+21. [X] Ender_Dragon
+22. [X] Enderman
+23. [X] Endermite
+24. [X] Evoker
+25. [X] Fox
+26. [X] Frog
+27. [X] Giant
+28. [X] Glow_Squid
+29. [X] Goat
+30. [X] Guardian
+31. [X] Hoglin
+32. [X] Horse
+33. [X] Husk
+34. [X] Illusioner
+35. [X] Iron_Golem
+36. [X] Llama
+37. [X] Magma_Cube
+38. [X] Mooshroom
+39. [X] Mule
+40. [X] Ocelot
+41. [X] Panda
+42. [X] Parrot
+43. [X] Phantom
+44. [X] Pig
+45. [X] Piglin
+46. [X] Piglin_Brute
+47. [X] Pillager
+48. [X] Polar_Bear
+49. [X] Pufferfish
+50. [X] Rabbit
+51. [X] Ravager
+52. [X] Salmon
 53. [X] Sheep
 54. [X] Shulker
 55. [X] Silverfish
@@ -117,22 +117,23 @@ PROGRESS: 70 / 80 mobs completed
 62. [X] Squid
 63. [X] Stray
 64. [X] Strider
-65. [X] Tadpole
-66. [X] Trader_Llama
-67. [X] Tropical_Fish
-68. [X] Turtle
-69. [X] Vex
-70. [X] Villager
-71. [X] Vindicator
-72. [X] Wandering_Trader
-73. [X] Warden
-74. [X] Witch
-75. [X] Wither
-76. [X] Wither_Skeleton
-77. [X] Wolf
-78. [X] Zoglin
-79. [X] Zombie
-80. [X] Zombie_Villager
+65. [X] Sulfur_Cube
+66. [X] Tadpole
+67. [X] Trader_Llama
+68. [X] Tropical_Fish
+69. [X] Turtle
+70. [X] Vex
+71. [X] Villager
+72. [X] Vindicator
+73. [X] Wandering_Trader
+74. [X] Warden
+75. [X] Witch
+76. [X] Wither
+77. [X] Wither_Skeleton
+78. [X] Wolf
+79. [X] Zoglin
+80. [X] Zombie
+81. [X] Zombie_Villager
 
 ================================================================================
                               MOB DEFINITIONS
@@ -204,6 +205,7 @@ Spider:          type=hostile,  weapon=none,         armor=none,        shield=f
 Squid:           type=passive,  weapon=none,         armor=none,        shield=false, trees=[]
 Stray:           type=hostile,  weapon=bow,          armor=full_normal, shield=true,  trees=[ranged]
 Strider:         type=passive,  weapon=none,         armor=none,        shield=false, trees=[]
+Sulfur_Cube:     type=hostile,  weapon=none,         armor=none,        shield=false, trees=[]
 Tadpole:         type=passive,  weapon=none,         armor=none,        shield=false, trees=[]
 Trader_Llama:    type=neutral,  weapon=none,         armor=none,        shield=false, trees=[ranged]
 Tropical_Fish:   type=passive,  weapon=none,         armor=none,        shield=false, trees=[]
@@ -748,6 +750,7 @@ Spider:          "Web Weaver"
 Squid:           "Ink Cloud Drifter"
 Stray:           "Frozen Archer"
 Strider:         "Lava Walker"
+Sulfur_Cube:     "Sulfur Bouncer"
 Tadpole:         "Tiny Swimmer"
 Trader_Llama:    "Merchant Guardian"
 Tropical_Fish:   "Coral Dancer"
