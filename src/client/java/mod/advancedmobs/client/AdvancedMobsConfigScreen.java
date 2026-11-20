@@ -101,24 +101,24 @@ public class AdvancedMobsConfigScreen extends Screen {
     protected void init() {
         this.config = ModConfig.getInstance();
 
-        categoryButtons.values().forEach(this::remove);
+        categoryButtons.values().forEach(this::removeWidget);
         categoryButtons.clear();
 
         int navLeft = getNavLeft();
         int navY = NAV_TOP;
         for (Category category : CATEGORY_ORDER) {
             Button button = Button.builder(category.title(), btn -> setCategory(category))
-                .dimensions(navLeft, navY, NAV_WIDTH, NAV_BUTTON_HEIGHT)
+                .bounds(navLeft, navY, NAV_WIDTH, NAV_BUTTON_HEIGHT)
                 .build();
-            this.addDrawableChild(button);
+            this.addRenderableWidget(button);
             categoryButtons.put(category, button);
             navY += NAV_BUTTON_HEIGHT + NAV_BUTTON_GAP;
         }
 
-        this.addDrawableChild(Button.builder(Component.literal("Save & Exit"), button -> {
+        this.addRenderableWidget(Button.builder(Component.literal("Save & Exit"), button -> {
             ModConfig.save();
-            if (this.client != null) this.client.setScreen(this.parent);
-        }).dimensions(this.width / 2 - 100, this.height - 30, 200, 20).build());
+            if (this.minecraft != null) this.minecraft.setScreenAndShow(this.parent);
+        }).bounds(this.width / 2 - 100, this.height - 30, 200, 20).build());
 
         refreshWidgets();
     }
@@ -131,7 +131,7 @@ public class AdvancedMobsConfigScreen extends Screen {
     private void refreshWidgets() {
         // Remove old widgets before drawing new ones
         for (AbstractWidget widget : activeWidgets) {
-            this.remove(widget);
+            this.removeWidget(widget);
         }
         activeWidgets.clear();
         widgetPlacements.clear();
@@ -349,11 +349,11 @@ public class AdvancedMobsConfigScreen extends Screen {
     }
 
     private int addCheckbox(int x, int relativeY, String text, boolean checked, Consumer<Boolean> onSave, String tooltip) {
-        Checkbox widget = Checkbox.builder(Component.literal(text), this.textRenderer)
+        Checkbox widget = Checkbox.builder(Component.literal(text), this.font)
             .pos(x, CONTENT_TOP + relativeY)
-            .checked(checked)
-            .callback((checkbox, isChecked) -> onSave.accept(isChecked))
-            .tooltip(Tooltip.of(Component.literal(tooltip)))
+            .selected(checked)
+            .onValueChange((checkbox, isChecked) -> onSave.accept(isChecked))
+            .tooltip(Tooltip.create(Component.literal(tooltip)))
             .build();
         registerScrollableWidget(widget, relativeY);
         return relativeY + ROW_GAP;
@@ -385,14 +385,26 @@ public class AdvancedMobsConfigScreen extends Screen {
                                 int minValue, int maxValue, Consumer<Integer> onSave, String tooltip) {
         registerLabel(Component.literal(label), relativeY);
         int fieldRelativeY = relativeY + LABEL_GAP;
-        EditBox field = new EditBox(this.textRenderer, x, CONTENT_TOP + fieldRelativeY, w, WIDGET_HEIGHT, Component.literal(label));
-        field.setText(String.valueOf(initialValue));
+        EditBox field = new EditBox(this.font, x, CONTENT_TOP + fieldRelativeY, w, WIDGET_HEIGHT, Component.literal(label));
+        field.setValue(String.valueOf(initialValue));
         field.setMaxLength(7);
-        field.setPlaceholder(Component.literal("Use -1 to follow real days"));
-        field.setTooltip(Tooltip.of(Component.literal(tooltip)));
-        field.setTextPredicate(text -> text.isEmpty() || text.equals("-") || text.matches("-?\\d{0,6}"));
-        field.setChangedListener(text -> {
-            if (text == null || text.isEmpty() || text.equals("-")) {
+        field.setHint(Component.literal("Use -1 to follow real days"));
+        field.setTooltip(Tooltip.create(Component.literal(tooltip)));
+        // 26.2 EditBox has no input filter (setTextPredicate is gone), so
+        // the same constraint is enforced in the responder: an edit that
+        // is not empty, "-", or up to 6 digits is reverted to the last
+        // accepted text.
+        String[] lastValidText = { String.valueOf(initialValue) };
+        field.setResponder(text -> {
+            if (text == null) {
+                return;
+            }
+            if (!(text.isEmpty() || text.equals("-") || text.matches("-?\\d{0,6}"))) {
+                field.setValue(lastValidText[0]);
+                return;
+            }
+            lastValidText[0] = text;
+            if (text.isEmpty() || text.equals("-")) {
                 return;
             }
             try {
@@ -401,7 +413,7 @@ public class AdvancedMobsConfigScreen extends Screen {
                 onSave.accept(parsed);
                 String clampedText = String.valueOf(parsed);
                 if (!clampedText.equals(text)) {
-                    field.setText(clampedText);
+                    field.setValue(clampedText);
                 }
             } catch (NumberFormatException ignored) {}
         });
@@ -410,7 +422,7 @@ public class AdvancedMobsConfigScreen extends Screen {
     }
 
     private void registerScrollableWidget(AbstractWidget widget, int relativeY) {
-        this.addDrawableChild(widget);
+        this.addRenderableWidget(widget);
         activeWidgets.add(widget);
         widgetPlacements.add(new WidgetPlacement(widget, relativeY));
         updateContentHeight(relativeY);
@@ -472,29 +484,29 @@ public class AdvancedMobsConfigScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
-        this.renderBackground(context, mouseX, mouseY, delta);
+    public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+        this.extractBackground(context, mouseX, mouseY, delta);
         int contentLeft = getContentLeft();
         int navLeft = getNavLeft();
         int visibleHeight = getVisibleHeight();
 
-        context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, 15, 0xFFFFFF);
+        context.centeredText(this.font, this.title, this.width / 2, 15, 0xFFFFFF);
 
         int navPanelBottom = CONTENT_TOP + visibleHeight + 10;
         context.fill(navLeft - 6, NAV_TOP - 10, navLeft + NAV_WIDTH + 6, navPanelBottom, 0x33000000);
-        context.drawTextWithShadow(this.textRenderer, Component.literal("Sections"), navLeft, NAV_TOP - 16, 0xAAAAAA);
-        context.drawTextWithShadow(this.textRenderer, currentCategory.title(), contentLeft, 60, 0xFFFFFF);
+        context.text(this.font, Component.literal("Sections"), navLeft, NAV_TOP - 16, 0xAAAAAA, true);
+        context.text(this.font, currentCategory.title(), contentLeft, 60, 0xFFFFFF, true);
         if (!categoryDescription.getString().isEmpty()) {
-            context.drawTextWithShadow(this.textRenderer, categoryDescription, contentLeft, 78, 0x77C0FF);
+            context.text(this.font, categoryDescription, contentLeft, 78, 0x77C0FF, true);
         }
 
         context.fill(contentLeft - 6, CONTENT_TOP - 10, contentLeft + CONTENT_WIDTH + 6, CONTENT_TOP + visibleHeight + 10, 0x44000000);
         renderLabels(context);
-        super.render(context, mouseX, mouseY, delta);
+        super.extractRenderState(context, mouseX, mouseY, delta);
 
         Button selected = categoryButtons.get(currentCategory);
         if (selected != null) {
-            context.drawBorder(selected.getX() - 2, selected.getY() - 2, selected.getWidth() + 4,
+            context.outline(selected.getX() - 2, selected.getY() - 2, selected.getWidth() + 4,
                 selected.getHeight() + 4, 0xFF77C0FF);
         }
 
@@ -520,7 +532,7 @@ public class AdvancedMobsConfigScreen extends Screen {
             if (drawY < CONTENT_TOP - 12 || drawY > CONTENT_TOP + visibleHeight) {
                 continue;
             }
-            context.drawTextWithShadow(this.textRenderer, label.text, x, drawY, label.color);
+            context.text(this.font, label.text, x, drawY, label.color, true);
         }
     }
 

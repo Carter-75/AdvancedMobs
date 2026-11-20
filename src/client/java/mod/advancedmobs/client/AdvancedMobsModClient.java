@@ -6,7 +6,7 @@ import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents;
 
 /**
  * Client-side initialization for Advanced Mobs.
@@ -33,8 +33,8 @@ public class AdvancedMobsModClient implements ClientModInitializer {
         // Register custom witch renderer for the Mob Warlord
         EntityRendererRegistry.register(AdvancedMobsMod.MOB_WARLORD, MobWarlordRenderer::new);
         
-        // Register world render callback for visual features
-        WorldRenderEvents.LAST.register(new MobVisualRenderer());
+        // Register level render callback for visual features
+        LevelRenderEvents.COLLECT_SUBMITS.register(new MobVisualRenderer());
         
         AdvancedMobsMod.LOGGER.info("Advanced Mobs client initialized - Custom witch renderer and visual features registered!");
     }

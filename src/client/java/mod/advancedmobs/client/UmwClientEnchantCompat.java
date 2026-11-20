@@ -21,7 +21,7 @@ public final class UmwClientEnchantCompat {
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
             try {
                 Registry<Enchantment> enchantRegistry = handler.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
-                List<Identifier> ids = new ArrayList<>(enchantRegistry.getIds());
+                List<Identifier> ids = new ArrayList<>(enchantRegistry.keySet());
                 ClientPlayNetworking.send(new UmwClientEnchantmentsPayload(ids));
             } catch (Exception e) {
                 AdvancedMobsMod.LOGGER.warn("[EnchantCompat] Failed to send client enchantment list", e);
