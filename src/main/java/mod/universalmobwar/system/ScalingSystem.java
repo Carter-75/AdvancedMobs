@@ -1014,6 +1014,21 @@ public class ScalingSystem {
             return;
         }
 
+        // PERF: The full audit below inspects every equipment slot and builds
+        // expected ItemStacks, which is wasteful to run 20 times per second for
+        // every loaded mob. Run it every 10 ticks per mob instead, staggered by
+        // UUID so mobs do not all audit on the same tick. The initial disarm
+        // above still runs every tick, and a broken or swapped item is now
+        // detected at most 10 ticks (half a second) later, which is not
+        // observable in gameplay.
+        long worldTime = mob.getWorld().getTime();
+        if (Math.floorMod(worldTime + (mob.getUuid().hashCode() & 1023), 10) != 0) {
+            if (stateChanged) {
+                MobWarData.save(mob, data);
+            }
+            return;
+        }
+
         JsonObject tree = config.getAsJsonObject("tree");
         ServerWorld serverWorld = mob.getWorld() instanceof ServerWorld sw ? sw : null;
         JsonElement shieldElement = tree.has("shield") ? tree.get("shield") : null;
@@ -1451,22 +1466,23 @@ public class ScalingSystem {
             shouldScheduleNow = false;
         }
 
-        // This scan is expensive and referenced multiple times below.
-        boolean affordableUpgradeAvailable = hasAffordableUpgradeAvailable(
-            mobUuid,
-            config,
-            mobType,
-            enchantRegistry,
-            skillData,
-            budget
-        );
+        // This scan is expensive (it walks every upgrade option, including the
+        // enchantment registry), so it is computed lazily on first use below.
+        // On most ticks none of the upgrade paths need the answer, and the old
+        // code paid the full scan cost every tick for a result nobody read.
+        Boolean affordableUpgradeAvailable = null;
 
         boolean forceUpgradePass = forceImmediateUpgrade && shouldRequestUpgrade && !upgradePending;
-        if (forceUpgradePass && affordableUpgradeAvailable) {
-            scheduleSpawnBurstUpgradePass(skillData, currentTick);
-            clearBudgetProbeThrottle(skillData);
-            MobWarData.save(mob, data);
-            return;
+        if (forceUpgradePass) {
+            if (affordableUpgradeAvailable == null) {
+                affordableUpgradeAvailable = hasAffordableUpgradeAvailable(mobUuid, config, mobType, enchantRegistry, skillData, budget);
+            }
+            if (affordableUpgradeAvailable) {
+                scheduleSpawnBurstUpgradePass(skillData, currentTick);
+                clearBudgetProbeThrottle(skillData);
+                MobWarData.save(mob, data);
+                return;
+            }
         }
 
         if (readyForNextCycle && upgradePending && !windowApproved) {
@@ -1474,7 +1490,14 @@ public class ScalingSystem {
             windowApproved = true;
         }
 
-        if (shouldScheduleNow && affordableUpgradeAvailable) {
+        boolean scheduleWithAffordable = false;
+        if (shouldScheduleNow) {
+            if (affordableUpgradeAvailable == null) {
+                affordableUpgradeAvailable = hasAffordableUpgradeAvailable(mobUuid, config, mobType, enchantRegistry, skillData, budget);
+            }
+            scheduleWithAffordable = affordableUpgradeAvailable;
+        }
+        if (scheduleWithAffordable) {
             boolean approveNow = readyForNextCycle || firstUpgradeCycle;
             scheduleUpgradePass(skillData, currentTick, modConfig, approveNow);
             upgradePending = true;
@@ -1497,10 +1520,15 @@ public class ScalingSystem {
             upgradeScheduleReady = false;
         }
 
-        if (upgradeScheduleReady && !affordableUpgradeAvailable) {
-            clearUpgradeSchedule(skillData);
-            throttleBudgetProbe(skillData, currentTick);
-            upgradeScheduleReady = false;
+        if (upgradeScheduleReady) {
+            if (affordableUpgradeAvailable == null) {
+                affordableUpgradeAvailable = hasAffordableUpgradeAvailable(mobUuid, config, mobType, enchantRegistry, skillData, budget);
+            }
+            if (!affordableUpgradeAvailable) {
+                clearUpgradeSchedule(skillData);
+                throttleBudgetProbe(skillData, currentTick);
+                upgradeScheduleReady = false;
+            }
         }
 
         if (upgradeScheduleReady) {
@@ -2877,6 +2905,24 @@ public class ScalingSystem {
             return;
         }
         applyPotionEffect(mob, skillData, effects, effectName, effect, skillKey, levelKey);
+    }
+
+    /**
+     * Drops all runtime-only per-mob state for a mob that is leaving the world.
+     * These maps are keyed by mob UUID and were previously never pruned, so they
+     * grew without bound over a long session as mobs spawned and despawned.
+     * Everything removed here is transient (cooldowns, shot cycle position,
+     * target immunities, a pending equipment snapshot); persistent progression
+     * lives in MobWarData NBT and is not touched.
+     */
+    public static void cleanupMobState(UUID mobUuid) {
+        if (mobUuid == null) {
+            return;
+        }
+        ABILITY_COOLDOWNS.remove(mobUuid);
+        ABILITY_TARGET_IMMUNITIES.remove(mobUuid);
+        EXTRA_SHOT_TRACKERS.remove(mobUuid);
+        PENDING_EQUIPMENT_SNAPSHOTS.remove(mobUuid);
     }
 
     private static void handleUndeadHealingPulse(MobEntity mob, NbtCompound skillData, long currentTick) {
