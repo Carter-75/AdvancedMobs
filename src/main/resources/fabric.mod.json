@@ -19,12 +19,13 @@
 		"advancedmobs.mixins.json"
 	],
 	"depends": {
-		"fabricloader": ">=0.15.10",
-		"minecraft": "1.21.x",
+		"fabricloader": ">=0.19.2",
+		"minecraft": ">=26.2",
+		"java": ">=25",
 		"fabric-api": "*"
 	},
 	"suggests": {
-		"modmenu": ">=7.2.0"
+		"modmenu": ">=20.0.0"
 	}
 }
 
