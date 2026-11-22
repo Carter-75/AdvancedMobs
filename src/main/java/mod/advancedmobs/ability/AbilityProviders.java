@@ -49,6 +49,7 @@ import mod.advancedmobs.ability.strider.StriderAbilities;
 import mod.advancedmobs.ability.dolphin.DolphinAbilities;
 import mod.advancedmobs.ability.pig.PigAbilities;
 import mod.advancedmobs.ability.cow.CowAbilities;
+import mod.advancedmobs.ability.mooshroom.MooshroomAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
@@ -124,5 +125,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Dolphin", new DolphinAbilities());
         AbilityRegistry.register("Pig", new PigAbilities());
         AbilityRegistry.register("Cow", new CowAbilities());
+        AbilityRegistry.register("Mooshroom", new MooshroomAbilities());
     }
 }
