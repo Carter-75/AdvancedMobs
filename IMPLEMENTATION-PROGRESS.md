@@ -68,7 +68,7 @@ mob and is not tracked here.
 - [ ] Slime
 - [ ] Sniffer
 - [ ] Snow_Golem
-- [ ] Spider
+- [x] Spider
 - [ ] Squid
 - [x] Stray
 - [ ] Strider
