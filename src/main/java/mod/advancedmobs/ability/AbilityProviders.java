@@ -1,5 +1,6 @@
 package mod.advancedmobs.ability;
 
+import mod.advancedmobs.ability.blaze.BlazeAbilities;
 import mod.advancedmobs.ability.bogged.BoggedAbilities;
 import mod.advancedmobs.ability.cavespider.CaveSpiderAbilities;
 import mod.advancedmobs.ability.creeper.CreeperAbilities;
@@ -52,5 +53,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Silverfish", new SilverfishAbilities());
         AbilityRegistry.register("Slime", new SlimeAbilities());
         AbilityRegistry.register("Magma_Cube", new MagmaCubeAbilities());
+        AbilityRegistry.register("Blaze", new BlazeAbilities());
     }
 }

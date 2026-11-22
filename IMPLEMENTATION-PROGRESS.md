@@ -13,7 +13,7 @@ mob and is not tracked here.
 - [ ] Axolotl
 - [ ] Bat
 - [ ] Bee
-- [ ] Blaze
+- [x] Blaze
 - [x] Bogged
 - [ ] Breeze
 - [ ] Camel
