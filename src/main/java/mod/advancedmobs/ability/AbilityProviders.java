@@ -16,6 +16,7 @@ import mod.advancedmobs.ability.hoglin.HoglinAbilities;
 import mod.advancedmobs.ability.husk.HuskAbilities;
 import mod.advancedmobs.ability.illusioner.IllusionerAbilities;
 import mod.advancedmobs.ability.ravager.RavagerAbilities;
+import mod.advancedmobs.ability.breeze.BreezeAbilities;
 import mod.advancedmobs.ability.warden.WardenAbilities;
 import mod.advancedmobs.ability.magmacube.MagmaCubeAbilities;
 import mod.advancedmobs.ability.piglin.PiglinAbilities;
@@ -90,5 +91,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Illusioner", new IllusionerAbilities());
         AbilityRegistry.register("Ravager", new RavagerAbilities());
         AbilityRegistry.register("Warden", new WardenAbilities());
+        AbilityRegistry.register("Breeze", new BreezeAbilities());
     }
 }

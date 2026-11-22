@@ -15,7 +15,7 @@ mob and is not tracked here.
 - [ ] Bee
 - [x] Blaze
 - [x] Bogged
-- [ ] Breeze
+- [x] Breeze
 - [ ] Camel
 - [ ] Cat
 - [x] Cave_Spider
