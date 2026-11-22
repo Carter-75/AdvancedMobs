@@ -35,7 +35,7 @@ mob and is not tracked here.
 - [x] Frog
 - [x] Ghast
 - [x] Giant
-- [ ] Glow_Squid
+- [x] Glow_Squid
 - [x] Goat
 - [x] Guardian
 - [x] Hoglin
