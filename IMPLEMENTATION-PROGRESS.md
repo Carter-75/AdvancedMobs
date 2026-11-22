@@ -64,7 +64,7 @@ mob and is not tracked here.
 - [x] Shulker
 - [x] Silverfish
 - [x] Skeleton
-- [ ] Skeleton_Horse
+- [x] Skeleton_Horse
 - [x] Slime
 - [ ] Sniffer
 - [x] Snow_Golem

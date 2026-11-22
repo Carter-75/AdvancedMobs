@@ -56,6 +56,7 @@ import mod.advancedmobs.ability.rabbit.RabbitAbilities;
 import mod.advancedmobs.ability.horse.HorseAbilities;
 import mod.advancedmobs.ability.donkey.DonkeyAbilities;
 import mod.advancedmobs.ability.mule.MuleAbilities;
+import mod.advancedmobs.ability.skeletonhorse.SkeletonHorseAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
@@ -138,5 +139,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Horse", new HorseAbilities());
         AbilityRegistry.register("Donkey", new DonkeyAbilities());
         AbilityRegistry.register("Mule", new MuleAbilities());
+        AbilityRegistry.register("Skeleton_Horse", new SkeletonHorseAbilities());
     }
 }
