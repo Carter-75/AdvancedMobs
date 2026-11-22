@@ -69,7 +69,7 @@ mob and is not tracked here.
 - [x] Sniffer
 - [x] Snow_Golem
 - [x] Spider
-- [ ] Squid
+- [x] Squid
 - [x] Stray
 - [x] Strider
 - [x] Sulfur_Cube
