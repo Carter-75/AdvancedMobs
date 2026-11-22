@@ -22,7 +22,7 @@ mob and is not tracked here.
 - [ ] Chicken
 - [ ] Cod
 - [ ] Cow
-- [ ] Creeper
+- [x] Creeper
 - [ ] Dolphin
 - [ ] Donkey
 - [x] Drowned
