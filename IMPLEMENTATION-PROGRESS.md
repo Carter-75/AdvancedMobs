@@ -61,7 +61,7 @@ mob and is not tracked here.
 - [ ] Ravager
 - [ ] Salmon
 - [ ] Sheep
-- [ ] Shulker
+- [x] Shulker
 - [x] Silverfish
 - [x] Skeleton
 - [ ] Skeleton_Horse
