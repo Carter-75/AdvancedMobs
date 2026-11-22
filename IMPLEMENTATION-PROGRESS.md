@@ -40,7 +40,7 @@ mob and is not tracked here.
 - [ ] Guardian
 - [ ] Hoglin
 - [ ] Horse
-- [ ] Husk
+- [x] Husk
 - [ ] Illusioner
 - [ ] Iron_Golem
 - [ ] Llama

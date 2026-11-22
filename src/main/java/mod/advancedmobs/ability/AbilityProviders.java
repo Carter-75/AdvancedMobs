@@ -1,5 +1,6 @@
 package mod.advancedmobs.ability;
 
+import mod.advancedmobs.ability.husk.HuskAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
 
@@ -24,5 +25,6 @@ public final class AbilityProviders {
     public static void registerAll() {
         AbilityRegistry.register("Zombie", new ZombieAbilities());
         AbilityRegistry.register("Zombie_Villager", new ZombieVillagerAbilities());
+        AbilityRegistry.register("Husk", new HuskAbilities());
     }
 }
