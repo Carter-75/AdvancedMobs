@@ -46,6 +46,7 @@ import mod.advancedmobs.ability.panda.PandaAbilities;
 import mod.advancedmobs.ability.irongolem.IronGolemAbilities;
 import mod.advancedmobs.ability.snowgolem.SnowGolemAbilities;
 import mod.advancedmobs.ability.strider.StriderAbilities;
+import mod.advancedmobs.ability.dolphin.DolphinAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
@@ -118,5 +119,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Iron_Golem", new IronGolemAbilities());
         AbilityRegistry.register("Snow_Golem", new SnowGolemAbilities());
         AbilityRegistry.register("Strider", new StriderAbilities());
+        AbilityRegistry.register("Dolphin", new DolphinAbilities());
     }
 }

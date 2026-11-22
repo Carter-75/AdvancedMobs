@@ -23,7 +23,7 @@ mob and is not tracked here.
 - [ ] Cod
 - [ ] Cow
 - [x] Creeper
-- [ ] Dolphin
+- [x] Dolphin
 - [ ] Donkey
 - [x] Drowned
 - [x] Elder_Guardian
