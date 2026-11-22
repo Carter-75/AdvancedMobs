@@ -7,6 +7,7 @@ import mod.advancedmobs.ability.drowned.DrownedAbilities;
 import mod.advancedmobs.ability.enderman.EndermanAbilities;
 import mod.advancedmobs.ability.endermite.EndermiteAbilities;
 import mod.advancedmobs.ability.husk.HuskAbilities;
+import mod.advancedmobs.ability.magmacube.MagmaCubeAbilities;
 import mod.advancedmobs.ability.silverfish.SilverfishAbilities;
 import mod.advancedmobs.ability.slime.SlimeAbilities;
 import mod.advancedmobs.ability.skeleton.SkeletonAbilities;
@@ -50,5 +51,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Endermite", new EndermiteAbilities());
         AbilityRegistry.register("Silverfish", new SilverfishAbilities());
         AbilityRegistry.register("Slime", new SlimeAbilities());
+        AbilityRegistry.register("Magma_Cube", new MagmaCubeAbilities());
     }
 }

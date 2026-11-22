@@ -44,7 +44,7 @@ mob and is not tracked here.
 - [ ] Illusioner
 - [ ] Iron_Golem
 - [ ] Llama
-- [ ] Magma_Cube
+- [x] Magma_Cube
 - [ ] Mooshroom
 - [ ] Mule
 - [ ] Ocelot
