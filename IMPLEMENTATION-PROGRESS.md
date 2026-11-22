@@ -49,7 +49,7 @@ mob and is not tracked here.
 - [x] Mule
 - [x] Ocelot
 - [x] Panda
-- [ ] Parrot
+- [x] Parrot
 - [x] Phantom
 - [x] Pig
 - [x] Piglin

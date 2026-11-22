@@ -60,6 +60,7 @@ import mod.advancedmobs.ability.skeletonhorse.SkeletonHorseAbilities;
 import mod.advancedmobs.ability.camel.CamelAbilities;
 import mod.advancedmobs.ability.cat.CatAbilities;
 import mod.advancedmobs.ability.ocelot.OcelotAbilities;
+import mod.advancedmobs.ability.parrot.ParrotAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
@@ -146,5 +147,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Camel", new CamelAbilities());
         AbilityRegistry.register("Cat", new CatAbilities());
         AbilityRegistry.register("Ocelot", new OcelotAbilities());
+        AbilityRegistry.register("Parrot", new ParrotAbilities());
     }
 }
