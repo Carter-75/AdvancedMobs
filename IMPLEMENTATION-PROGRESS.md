@@ -31,7 +31,7 @@ mob and is not tracked here.
 - [x] Enderman
 - [x] Endermite
 - [x] Evoker
-- [ ] Fox
+- [x] Fox
 - [ ] Frog
 - [x] Ghast
 - [x] Giant

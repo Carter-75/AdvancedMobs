@@ -10,6 +10,7 @@ import mod.advancedmobs.ability.enderdragon.EnderDragonAbilities;
 import mod.advancedmobs.ability.enderman.EndermanAbilities;
 import mod.advancedmobs.ability.endermite.EndermiteAbilities;
 import mod.advancedmobs.ability.evoker.EvokerAbilities;
+import mod.advancedmobs.ability.fox.FoxAbilities;
 import mod.advancedmobs.ability.ghast.GhastAbilities;
 import mod.advancedmobs.ability.giant.GiantAbilities;
 import mod.advancedmobs.ability.sulfurcube.SulfurCubeAbilities;
@@ -148,5 +149,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Cat", new CatAbilities());
         AbilityRegistry.register("Ocelot", new OcelotAbilities());
         AbilityRegistry.register("Parrot", new ParrotAbilities());
+        AbilityRegistry.register("Fox", new FoxAbilities());
     }
 }
