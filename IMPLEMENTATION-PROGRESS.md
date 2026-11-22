@@ -72,7 +72,7 @@ mob and is not tracked here.
 - [ ] Squid
 - [x] Stray
 - [ ] Strider
-- [ ] Sulfur_Cube
+- [x] Sulfur_Cube
 - [ ] Tadpole
 - [ ] Trader_Llama
 - [ ] Tropical_Fish
