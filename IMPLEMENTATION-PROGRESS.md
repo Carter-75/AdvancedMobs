@@ -59,7 +59,7 @@ mob and is not tracked here.
 - [ ] Pufferfish
 - [x] Rabbit
 - [x] Ravager
-- [ ] Salmon
+- [x] Salmon
 - [x] Sheep
 - [x] Shulker
 - [x] Silverfish
