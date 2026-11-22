@@ -9,6 +9,7 @@ import mod.advancedmobs.ability.elderguardian.ElderGuardianAbilities;
 import mod.advancedmobs.ability.enderdragon.EnderDragonAbilities;
 import mod.advancedmobs.ability.enderman.EndermanAbilities;
 import mod.advancedmobs.ability.endermite.EndermiteAbilities;
+import mod.advancedmobs.ability.evoker.EvokerAbilities;
 import mod.advancedmobs.ability.ghast.GhastAbilities;
 import mod.advancedmobs.ability.guardian.GuardianAbilities;
 import mod.advancedmobs.ability.hoglin.HoglinAbilities;
@@ -78,5 +79,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Piglin_Brute", new PiglinBruteAbilities());
         AbilityRegistry.register("Vex", new VexAbilities());
         AbilityRegistry.register("Witch", new WitchAbilities());
+        AbilityRegistry.register("Evoker", new EvokerAbilities());
     }
 }

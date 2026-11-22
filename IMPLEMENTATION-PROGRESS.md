@@ -30,7 +30,7 @@ mob and is not tracked here.
 - [x] Ender_Dragon
 - [x] Enderman
 - [x] Endermite
-- [ ] Evoker
+- [x] Evoker
 - [ ] Fox
 - [ ] Frog
 - [x] Ghast
