@@ -15,6 +15,7 @@ import mod.advancedmobs.ability.guardian.GuardianAbilities;
 import mod.advancedmobs.ability.hoglin.HoglinAbilities;
 import mod.advancedmobs.ability.husk.HuskAbilities;
 import mod.advancedmobs.ability.illusioner.IllusionerAbilities;
+import mod.advancedmobs.ability.ravager.RavagerAbilities;
 import mod.advancedmobs.ability.magmacube.MagmaCubeAbilities;
 import mod.advancedmobs.ability.piglin.PiglinAbilities;
 import mod.advancedmobs.ability.piglinbrute.PiglinBruteAbilities;
@@ -86,5 +87,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Vindicator", new VindicatorAbilities());
         AbilityRegistry.register("Pillager", new PillagerAbilities());
         AbilityRegistry.register("Illusioner", new IllusionerAbilities());
+        AbilityRegistry.register("Ravager", new RavagerAbilities());
     }
 }

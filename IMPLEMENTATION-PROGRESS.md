@@ -58,7 +58,7 @@ mob and is not tracked here.
 - [ ] Polar_Bear
 - [ ] Pufferfish
 - [ ] Rabbit
-- [ ] Ravager
+- [x] Ravager
 - [ ] Salmon
 - [ ] Sheep
 - [x] Shulker
