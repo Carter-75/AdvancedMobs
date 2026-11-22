@@ -1,5 +1,6 @@
 package mod.advancedmobs.ability;
 
+import mod.advancedmobs.ability.bogged.BoggedAbilities;
 import mod.advancedmobs.ability.drowned.DrownedAbilities;
 import mod.advancedmobs.ability.husk.HuskAbilities;
 import mod.advancedmobs.ability.skeleton.SkeletonAbilities;
@@ -32,5 +33,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Drowned", new DrownedAbilities());
         AbilityRegistry.register("Skeleton", new SkeletonAbilities());
         AbilityRegistry.register("Stray", new StrayAbilities());
+        AbilityRegistry.register("Bogged", new BoggedAbilities());
     }
 }

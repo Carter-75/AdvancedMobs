@@ -14,7 +14,7 @@ mob and is not tracked here.
 - [ ] Bat
 - [ ] Bee
 - [ ] Blaze
-- [ ] Bogged
+- [x] Bogged
 - [ ] Breeze
 - [ ] Camel
 - [ ] Cat
