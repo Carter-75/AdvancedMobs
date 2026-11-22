@@ -74,7 +74,7 @@ mob and is not tracked here.
 - [ ] Strider
 - [x] Sulfur_Cube
 - [ ] Tadpole
-- [ ] Trader_Llama
+- [x] Trader_Llama
 - [ ] Tropical_Fish
 - [ ] Turtle
 - [x] Vex
