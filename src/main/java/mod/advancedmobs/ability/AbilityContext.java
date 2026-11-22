@@ -3,11 +3,14 @@ package mod.advancedmobs.ability;
 import mod.advancedmobs.data.MobWarData;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.world.entity.boss.enderdragon.EnderDragon;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.gamerules.GameRules;
 
 import java.util.UUID;
 
@@ -105,6 +108,44 @@ public final class AbilityContext {
                 return living;
             }
         }
+        if (mob instanceof EnderDragon && level instanceof ServerLevel serverLevel) {
+            // The Ender Dragon never has a vanilla or tracked target: its
+            // phases aim at positions, not entities (verified against the
+            // 26.2 jar), so without this fallback the framework's combat
+            // gate would keep every dragon ability from ever firing. Its
+            // combat target is the nearest living, non-spectator player
+            // in the arena, matching the combat check ScalingSystem uses
+            // for the dragon's combat point accrual.
+            LivingEntity nearest = null;
+            double nearestSqr = 192.0 * 192.0;
+            for (ServerPlayer player : serverLevel.players()) {
+                if (!player.isAlive() || player.isSpectator()) {
+                    continue;
+                }
+                double distanceSqr = player.distanceToSqr(mob);
+                if (distanceSqr <= nearestSqr) {
+                    nearestSqr = distanceSqr;
+                    nearest = player;
+                }
+            }
+            return nearest;
+        }
         return null;
+    }
+
+    /**
+     * Whether this mob's abilities may change blocks in its level right
+     * now: the vanilla mobGriefing game rule (26.2 key "mob_griefing",
+     * GameRules.MOB_GRIEFING, verified against the real jar). This is the
+     * ONE shared check for the standing terrain rule (Carter, Nov 21,
+     * 2026): terrain changes from abilities are PERMANENT, and they only
+     * happen when mobGriefing is on; when it is off an ability must not
+     * alter blocks at all, though its non-terrain effects still run.
+     * Every ability that places or breaks blocks must gate that work on
+     * this call. Client levels and non-server contexts return false.
+     */
+    public boolean mobGriefingAllowed() {
+        ServerLevel serverLevel = serverLevel();
+        return serverLevel != null && serverLevel.getGameRules().get(GameRules.MOB_GRIEFING);
     }
 }

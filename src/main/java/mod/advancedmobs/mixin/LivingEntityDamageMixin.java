@@ -41,6 +41,12 @@ public abstract class LivingEntityDamageMixin {
             }
 
             long currentTick = mobEntity.level().getGameTime();
+            // Boss combat progression (Part B): stamp the last successful
+            // hurt so ScalingSystem's combat check counts a recently hurt
+            // boss as in combat for the following 10 seconds, even when it
+            // momentarily has no target. One long write per damage event,
+            // never per tick.
+            data.setLastHurtTick(currentTick);
             ScalingSystem.handleDamageAbilities(mobEntity, data, currentTick);
         });
     }

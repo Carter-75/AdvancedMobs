@@ -4,7 +4,7 @@ import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.data.IMobWarDataHolder;
 import mod.advancedmobs.data.MobWarData;
-import mod.advancedmobs.system.AbilitySystem;
+import mod.advancedmobs.system.ProgressionTicker;
 import mod.advancedmobs.system.ScalingSystem;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -87,15 +87,12 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
     @Inject(method = "serverAiStep", at = @At("HEAD"))
     private void advancedmobs$onMobTick(CallbackInfo ci) {
         AdvancedMobsMod.runSafely("MobDataMixin#onMobTick", () -> {
-            if (!ModConfig.getInstance().modEnabled) {
-                return;
-            }
+            // The pipeline itself lives in ProgressionTicker so the
+            // Ender Dragon, whose custom aiStep never reaches
+            // serverAiStep, runs the identical stack (see
+            // EnderDragonProgressionMixin).
             Mob self = (Mob)(Object)this;
-            ScalingSystem.monitorEquipmentState(self, advancedMobsData);
-            ScalingSystem.processMobTick(self, self.level(), advancedMobsData);
-            // Ability system ticks after scaling so the lifetime points
-            // behind its power fraction are fresh for this tick.
-            AbilitySystem.tick(self, self.level(), advancedMobsData);
+            ProgressionTicker.tick(self, advancedMobsData);
         });
     }
 

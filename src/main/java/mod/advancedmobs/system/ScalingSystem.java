@@ -7,6 +7,7 @@ import com.google.gson.JsonObject;
 import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.data.MobWarData;
+import mod.advancedmobs.entity.MobWarlordEntity;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.enchantment.ItemEnchantments;
@@ -686,7 +687,13 @@ public class ScalingSystem {
         handleUndeadHealingPulse(mob, skillData, currentTick);
         handleInvisibilityGlowFlicker(mob, currentTick);
         clearUpgradeSchedule(skillData);
-        data.setSkillPoints(0.0d);
+        // Fallback configs have no day or kill accrual (their point system
+        // is empty by construction), so their lifetime pool is exactly
+        // their boss combat points. This line used to hard-zero skillPoints
+        // every tick, which silently erased the Mob Warlord's combat
+        // progression (the warlord always resolves to a fallback config)
+        // and would have erased any boss's if it ever fell back.
+        data.setSkillPoints(Math.max(0.0d, data.getBossCombatPoints()));
         data.setSpentPoints(0.0d);
         MobWarData.save(mob, data);
     }
@@ -1056,6 +1063,14 @@ public class ScalingSystem {
         // Always store the effective fingerprint so config changes can be detected cheaply on future ticks.
         skillData.putLong(NBT_CONFIG_FINGERPRINT, configFingerprint);
 
+        // Boss combat progression (Part B) runs before the fallback split:
+        // the Mob Warlord has no shipped config and always lands on the
+        // fallback path, and its combat points must still accrue so its
+        // ability power fraction can climb during a raid fight.
+        if (isBossEntity(entityId) || mob instanceof MobWarlordEntity) {
+            accrueBossCombatPoints(mob, world, data, entityIdStr, modConfig);
+        }
+
         boolean fallbackConfig = config.has(FALLBACK_FLAG_KEY) && config.get(FALLBACK_FLAG_KEY).getAsBoolean();
         if (fallbackConfig) {
             processFallbackMob(mob, world, data, config, skillData, world.getGameTime());
@@ -1088,7 +1103,7 @@ public class ScalingSystem {
             lastAccountedDay = worldDays;
             skillData.putInt(NBT_LAST_ACCOUNTED_DAY, lastAccountedDay);
             skillData.putDouble(NBT_TOTAL_POINT_CACHE, dayPointCache);
-            data.setSkillPoints(Math.max(0.0, dayPointCache + killPoints));
+            data.setSkillPoints(Math.max(0.0, dayPointCache + killPoints + data.getBossCombatPoints()));
             skillDataDirty = true;
             rebuiltDayPointCache = true;
         }
@@ -1107,7 +1122,12 @@ public class ScalingSystem {
             skillDataDirty = true;
         }
 
-        double totalPoints = Math.max(0.0, dayPointCache + killPoints);
+        // The lifetime pool is day points + kill points + boss combat
+        // points (Part B). The combat component lives in its own persisted
+        // MobWarData field because this line recomputes the total from the
+        // day cache and kill count every tick; anything added straight to
+        // skillPoints outside this formula would be overwritten here.
+        double totalPoints = Math.max(0.0, dayPointCache + killPoints + data.getBossCombatPoints());
         data.setSkillPoints(totalPoints);
 
         double spentPoints = data.getSpentPoints();
@@ -1350,7 +1370,116 @@ public class ScalingSystem {
             MobWarData.save(mob, data);
         }
     }
-    
+
+    // ==========================================================================
+    //                     BOSS COMBAT PROGRESSION (Part B)
+    // ==========================================================================
+    //
+    // WHY: Carter's order (Nov 21, 2026): boss fights last minutes, not
+    // days, so the day-based accrual that powers normal mobs can never
+    // power a boss up during its own fight, and the Ender Dragon in
+    // particular dies too fast to ever leave the first ability bracket.
+    // While a boss is in active combat it therefore earns bonus points
+    // per second, paid into the SAME lifetime pool (MobWarData.skillPoints
+    // via the persisted bossCombatPoints component) that the 80/20
+    // spending lottery spends from and that AbilitySystem reads for its
+    // power fraction. One pool, both systems climb together.
+    //
+    // WHAT COUNTS AS IN COMBAT (isBossInCombat): any of these:
+    //   - the boss has a living vanilla target, or a living war-system
+    //     tracked target (the same two sources AbilityContext.target()
+    //     resolves), or
+    //   - the boss was successfully hurt within the last
+    //     BOSS_COMBAT_MEMORY_TICKS (200 ticks, 10 seconds; the stamp is
+    //     MobWarData.lastHurtTick, written by LivingEntityDamageMixin on
+    //     every successful hurtServer), or
+    //   - the boss is the Ender Dragon and a living, non-spectator player
+    //     is within DRAGON_ARENA_RADIUS blocks: the dragon has no vanilla
+    //     target at all (its phases aim at positions, verified against
+    //     the 26.2 jar), so a player in its arena IS its combat state.
+    //
+    // RATES (ModConfig, points per second of combat) AND TIME TO BRACKET.
+    // Ability brackets sit at 900 / 1650 / 2250 / 2700 lifetime points
+    // (frac 0.30 / 0.55 / 0.75 / 0.90 of FULL_POWER 3000); full power is
+    // 3000. Ignoring whatever day and kill points the boss already has:
+    //   Ender Dragon, 25/s: brackets at 36 s, 66 s, 90 s, 108 s; full
+    //     power at 120 s. Meaningful brackets inside the first minute or
+    //     two, full power only in a long fight, as ordered.
+    //   Wither, 15/s: brackets at 60 s, 110 s, 150 s, 180 s; full 200 s.
+    //   Mob Warlord, 15/s: same as the Wither (raid fights are short and
+    //     the warlord starts from a fallback config with no other income).
+    //   Warden, 10/s: brackets at 90 s, 165 s, 225 s, 270 s; full 300 s.
+    //   Elder Guardian, 10/s: same as the Warden.
+    // Accrual is rate/20 per tick while in combat, accumulated in the
+    // persisted double MobWarData.bossCombatPoints; chunk unload pauses
+    // it (processMobTick does not run for unloaded mobs) and reload
+    // resumes it, with no catch-up burst, because elapsed wall time is
+    // never consulted. Non-boss mobs earn nothing: the only call site is
+    // gated on the boss set (the four vanilla boss ids plus the warlord).
+
+    /** How long after being hurt a boss still counts as in combat: 10 seconds. */
+    private static final long BOSS_COMBAT_MEMORY_TICKS = 200L;
+
+    /** Dragon arena radius for the dragon's player-presence combat check. */
+    private static final double DRAGON_ARENA_RADIUS = 192.0;
+
+    /** Per-second combat point rate for a boss, from ModConfig; 0 for non-bosses. */
+    private static double bossCombatRatePerSecond(Mob mob, String entityIdStr, ModConfig modConfig) {
+        if (mob instanceof MobWarlordEntity) {
+            return Math.max(0.0, modConfig.bossCombatPointsPerSecondWarlord);
+        }
+        if (entityIdStr == null) {
+            return 0.0;
+        }
+        return switch (entityIdStr) {
+            case "minecraft:ender_dragon" -> Math.max(0.0, modConfig.bossCombatPointsPerSecondDragon);
+            case "minecraft:wither" -> Math.max(0.0, modConfig.bossCombatPointsPerSecondWither);
+            case "minecraft:warden" -> Math.max(0.0, modConfig.bossCombatPointsPerSecondWarden);
+            case "minecraft:elder_guardian" -> Math.max(0.0, modConfig.bossCombatPointsPerSecondElderGuardian);
+            default -> 0.0;
+        };
+    }
+
+    /** Whether a boss is in active combat right now; see the design comment above. */
+    private static boolean isBossInCombat(Mob mob, Level world, MobWarData data) {
+        net.minecraft.world.entity.LivingEntity target = mob.getTarget();
+        if (target != null && target.isAlive()) {
+            return true;
+        }
+        java.util.UUID tracked = data.getCurrentTarget();
+        if (tracked != null && world instanceof ServerLevel serverWorld
+            && serverWorld.getEntity(tracked) instanceof net.minecraft.world.entity.LivingEntity living
+            && living.isAlive()) {
+            return true;
+        }
+        long lastHurt = data.getLastHurtTick();
+        if (lastHurt >= 0L && world.getGameTime() - lastHurt <= BOSS_COMBAT_MEMORY_TICKS) {
+            return true;
+        }
+        if (mob instanceof net.minecraft.world.entity.boss.enderdragon.EnderDragon
+            && world instanceof ServerLevel serverWorld) {
+            double radiusSqr = DRAGON_ARENA_RADIUS * DRAGON_ARENA_RADIUS;
+            for (net.minecraft.server.level.ServerPlayer player : serverWorld.players()) {
+                if (player.isAlive() && !player.isSpectator() && player.distanceToSqr(mob) <= radiusSqr) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /** Accrues one tick of boss combat points when the boss is in combat. */
+    private static void accrueBossCombatPoints(Mob mob, Level world, MobWarData data, String entityIdStr, ModConfig modConfig) {
+        double ratePerSecond = bossCombatRatePerSecond(mob, entityIdStr, modConfig);
+        if (ratePerSecond <= 0.0) {
+            return;
+        }
+        if (!isBossInCombat(mob, world, data)) {
+            return;
+        }
+        data.addBossCombatPoints(ratePerSecond / 20.0);
+    }
+
     // ==========================================================================
     //                           POINT CALCULATION
     // ==========================================================================

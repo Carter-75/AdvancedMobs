@@ -184,6 +184,46 @@ public class ModConfig implements ConfigData {
     public double abilityFullPowerPoints = 3000.0;
 
     // ==========================================================================
+    //                 SECTION 3C: BOSS COMBAT PROGRESSION
+    // ==========================================================================
+    // Boss fights last minutes, not days, so day-based accrual can never
+    // power a boss up mid-fight. While a boss is in active combat (living
+    // target, or hurt within the last 10 seconds, or, for the dragon, a
+    // player inside its arena), it earns these points per second into the
+    // same lifetime pool the spending lottery and the ability power
+    // fraction read. Non-boss mobs earn nothing here. Rates are tuned
+    // against FULL_POWER (3000): ability brackets sit at 900 / 1650 /
+    // 2250 / 2700 lifetime points (frac 0.30 / 0.55 / 0.75 / 0.90).
+    //   Ender Dragon 25/s: bracket 2 at 36 s, 3 at 66 s, 4 at 90 s,
+    //     5 at 108 s, full power at 120 s of continuous combat.
+    //   Wither and Mob Warlord 15/s: bracket 2 at 60 s, 5 at 180 s,
+    //     full power at 200 s.
+    //   Warden and Elder Guardian 10/s: bracket 2 at 90 s, 5 at 270 s,
+    //     full power at 300 s.
+    // The full design comment lives at the implementation site in
+    // ScalingSystem (accrueBossCombatPoints).
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double bossCombatPointsPerSecondDragon = 25.0;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double bossCombatPointsPerSecondWither = 15.0;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double bossCombatPointsPerSecondWarlord = 15.0;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double bossCombatPointsPerSecondWarden = 10.0;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double bossCombatPointsPerSecondElderGuardian = 10.0;
+
+    // ==========================================================================
     //                       SECTION 4: MOB WARLORD SYSTEM
     // Controls the raid boss feature
     // ==========================================================================

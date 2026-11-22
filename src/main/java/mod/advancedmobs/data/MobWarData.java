@@ -32,6 +32,22 @@ public class MobWarData {
     private double spentPoints = 0;
     private CompoundTag skillData = new CompoundTag();
 
+    // Boss combat progression (Part B of the Nov 21, 2026 audit): points a
+    // boss earned by being in active combat, accrued per second by
+    // ScalingSystem. This is a SEPARATE persisted component on purpose:
+    // processMobTick recomputes skillPoints every tick as day points plus
+    // kill points, so combat points kept only inside skillPoints would be
+    // overwritten on the next tick. processMobTick adds this component into
+    // the total it writes to skillPoints, so the spending lottery and the
+    // ability power fraction both see the same single lifetime pool.
+    private double bossCombatPoints = 0;
+
+    // Game time of the last successful damage this mob took (stamped by
+    // LivingEntityDamageMixin). Used by the boss combat check: a boss that
+    // was hurt within the combat memory window counts as in combat even if
+    // it momentarily has no target. -1 means never hurt.
+    private long lastHurtTick = -1L;
+
     // New ability system state (AbilitySystem). Persisted under am_ability_
     // keys; the legacy ability_ keys from the removed ability set are inert
     // and intentionally not reused.
@@ -62,6 +78,14 @@ public class MobWarData {
     public void setSpentPoints(double points) { this.spentPoints = points; }
     public CompoundTag getSkillData() { return skillData; }
     public void setSkillData(CompoundTag data) { this.skillData = data; }
+
+    // Boss combat progression accessors (see ScalingSystem Part B comment)
+    public double getBossCombatPoints() { return bossCombatPoints; }
+    public void addBossCombatPoints(double points) {
+        if (points > 0.0) this.bossCombatPoints += points;
+    }
+    public long getLastHurtTick() { return lastHurtTick; }
+    public void setLastHurtTick(long gameTime) { this.lastHurtTick = gameTime; }
 
     // New ability system accessors (see AbilitySystem for the rules)
     public int getAbilityEvalCount() { return abilityEvalCount; }
@@ -214,6 +238,10 @@ public class MobWarData {
         nbt.putString("am_ability_active", abilityActiveId);
         nbt.put("am_ability_state", abilityActiveState);
         nbt.putLong("am_ability_cooldown_end", abilityCooldownEnd);
+
+        // Boss combat progression persistence (am_ keys, added Nov 21, 2026)
+        nbt.putDouble("am_boss_combat_points", bossCombatPoints);
+        nbt.putLong("am_last_hurt_tick", lastHurtTick);
         
         if (currentTarget != null) {
             nbt.store("currentTarget", net.minecraft.core.UUIDUtil.CODEC, currentTarget);
@@ -261,6 +289,11 @@ public class MobWarData {
         abilityActiveId = nbt.getStringOr("am_ability_active", "");
         if (nbt.contains("am_ability_state")) abilityActiveState = nbt.getCompoundOrEmpty("am_ability_state");
         abilityCooldownEnd = nbt.getLongOr("am_ability_cooldown_end", 0L);
+
+        // Boss combat progression persistence. Absent on older saves; the
+        // defaults (0 points, never hurt) are the correct fresh state.
+        bossCombatPoints = nbt.getDoubleOr("am_boss_combat_points", 0.0);
+        lastHurtTick = nbt.getLongOr("am_last_hurt_tick", -1L);
         
         if (nbt.contains("currentTarget")) {
             currentTarget = nbt.read("currentTarget", net.minecraft.core.UUIDUtil.CODEC).orElse(null);
