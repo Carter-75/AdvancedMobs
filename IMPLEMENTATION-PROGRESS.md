@@ -29,7 +29,7 @@ mob and is not tracked here.
 - [ ] Elder_Guardian
 - [ ] Ender_Dragon
 - [x] Enderman
-- [ ] Endermite
+- [x] Endermite
 - [ ] Evoker
 - [ ] Fox
 - [ ] Frog
