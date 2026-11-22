@@ -65,7 +65,7 @@ mob and is not tracked here.
 - [x] Silverfish
 - [x] Skeleton
 - [ ] Skeleton_Horse
-- [ ] Slime
+- [x] Slime
 - [ ] Sniffer
 - [ ] Snow_Golem
 - [x] Spider

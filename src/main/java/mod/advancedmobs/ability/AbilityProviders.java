@@ -8,6 +8,7 @@ import mod.advancedmobs.ability.enderman.EndermanAbilities;
 import mod.advancedmobs.ability.endermite.EndermiteAbilities;
 import mod.advancedmobs.ability.husk.HuskAbilities;
 import mod.advancedmobs.ability.silverfish.SilverfishAbilities;
+import mod.advancedmobs.ability.slime.SlimeAbilities;
 import mod.advancedmobs.ability.skeleton.SkeletonAbilities;
 import mod.advancedmobs.ability.spider.SpiderAbilities;
 import mod.advancedmobs.ability.stray.StrayAbilities;
@@ -48,5 +49,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Enderman", new EndermanAbilities());
         AbilityRegistry.register("Endermite", new EndermiteAbilities());
         AbilityRegistry.register("Silverfish", new SilverfishAbilities());
+        AbilityRegistry.register("Slime", new SlimeAbilities());
     }
 }
