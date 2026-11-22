@@ -24,7 +24,7 @@ mob and is not tracked here.
 - [x] Cow
 - [x] Creeper
 - [x] Dolphin
-- [ ] Donkey
+- [x] Donkey
 - [x] Drowned
 - [x] Elder_Guardian
 - [x] Ender_Dragon
