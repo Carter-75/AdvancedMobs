@@ -82,7 +82,7 @@ mob and is not tracked here.
 - [ ] Vindicator
 - [ ] Wandering_Trader
 - [ ] Warden
-- [ ] Witch
+- [x] Witch
 - [x] Wither
 - [x] Wither_Skeleton
 - [ ] Wolf
