@@ -63,6 +63,7 @@ import mod.advancedmobs.ability.cat.CatAbilities;
 import mod.advancedmobs.ability.ocelot.OcelotAbilities;
 import mod.advancedmobs.ability.parrot.ParrotAbilities;
 import mod.advancedmobs.ability.frog.FrogAbilities;
+import mod.advancedmobs.ability.tadpole.TadpoleAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
@@ -152,5 +153,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Parrot", new ParrotAbilities());
         AbilityRegistry.register("Fox", new FoxAbilities());
         AbilityRegistry.register("Frog", new FrogAbilities());
+        AbilityRegistry.register("Tadpole", new TadpoleAbilities());
     }
 }

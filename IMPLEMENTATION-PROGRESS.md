@@ -73,7 +73,7 @@ mob and is not tracked here.
 - [x] Stray
 - [x] Strider
 - [x] Sulfur_Cube
-- [ ] Tadpole
+- [x] Tadpole
 - [x] Trader_Llama
 - [ ] Tropical_Fish
 - [ ] Turtle
