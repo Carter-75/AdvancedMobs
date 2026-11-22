@@ -66,7 +66,7 @@ mob and is not tracked here.
 - [x] Skeleton
 - [x] Skeleton_Horse
 - [x] Slime
-- [ ] Sniffer
+- [x] Sniffer
 - [x] Snow_Golem
 - [x] Spider
 - [ ] Squid
