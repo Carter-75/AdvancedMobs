@@ -62,7 +62,7 @@ mob and is not tracked here.
 - [ ] Salmon
 - [ ] Sheep
 - [ ] Shulker
-- [ ] Silverfish
+- [x] Silverfish
 - [x] Skeleton
 - [ ] Skeleton_Horse
 - [ ] Slime
