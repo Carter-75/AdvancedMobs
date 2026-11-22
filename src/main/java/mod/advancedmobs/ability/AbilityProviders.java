@@ -37,6 +37,7 @@ import mod.advancedmobs.ability.vex.VexAbilities;
 import mod.advancedmobs.ability.pillager.PillagerAbilities;
 import mod.advancedmobs.ability.vindicator.VindicatorAbilities;
 import mod.advancedmobs.ability.witch.WitchAbilities;
+import mod.advancedmobs.ability.polarbear.PolarBearAbilities;
 import mod.advancedmobs.ability.wolf.WolfAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
@@ -102,5 +103,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Sulfur_Cube", new SulfurCubeAbilities());
         AbilityRegistry.register("Bee", new BeeAbilities());
         AbilityRegistry.register("Wolf", new WolfAbilities());
+        AbilityRegistry.register("Polar_Bear", new PolarBearAbilities());
     }
 }
