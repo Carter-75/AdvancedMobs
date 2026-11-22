@@ -5,6 +5,7 @@ import mod.advancedmobs.ability.drowned.DrownedAbilities;
 import mod.advancedmobs.ability.husk.HuskAbilities;
 import mod.advancedmobs.ability.skeleton.SkeletonAbilities;
 import mod.advancedmobs.ability.stray.StrayAbilities;
+import mod.advancedmobs.ability.witherskeleton.WitherSkeletonAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
 
@@ -34,5 +35,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Skeleton", new SkeletonAbilities());
         AbilityRegistry.register("Stray", new StrayAbilities());
         AbilityRegistry.register("Bogged", new BoggedAbilities());
+        AbilityRegistry.register("Wither_Skeleton", new WitherSkeletonAbilities());
     }
 }
