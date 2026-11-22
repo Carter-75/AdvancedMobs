@@ -53,7 +53,7 @@ mob and is not tracked here.
 - [ ] Phantom
 - [ ] Pig
 - [x] Piglin
-- [ ] Piglin_Brute
+- [x] Piglin_Brute
 - [ ] Pillager
 - [ ] Polar_Bear
 - [ ] Pufferfish

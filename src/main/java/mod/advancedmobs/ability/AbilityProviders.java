@@ -15,6 +15,7 @@ import mod.advancedmobs.ability.hoglin.HoglinAbilities;
 import mod.advancedmobs.ability.husk.HuskAbilities;
 import mod.advancedmobs.ability.magmacube.MagmaCubeAbilities;
 import mod.advancedmobs.ability.piglin.PiglinAbilities;
+import mod.advancedmobs.ability.piglinbrute.PiglinBruteAbilities;
 import mod.advancedmobs.ability.silverfish.SilverfishAbilities;
 import mod.advancedmobs.ability.slime.SlimeAbilities;
 import mod.advancedmobs.ability.skeleton.SkeletonAbilities;
@@ -70,5 +71,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Hoglin", new HoglinAbilities());
         AbilityRegistry.register("Zoglin", new ZoglinAbilities());
         AbilityRegistry.register("Piglin", new PiglinAbilities());
+        AbilityRegistry.register("Piglin_Brute", new PiglinBruteAbilities());
     }
 }
