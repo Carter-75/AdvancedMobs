@@ -32,7 +32,7 @@ mob and is not tracked here.
 - [x] Endermite
 - [x] Evoker
 - [x] Fox
-- [ ] Frog
+- [x] Frog
 - [x] Ghast
 - [x] Giant
 - [ ] Glow_Squid
