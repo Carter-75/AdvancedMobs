@@ -1,6 +1,7 @@
 package mod.advancedmobs.ability;
 
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
+import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
 
 /**
  * AbilityProviders: THE registration site for the new ability system.
@@ -22,5 +23,6 @@ public final class AbilityProviders {
     /** Registers every implemented mob's ability provider. Called once at mod init. */
     public static void registerAll() {
         AbilityRegistry.register("Zombie", new ZombieAbilities());
+        AbilityRegistry.register("Zombie_Villager", new ZombieVillagerAbilities());
     }
 }

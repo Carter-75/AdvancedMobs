@@ -88,4 +88,4 @@ mob and is not tracked here.
 - [ ] Wolf
 - [ ] Zoglin
 - [x] Zombie
-- [ ] Zombie_Villager
+- [x] Zombie_Villager
