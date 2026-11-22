@@ -21,7 +21,7 @@ mob and is not tracked here.
 - [x] Cave_Spider
 - [ ] Chicken
 - [ ] Cod
-- [ ] Cow
+- [x] Cow
 - [x] Creeper
 - [x] Dolphin
 - [ ] Donkey
