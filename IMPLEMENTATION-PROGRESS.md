@@ -18,7 +18,7 @@ mob and is not tracked here.
 - [ ] Breeze
 - [ ] Camel
 - [ ] Cat
-- [ ] Cave_Spider
+- [x] Cave_Spider
 - [ ] Chicken
 - [ ] Cod
 - [ ] Cow
