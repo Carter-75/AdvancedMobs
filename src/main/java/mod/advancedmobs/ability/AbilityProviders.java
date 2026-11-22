@@ -41,6 +41,7 @@ import mod.advancedmobs.ability.polarbear.PolarBearAbilities;
 import mod.advancedmobs.ability.wolf.WolfAbilities;
 import mod.advancedmobs.ability.llama.LlamaAbilities;
 import mod.advancedmobs.ability.traderllama.TraderLlamaAbilities;
+import mod.advancedmobs.ability.goat.GoatAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
@@ -108,5 +109,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Polar_Bear", new PolarBearAbilities());
         AbilityRegistry.register("Llama", new LlamaAbilities());
         AbilityRegistry.register("Trader_Llama", new TraderLlamaAbilities());
+        AbilityRegistry.register("Goat", new GoatAbilities());
     }
 }
