@@ -12,7 +12,7 @@ mob and is not tracked here.
 - [ ] Armadillo
 - [ ] Axolotl
 - [ ] Bat
-- [ ] Bee
+- [x] Bee
 - [x] Blaze
 - [x] Bogged
 - [x] Breeze
