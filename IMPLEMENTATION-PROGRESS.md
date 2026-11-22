@@ -17,7 +17,7 @@ mob and is not tracked here.
 - [x] Bogged
 - [x] Breeze
 - [x] Camel
-- [ ] Cat
+- [x] Cat
 - [x] Cave_Spider
 - [x] Chicken
 - [ ] Cod

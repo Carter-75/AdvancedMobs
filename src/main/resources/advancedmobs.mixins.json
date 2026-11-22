@@ -20,8 +20,9 @@
 		"WarlordMinionProtectionMixin",
 		"RaidSpawningMixin",
 		"NaturalMobSpawnBlockerMixin",
-		"		"ZoglinUndyingBulkMixin",
-		"EvokerTotemTyrantMixin""
+		"ZoglinUndyingBulkMixin",
+		"EvokerTotemTyrantMixin",
+		"CatNineLivesMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
