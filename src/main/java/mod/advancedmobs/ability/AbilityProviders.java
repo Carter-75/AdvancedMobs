@@ -43,6 +43,7 @@ import mod.advancedmobs.ability.llama.LlamaAbilities;
 import mod.advancedmobs.ability.traderllama.TraderLlamaAbilities;
 import mod.advancedmobs.ability.goat.GoatAbilities;
 import mod.advancedmobs.ability.panda.PandaAbilities;
+import mod.advancedmobs.ability.irongolem.IronGolemAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
@@ -112,5 +113,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Trader_Llama", new TraderLlamaAbilities());
         AbilityRegistry.register("Goat", new GoatAbilities());
         AbilityRegistry.register("Panda", new PandaAbilities());
+        AbilityRegistry.register("Iron_Golem", new IronGolemAbilities());
     }
 }

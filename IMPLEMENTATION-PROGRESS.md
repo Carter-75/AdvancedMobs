@@ -42,7 +42,7 @@ mob and is not tracked here.
 - [ ] Horse
 - [x] Husk
 - [x] Illusioner
-- [ ] Iron_Golem
+- [x] Iron_Golem
 - [x] Llama
 - [x] Magma_Cube
 - [ ] Mooshroom
