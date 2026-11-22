@@ -78,7 +78,7 @@ mob and is not tracked here.
 - [x] Tropical_Fish
 - [x] Turtle
 - [x] Vex
-- [ ] Villager
+- [x] Villager
 - [x] Vindicator
 - [ ] Wandering_Trader
 - [x] Warden
