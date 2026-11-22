@@ -39,7 +39,7 @@ mob and is not tracked here.
 - [x] Goat
 - [x] Guardian
 - [x] Hoglin
-- [ ] Horse
+- [x] Horse
 - [x] Husk
 - [x] Illusioner
 - [x] Iron_Golem

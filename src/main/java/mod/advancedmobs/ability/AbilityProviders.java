@@ -53,6 +53,7 @@ import mod.advancedmobs.ability.mooshroom.MooshroomAbilities;
 import mod.advancedmobs.ability.sheep.SheepAbilities;
 import mod.advancedmobs.ability.chicken.ChickenAbilities;
 import mod.advancedmobs.ability.rabbit.RabbitAbilities;
+import mod.advancedmobs.ability.horse.HorseAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
@@ -132,5 +133,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Sheep", new SheepAbilities());
         AbilityRegistry.register("Chicken", new ChickenAbilities());
         AbilityRegistry.register("Rabbit", new RabbitAbilities());
+        AbilityRegistry.register("Horse", new HorseAbilities());
     }
 }
