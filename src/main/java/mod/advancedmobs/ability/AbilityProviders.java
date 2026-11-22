@@ -69,6 +69,7 @@ import mod.advancedmobs.ability.armadillo.ArmadilloAbilities;
 import mod.advancedmobs.ability.sniffer.SnifferAbilities;
 import mod.advancedmobs.ability.cod.CodAbilities;
 import mod.advancedmobs.ability.salmon.SalmonAbilities;
+import mod.advancedmobs.ability.tropicalfish.TropicalFishAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
@@ -164,5 +165,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Sniffer", new SnifferAbilities());
         AbilityRegistry.register("Cod", new CodAbilities());
         AbilityRegistry.register("Salmon", new SalmonAbilities());
+        AbilityRegistry.register("Tropical_Fish", new TropicalFishAbilities());
     }
 }

@@ -75,7 +75,7 @@ mob and is not tracked here.
 - [x] Sulfur_Cube
 - [x] Tadpole
 - [x] Trader_Llama
-- [ ] Tropical_Fish
+- [x] Tropical_Fish
 - [x] Turtle
 - [x] Vex
 - [ ] Villager
