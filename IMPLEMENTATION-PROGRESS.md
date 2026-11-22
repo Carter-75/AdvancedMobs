@@ -41,7 +41,7 @@ mob and is not tracked here.
 - [x] Hoglin
 - [ ] Horse
 - [x] Husk
-- [ ] Illusioner
+- [x] Illusioner
 - [ ] Iron_Golem
 - [ ] Llama
 - [x] Magma_Cube
