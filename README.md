@@ -82,7 +82,7 @@ Final Result:
 - Diamond Sword (Sharpness V, Fire Aspect II, Looting II)
 - Full Diamond Armor (Protection III, Thorns II)
 - Health: 34 HP, Strength III, Speed II, Regeneration II
-- Special: Horde Summon 30% chance, Hunger Attack II
+- Abilities: granted separately by the ability system (see Ability System below)
 ```
 
 ---
@@ -257,6 +257,20 @@ A legendary boss that spawns during raids:
 
 ---
 
+## ✨ Ability System
+
+Every one of the 81 mobs has 5 unique abilities (405 total), implemented in code under `ability/` with the full spec for each ability written in its class comments. The roster is in `MOB_PROGRESS.txt` and the design source is `ABILITY-IDEAS.md`.
+
+- **Power fraction**: a mob's lifetime earned points divided by `abilityFullPowerPoints` (config, default 3000).
+- **Access chance**: normal mobs roll 1% at zero power up to a 25% cap at full power. Bosses (Ender Dragon, Wither, Warden, Elder Guardian, Mob Warlord) roll 1% up to 100%, and the Ender Dragon is guaranteed at least one ability from the very start.
+- **Accessible count**: below 0.30 power = 1 ability, 0.30-0.55 = 2, 0.55-0.75 = 3, 0.75-0.90 = 4, 0.90+ = all 5. Grants are random, permanent, and only extend when a mob crosses into a higher bracket.
+- **Boss progression**: bosses in active combat earn points rapidly (dragon 25/s, wither and warlord 15/s, warden and elder guardian 10/s), so even the short-lived Ender Dragon ramps up during its fight.
+- **Firing**: one ability at a time per mob, combat only. The cooldown starts when an ability finishes and runs 10 to 60 seconds, weighted shorter for stronger mobs.
+- **Terrain rule**: ability block changes are permanent and only happen when the level's mobGriefing game rule is on. With it off, no blocks change and the other effects still run.
+- **Master toggle**: `abilitiesEnabled` in the config.
+
+---
+
 ## 🎮 Commands
 
 ```bash
@@ -351,7 +365,7 @@ mob_configs/
 ├── allay.json           (Passive mob - regeneration, resistance, health boost)
 ├── blaze.json           (Hostile + ranged tree - potion effects + ranged abilities)
 ├── bogged.json          (Hostile + equipment + zombie/ranged trees - full progression)
-├── ... (80 total files when complete)
+├── ... (81 total files)
 ```
 
 **Each JSON contains**:
@@ -363,7 +377,7 @@ mob_configs/
   - Weapon progression (if applicable) with tiers, enchants, masteries
   - Shield (if applicable)
   - Armor progression (helmet, chestplate, leggings, boots)
-  - Special abilities from mob's skill trees
+  - Abilities are not in the JSON: every mob has 5 abilities implemented in code (see Ability System below)
 
 > ℹ️ **No matching JSON?** The scaling system auto-detects passive/neutral/hostile state, applies the matching fallback potion suite, and still respects targeting rules. Drop a JSON alongside it when you want full equipment trees and custom abilities.
 
@@ -529,11 +543,11 @@ Report bugs on GitHub with:
 
 Advanced Mobs transforms Minecraft into a dynamic battlefield:
 
-- ✅ **80 individual mob configs** with complete upgrade paths (in progress)
+- ✅ **81 individual mob configs** with complete upgrade paths
 - ✅ **Progressive point economy** with 80%/20% buy/save system
 - ✅ **5-tier equipment progression** (Wood → Netherite)
 - ✅ **27 enchantments** with multi-level costs
-- ✅ **6 mob-specific skill trees** with unique abilities
+- ✅ **405 unique abilities**, 5 for every mob, granted by lifetime power
 - ✅ **Dynamic alliance system** (strong/weak, 5s-20s duration)
 - ✅ **Legendary Mob Warlord boss** with minion armies
 - ✅ **Config coverage for vanilla 26.2 mobs**; others auto-scale with fallback potions until you author a JSON
