@@ -33,7 +33,7 @@ mob and is not tracked here.
 - [ ] Evoker
 - [ ] Fox
 - [ ] Frog
-- [ ] Ghast
+- [x] Ghast
 - [ ] Giant
 - [ ] Glow_Squid
 - [ ] Goat
