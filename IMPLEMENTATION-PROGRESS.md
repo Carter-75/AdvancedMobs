@@ -50,7 +50,7 @@ mob and is not tracked here.
 - [ ] Ocelot
 - [ ] Panda
 - [ ] Parrot
-- [ ] Phantom
+- [x] Phantom
 - [ ] Pig
 - [x] Piglin
 - [x] Piglin_Brute
