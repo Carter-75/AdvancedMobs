@@ -26,6 +26,7 @@ import mod.advancedmobs.ability.wither.WitherAbilities;
 import mod.advancedmobs.ability.witherskeleton.WitherSkeletonAbilities;
 import mod.advancedmobs.ability.shulker.ShulkerAbilities;
 import mod.advancedmobs.ability.vex.VexAbilities;
+import mod.advancedmobs.ability.vindicator.VindicatorAbilities;
 import mod.advancedmobs.ability.witch.WitchAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
@@ -80,5 +81,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Vex", new VexAbilities());
         AbilityRegistry.register("Witch", new WitchAbilities());
         AbilityRegistry.register("Evoker", new EvokerAbilities());
+        AbilityRegistry.register("Vindicator", new VindicatorAbilities());
     }
 }

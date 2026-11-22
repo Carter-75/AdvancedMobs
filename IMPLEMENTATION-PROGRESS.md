@@ -79,7 +79,7 @@ mob and is not tracked here.
 - [ ] Turtle
 - [x] Vex
 - [ ] Villager
-- [ ] Vindicator
+- [x] Vindicator
 - [ ] Wandering_Trader
 - [ ] Warden
 - [x] Witch
