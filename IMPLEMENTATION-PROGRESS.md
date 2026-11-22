@@ -43,7 +43,7 @@ mob and is not tracked here.
 - [x] Husk
 - [x] Illusioner
 - [ ] Iron_Golem
-- [ ] Llama
+- [x] Llama
 - [x] Magma_Cube
 - [ ] Mooshroom
 - [ ] Mule

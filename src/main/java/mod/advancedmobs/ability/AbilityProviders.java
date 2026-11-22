@@ -39,6 +39,7 @@ import mod.advancedmobs.ability.vindicator.VindicatorAbilities;
 import mod.advancedmobs.ability.witch.WitchAbilities;
 import mod.advancedmobs.ability.polarbear.PolarBearAbilities;
 import mod.advancedmobs.ability.wolf.WolfAbilities;
+import mod.advancedmobs.ability.llama.LlamaAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
@@ -104,5 +105,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Bee", new BeeAbilities());
         AbilityRegistry.register("Wolf", new WolfAbilities());
         AbilityRegistry.register("Polar_Bear", new PolarBearAbilities());
+        AbilityRegistry.register("Llama", new LlamaAbilities());
     }
 }
