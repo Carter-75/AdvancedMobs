@@ -70,7 +70,7 @@ mob and is not tracked here.
 - [ ] Snow_Golem
 - [ ] Spider
 - [ ] Squid
-- [ ] Stray
+- [x] Stray
 - [ ] Strider
 - [ ] Sulfur_Cube
 - [ ] Tadpole
