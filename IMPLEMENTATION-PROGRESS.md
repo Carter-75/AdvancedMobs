@@ -83,7 +83,7 @@ mob and is not tracked here.
 - [ ] Wandering_Trader
 - [ ] Warden
 - [ ] Witch
-- [ ] Wither
+- [x] Wither
 - [x] Wither_Skeleton
 - [ ] Wolf
 - [ ] Zoglin
