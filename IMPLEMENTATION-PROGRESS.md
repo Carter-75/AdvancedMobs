@@ -80,7 +80,7 @@ mob and is not tracked here.
 - [x] Vex
 - [x] Villager
 - [x] Vindicator
-- [ ] Wandering_Trader
+- [x] Wandering_Trader
 - [x] Warden
 - [x] Witch
 - [x] Wither

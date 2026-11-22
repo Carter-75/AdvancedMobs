@@ -73,6 +73,7 @@ import mod.advancedmobs.ability.tropicalfish.TropicalFishAbilities;
 import mod.advancedmobs.ability.pufferfish.PufferfishAbilities;
 import mod.advancedmobs.ability.glowsquid.GlowSquidAbilities;
 import mod.advancedmobs.ability.villager.VillagerAbilities;
+import mod.advancedmobs.ability.wanderingtrader.WanderingTraderAbilities;
 import mod.advancedmobs.ability.squid.SquidAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
@@ -174,5 +175,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Squid", new SquidAbilities());
         AbilityRegistry.register("Glow_Squid", new GlowSquidAbilities());
         AbilityRegistry.register("Villager", new VillagerAbilities());
+        AbilityRegistry.register("Wandering_Trader", new WanderingTraderAbilities());
     }
 }
