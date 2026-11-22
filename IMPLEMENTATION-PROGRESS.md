@@ -8,7 +8,7 @@ one mob at a time, verify, then push). The ability gating framework itself
 (AbilitySystem, access rolls, brackets, cooldowns) landed before the first
 mob and is not tracked here.
 
-- [ ] Allay
+- [x] Allay
 - [x] Armadillo
 - [ ] Axolotl
 - [ ] Bat
