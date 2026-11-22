@@ -48,7 +48,7 @@ mob and is not tracked here.
 - [ ] Mooshroom
 - [ ] Mule
 - [ ] Ocelot
-- [ ] Panda
+- [x] Panda
 - [ ] Parrot
 - [x] Phantom
 - [ ] Pig
