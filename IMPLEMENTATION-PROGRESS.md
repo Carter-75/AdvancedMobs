@@ -19,7 +19,7 @@ mob and is not tracked here.
 - [ ] Camel
 - [ ] Cat
 - [x] Cave_Spider
-- [ ] Chicken
+- [x] Chicken
 - [ ] Cod
 - [x] Cow
 - [x] Creeper
