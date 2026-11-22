@@ -166,6 +166,10 @@ public class AdvancedMobsMod implements ModInitializer {
 			}
 		});
 
+		// Register the new ability system's per-mob providers (one line per
+		// implemented mob in AbilityProviders.registerAll).
+		mod.advancedmobs.ability.AbilityProviders.registerAll();
+
 		UmwServerEnchantCompat.init();
 		ServerLifecycleEvents.SERVER_STARTED.register(AdvancedMobsMod::syncGameRulesWithConfig);
 		

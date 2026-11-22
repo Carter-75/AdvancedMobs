@@ -87,5 +87,5 @@ mob and is not tracked here.
 - [ ] Wither_Skeleton
 - [ ] Wolf
 - [ ] Zoglin
-- [ ] Zombie
+- [x] Zombie
 - [ ] Zombie_Villager
