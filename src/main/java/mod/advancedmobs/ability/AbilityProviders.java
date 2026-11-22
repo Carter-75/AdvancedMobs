@@ -11,6 +11,7 @@ import mod.advancedmobs.ability.enderman.EndermanAbilities;
 import mod.advancedmobs.ability.endermite.EndermiteAbilities;
 import mod.advancedmobs.ability.evoker.EvokerAbilities;
 import mod.advancedmobs.ability.ghast.GhastAbilities;
+import mod.advancedmobs.ability.giant.GiantAbilities;
 import mod.advancedmobs.ability.guardian.GuardianAbilities;
 import mod.advancedmobs.ability.hoglin.HoglinAbilities;
 import mod.advancedmobs.ability.husk.HuskAbilities;
@@ -94,5 +95,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Warden", new WardenAbilities());
         AbilityRegistry.register("Breeze", new BreezeAbilities());
         AbilityRegistry.register("Phantom", new PhantomAbilities());
+        AbilityRegistry.register("Giant", new GiantAbilities());
     }
 }
