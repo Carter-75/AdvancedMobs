@@ -2,6 +2,7 @@ package mod.advancedmobs.data;
 
 import net.minecraft.world.entity.Mob;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
 
 import java.util.*;
 
@@ -31,6 +32,27 @@ public class MobWarData {
     private double spentPoints = 0;
     private CompoundTag skillData = new CompoundTag();
 
+    // New ability system state (AbilitySystem). Persisted under am_ability_
+    // keys; the legacy ability_ keys from the removed ability set are inert
+    // and intentionally not reused.
+    // abilityEvalCount: the accessible-count bracket (1 to 5) this mob was
+    // last evaluated at; 0 means never evaluated. See AbilitySystem.
+    private int abilityEvalCount = 0;
+    // abilityHas: whether the mob passed its access roll (or is the Ender
+    // Dragon, which is guaranteed access). Once true it never goes back.
+    private boolean abilityHas = false;
+    // abilityAccessible: ids of the mob's registered abilities this mob may
+    // use, a random subset whose size follows its power bracket.
+    private final List<String> abilityAccessible = new ArrayList<>();
+    // abilityActiveId: id of the currently running ability, "" when idle.
+    private String abilityActiveId = "";
+    // abilityActiveState: per-activation scratch tag of the active ability.
+    private CompoundTag abilityActiveState = new CompoundTag();
+    // abilityCooldownEnd: absolute game time at which the post-ability
+    // cooldown ends. The cooldown starts when an ability ends, never when
+    // it starts.
+    private long abilityCooldownEnd = 0L;
+
     public MobWarData() {}
 
     // Skill Tree Methods
@@ -40,6 +62,23 @@ public class MobWarData {
     public void setSpentPoints(double points) { this.spentPoints = points; }
     public CompoundTag getSkillData() { return skillData; }
     public void setSkillData(CompoundTag data) { this.skillData = data; }
+
+    // New ability system accessors (see AbilitySystem for the rules)
+    public int getAbilityEvalCount() { return abilityEvalCount; }
+    public void setAbilityEvalCount(int count) { this.abilityEvalCount = count; }
+    public boolean hasAbilities() { return abilityHas; }
+    public void setHasAbilities(boolean has) { this.abilityHas = has; }
+    public List<String> getAbilityAccessibleIds() { return new ArrayList<>(abilityAccessible); }
+    public void setAbilityAccessibleIds(List<String> ids) {
+        this.abilityAccessible.clear();
+        if (ids != null) this.abilityAccessible.addAll(ids);
+    }
+    public String getAbilityActiveId() { return abilityActiveId; }
+    public void setAbilityActiveId(String id) { this.abilityActiveId = id != null ? id : ""; }
+    public CompoundTag getAbilityActiveState() { return abilityActiveState; }
+    public void setAbilityActiveState(CompoundTag state) { this.abilityActiveState = state != null ? state : new CompoundTag(); }
+    public long getAbilityCooldownEnd() { return abilityCooldownEnd; }
+    public void setAbilityCooldownEnd(long gameTime) { this.abilityCooldownEnd = gameTime; }
     
     public PowerProfile getPowerProfile() {
         if (skillData == null || skillData.isEmpty()) return null;
@@ -163,6 +202,18 @@ public class MobWarData {
         nbt.putDouble("skillPoints", skillPoints);
         nbt.putDouble("spentPoints", spentPoints);
         nbt.put("skillData", skillData);
+
+        // New ability system persistence (am_ability_ keys)
+        nbt.putInt("am_ability_eval_count", abilityEvalCount);
+        nbt.putBoolean("am_ability_has", abilityHas);
+        ListTag accessibleTag = new ListTag();
+        for (String id : abilityAccessible) {
+            accessibleTag.add(net.minecraft.nbt.StringTag.valueOf(id));
+        }
+        nbt.put("am_ability_accessible", accessibleTag);
+        nbt.putString("am_ability_active", abilityActiveId);
+        nbt.put("am_ability_state", abilityActiveState);
+        nbt.putLong("am_ability_cooldown_end", abilityCooldownEnd);
         
         if (currentTarget != null) {
             nbt.store("currentTarget", net.minecraft.core.UUIDUtil.CODEC, currentTarget);
@@ -193,6 +244,23 @@ public class MobWarData {
         if (nbt.contains("skillPoints")) skillPoints = nbt.getDoubleOr("skillPoints", 0.0);
         if (nbt.contains("spentPoints")) spentPoints = nbt.getDoubleOr("spentPoints", 0.0);
         if (nbt.contains("skillData")) skillData = nbt.getCompoundOrEmpty("skillData");
+
+        // New ability system persistence (am_ability_ keys). Absent on data
+        // saved before the ability system existed; defaults are the fresh
+        // state (never evaluated, no abilities, idle, no cooldown).
+        abilityEvalCount = nbt.getIntOr("am_ability_eval_count", 0);
+        abilityHas = nbt.getBooleanOr("am_ability_has", false);
+        abilityAccessible.clear();
+        if (nbt.contains("am_ability_accessible")) {
+            ListTag accessibleTag = nbt.getListOrEmpty("am_ability_accessible");
+            for (int i = 0; i < accessibleTag.size(); i++) {
+                String id = accessibleTag.getStringOr(i, "");
+                if (!id.isEmpty()) abilityAccessible.add(id);
+            }
+        }
+        abilityActiveId = nbt.getStringOr("am_ability_active", "");
+        if (nbt.contains("am_ability_state")) abilityActiveState = nbt.getCompoundOrEmpty("am_ability_state");
+        abilityCooldownEnd = nbt.getLongOr("am_ability_cooldown_end", 0L);
         
         if (nbt.contains("currentTarget")) {
             currentTarget = nbt.read("currentTarget", net.minecraft.core.UUIDUtil.CODEC).orElse(null);

@@ -4,6 +4,7 @@ import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.data.IMobWarDataHolder;
 import mod.advancedmobs.data.MobWarData;
+import mod.advancedmobs.system.AbilitySystem;
 import mod.advancedmobs.system.ScalingSystem;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -92,6 +93,9 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
             Mob self = (Mob)(Object)this;
             ScalingSystem.monitorEquipmentState(self, advancedMobsData);
             ScalingSystem.processMobTick(self, self.level(), advancedMobsData);
+            // Ability system ticks after scaling so the lifetime points
+            // behind its power fraction are fresh for this tick.
+            AbilitySystem.tick(self, self.level(), advancedMobsData);
         });
     }
 

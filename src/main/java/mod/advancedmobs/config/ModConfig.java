@@ -163,6 +163,27 @@ public class ModConfig implements ConfigData {
     public boolean allowModdedEnchantments = true;
 
     // ==========================================================================
+    //                       SECTION 3B: ABILITY SYSTEM
+    // Controls the new special abilities (see AbilitySystem for the rules)
+    // ==========================================================================
+
+    @ConfigEntry.Category("abilities")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public boolean abilitiesEnabled = true;
+
+    // FULL_POWER reference for the ability system's power fraction:
+    // frac = lifetime points earned / this value, clamped to [0, 1].
+    // Default 3000 is the summed cost of every level of every upgrade track
+    // in the Zombie reference config (potion effects 230 + weapon 439 +
+    // shield 352 + helmet 485 + chestplate 464 + leggings 488 + boots 528
+    // = 2,986, rounded): a mob that earned this many lifetime points has
+    // earned enough to buy out a complete upgrade tree. Lower it to make
+    // abilities unlock faster, raise it to make full power rarer.
+    @ConfigEntry.Category("abilities")
+    @ConfigEntry.Gui.Tooltip(count = 4)
+    public double abilityFullPowerPoints = 3000.0;
+
+    // ==========================================================================
     //                       SECTION 4: MOB WARLORD SYSTEM
     // Controls the raid boss feature
     // ==========================================================================
