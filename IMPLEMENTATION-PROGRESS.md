@@ -51,7 +51,7 @@ mob and is not tracked here.
 - [x] Panda
 - [ ] Parrot
 - [x] Phantom
-- [ ] Pig
+- [x] Pig
 - [x] Piglin
 - [x] Piglin_Brute
 - [x] Pillager
