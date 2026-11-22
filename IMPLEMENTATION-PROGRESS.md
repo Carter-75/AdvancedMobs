@@ -47,7 +47,7 @@ mob and is not tracked here.
 - [x] Magma_Cube
 - [x] Mooshroom
 - [x] Mule
-- [ ] Ocelot
+- [x] Ocelot
 - [x] Panda
 - [ ] Parrot
 - [x] Phantom
