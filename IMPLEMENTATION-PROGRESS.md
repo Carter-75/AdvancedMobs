@@ -11,7 +11,7 @@ mob and is not tracked here.
 - [x] Allay
 - [x] Armadillo
 - [x] Axolotl
-- [ ] Bat
+- [x] Bat
 - [x] Bee
 - [x] Blaze
 - [x] Bogged
