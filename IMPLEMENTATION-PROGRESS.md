@@ -56,7 +56,7 @@ mob and is not tracked here.
 - [x] Piglin_Brute
 - [x] Pillager
 - [x] Polar_Bear
-- [ ] Pufferfish
+- [x] Pufferfish
 - [x] Rabbit
 - [x] Ravager
 - [x] Salmon
