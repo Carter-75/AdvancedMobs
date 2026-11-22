@@ -9,7 +9,7 @@ one mob at a time, verify, then push). The ability gating framework itself
 mob and is not tracked here.
 
 - [ ] Allay
-- [ ] Armadillo
+- [x] Armadillo
 - [ ] Axolotl
 - [ ] Bat
 - [x] Bee
