@@ -21,6 +21,7 @@ import mod.advancedmobs.ability.spider.SpiderAbilities;
 import mod.advancedmobs.ability.stray.StrayAbilities;
 import mod.advancedmobs.ability.wither.WitherAbilities;
 import mod.advancedmobs.ability.witherskeleton.WitherSkeletonAbilities;
+import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
 
@@ -66,5 +67,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Guardian", new GuardianAbilities());
         AbilityRegistry.register("Elder_Guardian", new ElderGuardianAbilities());
         AbilityRegistry.register("Hoglin", new HoglinAbilities());
+        AbilityRegistry.register("Zoglin", new ZoglinAbilities());
     }
 }

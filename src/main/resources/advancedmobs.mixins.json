@@ -19,7 +19,8 @@
 		"UniversalSummonerTrackingMixin",
 		"WarlordMinionProtectionMixin",
 		"RaidSpawningMixin",
-		"NaturalMobSpawnBlockerMixin"
+		"NaturalMobSpawnBlockerMixin",
+		"ZoglinUndyingBulkMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1
