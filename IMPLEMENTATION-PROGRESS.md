@@ -26,7 +26,7 @@ mob and is not tracked here.
 - [ ] Dolphin
 - [ ] Donkey
 - [x] Drowned
-- [ ] Elder_Guardian
+- [x] Elder_Guardian
 - [x] Ender_Dragon
 - [x] Enderman
 - [x] Endermite
