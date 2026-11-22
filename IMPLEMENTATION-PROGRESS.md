@@ -25,7 +25,7 @@ mob and is not tracked here.
 - [ ] Creeper
 - [ ] Dolphin
 - [ ] Donkey
-- [ ] Drowned
+- [x] Drowned
 - [ ] Elder_Guardian
 - [ ] Ender_Dragon
 - [ ] Enderman
