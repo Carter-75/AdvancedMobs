@@ -77,7 +77,7 @@ mob and is not tracked here.
 - [ ] Trader_Llama
 - [ ] Tropical_Fish
 - [ ] Turtle
-- [ ] Vex
+- [x] Vex
 - [ ] Villager
 - [ ] Vindicator
 - [ ] Wandering_Trader

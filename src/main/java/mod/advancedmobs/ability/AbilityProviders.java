@@ -24,6 +24,7 @@ import mod.advancedmobs.ability.stray.StrayAbilities;
 import mod.advancedmobs.ability.wither.WitherAbilities;
 import mod.advancedmobs.ability.witherskeleton.WitherSkeletonAbilities;
 import mod.advancedmobs.ability.shulker.ShulkerAbilities;
+import mod.advancedmobs.ability.vex.VexAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
 import mod.advancedmobs.ability.zombievillager.ZombieVillagerAbilities;
@@ -74,5 +75,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Shulker", new ShulkerAbilities());
         AbilityRegistry.register("Piglin", new PiglinAbilities());
         AbilityRegistry.register("Piglin_Brute", new PiglinBruteAbilities());
+        AbilityRegistry.register("Vex", new VexAbilities());
     }
 }
