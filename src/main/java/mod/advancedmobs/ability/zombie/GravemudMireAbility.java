@@ -2,16 +2,11 @@ package mod.advancedmobs.ability.zombie;
 
 import mod.advancedmobs.ability.AbilityContext;
 import mod.advancedmobs.ability.MobAbility;
-import mod.advancedmobs.util.TickScheduler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.HolderGetter;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -24,7 +19,6 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.nbt.NbtUtils;
 
 import java.util.List;
 
@@ -34,19 +28,36 @@ import java.util.List;
  * WHAT IT DOES: the zombie slams the ground and a two-block-high ring wall
  * of churned dirt and gravel erupts around its target, penning it in.
  * Enemies standing inside the ring are mired: repeated SLOWNESS and
- * WEAKNESS while the wall stands. The zombie itself wades through its own
- * mire at full pace. When the ability ends, every placed block is removed
- * and the original terrain is restored exactly.
+ * WEAKNESS while the mire lasts. The zombie itself wades through its own
+ * mire at full pace.
+ *
+ * TERRAIN RULE (Carter, Nov 21, 2026, binding; see IMPLEMENTATION-RULES.md
+ * rule 6 and the MobAbility contract): terrain changes from abilities are
+ * PERMANENT and gated by the vanilla mobGriefing game rule, checked
+ * through AbilityContext.mobGriefingAllowed(). This ability has two modes:
+ * - mobGriefing ON: the dirt and gravel ring is placed and STAYS. There
+ *   is no restore: end() touches no blocks, and nothing is scheduled to
+ *   remove the wall later. The mire's debuff zone still lasts only the
+ *   ability duration; the wall itself is just terrain afterwards.
+ * - mobGriefing OFF: no blocks are placed at all. The ability runs as a
+ *   pure debuff zone for its duration (same pulses, same visuals, no
+ *   wall), and the world is left exactly as it was.
+ * (This ability originally placed temporary blocks and restored them in
+ * end(), with a TickScheduler backup for caster death. The Nov 21, 2026
+ * standing rule superseded that design; the restore machinery and the
+ * backup were removed, not adapted.)
  *
  * MECHANICS (the spec; fix bugs against these numbers):
  * - Trigger (canTrigger): target exists, within 12 blocks (distance
  *   squared 144), and standing on the ground.
- * - Duration: exactly 140 ticks (7 seconds) from start().
- * - The wall: a Chebyshev ring of radius 3 around the target's block
- *   position at start() (positions where max(|dx|, |dz|) == 3), two layers
- *   high (the target's feet level and one above). Bottom layer is always
- *   dirt; top layer is gravel or dirt, coin flip per position. At most 48
- *   blocks change (24 ring positions times 2 layers).
+ * - Duration: exactly 140 ticks (7 seconds) from start(). This is the
+ *   debuff zone's lifetime; in mobGriefing mode the wall outlives it.
+ * - The wall (mobGriefing mode only): a Chebyshev ring of radius 3 around
+ *   the target's block position at start() (positions where
+ *   max(|dx|, |dz|) == 3), two layers high (the target's feet level and
+ *   one above). Bottom layer is always dirt; top layer is gravel or
+ *   dirt, coin flip per position. At most 48 blocks change (24 ring
+ *   positions times 2 layers).
  * - Debuff pulse every 10 ticks: enemies (ZombieAbilitySupport rules)
  *   within horizontal radius 3.6 of the ring center and between 1 below
  *   and 3 above its base level get SLOWNESS II (amplifier 1) and
@@ -55,42 +66,32 @@ import java.util.List;
  *   (modifier id advancedmobs:gravemud_mire_efficiency, removed in end()),
  *   so slow terrain never hinders it, and the pulse never targets it.
  *
- * TERRAIN SAFETY (binding): a position is only changed when ALL of these
- * hold: the current block can be replaced (BlockState.canBeReplaced, so
- * air, grass, flowers, snow layers and similar), it has no block entity
+ * TERRAIN SAFETY (binding, both the placement checks kept from the
+ * original design): a position is only changed when ALL of these hold:
+ * the current block can be replaced (BlockState.canBeReplaced, so air,
+ * grass, flowers, snow layers and similar), it has no block entity
  * (containers, signs, spawners and so on are never touched), it is not
  * unbreakable (destroy speed not negative, so no bedrock or barriers),
  * and the block below is face-sturdy in the live level (so the wall never
  * floats; the top layer checks against the bottom block placed just
- * before it). Every change is recorded in the state tag ("blocks": pos,
- * original state NBT, placed state NBT) BEFORE the block is set, and
- * start() drops nothing: replaced vegetation simply returns at restore.
- *
- * RESTORE (binding): end() restores every recorded position, top layer
- * first (reverse record order, so a restored bottom block can never drop
- * a still-standing gravel block). A position is only restored when its
- * current block is still exactly the block this ability placed, so a
- * player or another system that changed the spot during the 7 seconds is
- * never overwritten. As a backup for the caster dying mid-ability (when
- * the framework never calls end()), start() also schedules the same
- * check-and-restore through TickScheduler at duration + 2 ticks, holding
- * a deep copy of the change list; the check makes the two paths safely
- * idempotent, so whichever runs second changes nothing.
+ * before it). Replaced vegetation is NOT dropped as items and does not
+ * come back: the change is permanent, per the terrain rule.
  *
  * WHAT IT LOOKS LIKE: on start, 24 FALLING_DUST particles of dirt burst
  * over the ring area and 12 mud-brown DUST motes (color 0.42, 0.33, 0.22,
  * scale 1.4) hang in the air. Every 20 ticks during the mire, 4 more
  * FALLING_DUST particles sift down inside the ring.
  *
- * PERFORMANCE: block work happens once in start() and once in end() (at
- * most 48 positions each). tick() returns immediately except every 10th
- * tick (debuff pulse, one bounded entity query over a 7.2 by 4 by 7.2
- * box) and every 20th tick (4 particles). Particle budget per activation:
+ * PERFORMANCE: block work happens once in start() (at most 48 positions,
+ * mobGriefing mode only) and never again; end() only removes the
+ * attribute modifier. tick() returns immediately except every 10th tick
+ * (debuff pulse, one bounded entity query over a 7.2 by 4 by 7.2 box)
+ * and every 20th tick (4 particles). Particle budget per activation:
  * 36 at start plus at most 7 interior pulses times 4 = 28, total at most
  * 64 particles.
  *
- * State tag keys: "cx", "cy", "cz" (ring center block pos), "blocks"
- * (the change list described above).
+ * State tag keys: "cx", "cy", "cz" (ring center block pos). No block
+ * list is stored: placed blocks are permanent and never revisited.
  */
 public final class GravemudMireAbility implements MobAbility {
 
@@ -126,12 +127,38 @@ public final class GravemudMireAbility implements MobAbility {
         }
         Mob mob = ctx.mob();
         BlockPos center = target.blockPosition();
-        CompoundTag state = ctx.state();
+        net.minecraft.nbt.CompoundTag state = ctx.state();
         state.putInt("cx", center.getX());
         state.putInt("cy", center.getY());
         state.putInt("cz", center.getZ());
 
-        ListTag changes = new ListTag();
+        // Terrain (mobGriefing mode only): raise the permanent ring wall.
+        // With mobGriefing off, no block is touched and the ability is a
+        // debuff zone only. See the TERRAIN RULE in the class comment.
+        if (ctx.mobGriefingAllowed()) {
+            placeRingWall(level, center, ctx);
+        }
+
+        // The zombie wades through its own mire at full pace.
+        AttributeInstance efficiency = mob.getAttribute(Attributes.MOVEMENT_EFFICIENCY);
+        if (efficiency != null) {
+            efficiency.addOrUpdateTransientModifier(
+                new AttributeModifier(EFFICIENCY_ID, 1.0, AttributeModifier.Operation.ADD_VALUE));
+        }
+
+        // Eruption visuals: falling dirt dust over the ring, mud motes in the air.
+        double cx = center.getX() + 0.5, cy = center.getY() + 0.5, cz = center.getZ() + 0.5;
+        level.sendParticles(DIRT_FALLING_DUST, cx, cy + 0.5, cz, 24, 3.0, 1.0, 3.0, 0.05);
+        level.sendParticles(MUD_DUST, cx, cy + 0.5, cz, 12, 2.8, 0.8, 2.8, 0.01);
+    }
+
+    /**
+     * Places the permanent two-layer ring wall around the center, keeping
+     * every placement safety check from the original design (replaceable
+     * only, no block entities, never unbreakable, never floating). The
+     * blocks are placed for good: nothing records them for removal.
+     */
+    private static void placeRingWall(ServerLevel level, BlockPos center, AbilityContext ctx) {
         // Bottom layer first, then the top layer, so the top layer's
         // support check sees the bottom blocks this ability just placed.
         for (int dy = 0; dy <= 1; dy++) {
@@ -158,35 +185,9 @@ public final class GravemudMireAbility implements MobAbility {
                     BlockState placed = dy == 0
                         ? Blocks.DIRT.defaultBlockState()
                         : (ctx.random().nextBoolean() ? Blocks.GRAVEL.defaultBlockState() : Blocks.DIRT.defaultBlockState());
-                    CompoundTag entry = new CompoundTag();
-                    entry.putLong("pos", pos.asLong());
-                    entry.put("old", NbtUtils.writeBlockState(current));
-                    entry.put("new", NbtUtils.writeBlockState(placed));
-                    changes.add(entry);
                     level.setBlock(pos, placed, Block.UPDATE_ALL);
                 }
             }
-        }
-        state.put("blocks", changes);
-
-        // The zombie wades through its own mire at full pace.
-        AttributeInstance efficiency = mob.getAttribute(Attributes.MOVEMENT_EFFICIENCY);
-        if (efficiency != null) {
-            efficiency.addOrUpdateTransientModifier(
-                new AttributeModifier(EFFICIENCY_ID, 1.0, AttributeModifier.Operation.ADD_VALUE));
-        }
-
-        // Eruption visuals: falling dirt dust over the ring, mud motes in the air.
-        double cx = center.getX() + 0.5, cy = center.getY() + 0.5, cz = center.getZ() + 0.5;
-        level.sendParticles(DIRT_FALLING_DUST, cx, cy + 0.5, cz, 24, 3.0, 1.0, 3.0, 0.05);
-        level.sendParticles(MUD_DUST, cx, cy + 0.5, cz, 12, 2.8, 0.8, 2.8, 0.01);
-
-        // Death backup: if the caster dies mid-ability the framework never
-        // calls end(), so schedule the same idempotent restore. The list is
-        // deep-copied so later state edits cannot corrupt the backup.
-        if (level.getServer() != null && !changes.isEmpty()) {
-            ListTag backup = changes.copy();
-            TickScheduler.schedule(level.getServer(), DURATION_TICKS + 2, () -> restoreBlocks(level, backup));
         }
     }
 
@@ -200,12 +201,14 @@ public final class GravemudMireAbility implements MobAbility {
         if (level == null) {
             return;
         }
-        CompoundTag state = ctx.state();
+        net.minecraft.nbt.CompoundTag state = ctx.state();
         double cx = state.getIntOr("cx", 0) + 0.5;
         double cy = state.getIntOr("cy", 0);
         double cz = state.getIntOr("cz", 0) + 0.5;
 
-        // Debuff pulse: enemies inside the ring are mired.
+        // Debuff pulse: enemies inside the ring are mired. This runs in
+        // both terrain modes; the zone exists whether or not the wall
+        // was allowed to rise.
         List<LivingEntity> victims = ZombieAbilitySupport.enemiesInBox(ctx, cx, cy, cz, 3.6, 1.0, 3.0);
         for (LivingEntity victim : victims) {
             victim.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 15, 1));
@@ -224,35 +227,14 @@ public final class GravemudMireAbility implements MobAbility {
 
     @Override
     public void end(AbilityContext ctx) {
+        // Only the caster's own modifier is undone. The ring wall, when
+        // placed, is permanent terrain and is deliberately NOT touched
+        // here (terrain rule, see the class comment).
         Mob mob = ctx.mob();
         AttributeInstance efficiency = mob.getAttribute(Attributes.MOVEMENT_EFFICIENCY);
         if (efficiency != null) {
             efficiency.removeModifier(EFFICIENCY_ID);
         }
-        ServerLevel level = ctx.serverLevel();
-        if (level != null && ctx.state().contains("blocks")) {
-            restoreBlocks(level, ctx.state().getListOrEmpty("blocks"));
-        }
     }
 
-    /**
-     * Restores every recorded position whose current block is still the
-     * block this ability placed, top layer first (reverse record order).
-     * Idempotent: safe to call from both end() and the TickScheduler
-     * death backup; whichever runs second finds nothing left to restore.
-     */
-    private static void restoreBlocks(ServerLevel level, ListTag changes) {
-        HolderGetter<net.minecraft.world.level.block.Block> blockGetter =
-            level.registryAccess().lookupOrThrow(Registries.BLOCK);
-        for (int i = changes.size() - 1; i >= 0; i--) {
-            CompoundTag entry = changes.getCompoundOrEmpty(i);
-            BlockPos pos = BlockPos.of(entry.getLongOr("pos", 0L));
-            BlockState placed = NbtUtils.readBlockState(blockGetter, entry.getCompoundOrEmpty("new"));
-            if (level.getBlockState(pos) != placed) {
-                continue; // Someone else changed this spot; never overwrite them.
-            }
-            BlockState original = NbtUtils.readBlockState(blockGetter, entry.getCompoundOrEmpty("old"));
-            level.setBlock(pos, original, Block.UPDATE_ALL);
-        }
-    }
 }

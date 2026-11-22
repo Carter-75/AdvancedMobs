@@ -59,3 +59,38 @@ they differ.
 5. Base is the new-abilities branch (the stripped mod: old abilities
    removed, compile-verified). Ability state persists in MobWarData under
    am_ability_ keys only; the legacy ability_ keys stay inert.
+
+6. TERRAIN CHANGES ARE PERMANENT AND GATED BY mobGriefing (Carter,
+   Nov 21, 2026): abilities that change blocks change them permanently.
+   There is no temporary placement and no restore machinery. Block
+   changes only happen when the level's vanilla mobGriefing game rule
+   is on (26.2 key "mob_griefing", checked through the one shared
+   helper AbilityContext.mobGriefingAllowed()). When mobGriefing is
+   off, an ability must not alter blocks at all; its non-terrain
+   effects (damage, debuffs, particles, movement) still run normally.
+   Placement safety checks (never overwrite containers or other block
+   entities, never touch unbreakable blocks, never float) still apply
+   in mobGriefing mode.
+
+7. BOSS COMBAT PROGRESSION (Carter, Nov 21, 2026; implemented in
+   ScalingSystem, see the Part B design comment there): while a boss
+   (Ender Dragon, Wither, Warden, Elder Guardian, Mob Warlord) is in
+   active combat, it earns bonus points per second into the same
+   lifetime pool the spending lottery and the ability power fraction
+   read, because day-based accrual can never power a boss up inside
+   its own fight. Rates live in ModConfig (dragon 25/s, wither and
+   warlord 15/s, warden and elder guardian 10/s by default). Non-boss
+   mobs earn no combat bonus. The whole progression path must actually
+   run for every mob: the Ender Dragon is hooked through its own
+   aiStep (EnderDragonProgressionMixin) because its aiStep never
+   reaches Mob.serverAiStep.
+
+8. TERMINATION AND TICK SOURCE (Nov 21, 2026 audit): when a caster
+   dies or is genuinely removed mid-activation, the framework runs the
+   active ability's end() exactly once (AbilitySystem.
+   terminateActiveAbility); a plain chunk unload is not a termination
+   and the activation resumes on reload. Abilities do not need their
+   own death backups for cleanup end() performs. Abilities tick from
+   the mob's AI step, so setNoAi freezes them along with the rest of
+   the mob's AI; that is the standing contract, and abilities must
+   never use NoAi to hold themselves still.

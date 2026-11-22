@@ -10,6 +10,8 @@ import mod.advancedmobs.mixin.MobEntityAccessor;
 import mod.advancedmobs.net.UmwRequiredClientPayload;
 import mod.advancedmobs.net.UmwServerEnchantCompat;
 // Evolution system handled globally via MobDataMixin + ScalingSystem
+import mod.advancedmobs.data.MobWarData;
+import mod.advancedmobs.system.AbilitySystem;
 import mod.advancedmobs.system.AllianceSystem;
 import mod.advancedmobs.system.NaturalSpawnLimiter;
 import mod.advancedmobs.system.EntityCleanupSystem;
@@ -267,6 +269,19 @@ public class AdvancedMobsMod implements ModInitializer {
 				() -> {
 					if (world instanceof ServerLevel serverWorld && entity instanceof Mob mob) {
 						NaturalSpawnLimiter.onMobUnloaded(serverWorld, mob.entityTags().contains("umw_natural_spawned"));
+						// Ability termination (Part C): an unload that is a
+						// genuine removal (the entity is removed or dead)
+						// ends the active ability through the framework. A
+						// plain chunk unload does NOT: the activation
+						// persists in MobWarData and resumes on reload, per
+						// the MobAbility contract. Deaths are already ended
+						// by MobDeathTrackerMixin, so this is the backstop
+						// for removals that never pass through die()
+						// (discard, /kill, dimension change), and it is
+						// idempotent against the death path.
+						if (mob.isRemoved() || !mob.isAlive()) {
+							AbilitySystem.terminateActiveAbility(mob, serverWorld, MobWarData.get(mob));
+						}
 						// Drop runtime-only per-mob state so the static maps keyed
 						// by mob UUID stop growing without bound as mobs come and
 						// go. The unregister and clear methods existed but had no

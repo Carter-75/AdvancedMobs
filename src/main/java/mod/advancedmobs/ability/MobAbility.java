@@ -43,6 +43,38 @@ package mod.advancedmobs.ability;
  * targets, what it spawns or changes), and what it looks like (particles,
  * model or render changes, sounds). The comments are the spec of intended
  * behavior; bugs are fixed against them.
+ *
+ * TICK SOURCE AND THE NoAi CONTRACT (decided Nov 21, 2026, with jar
+ * evidence): abilities tick from the mob's AI step (Mob.serverAiStep via
+ * MobDataMixin; the Ender Dragon's own aiStep via
+ * EnderDragonProgressionMixin, because the dragon overrides aiStep
+ * without ever reaching serverAiStep). LivingEntity.aiStep only calls
+ * serverAiStep when the entity has effective AI, so setNoAi(true) FREEZES
+ * a mob's abilities along with the rest of its AI. That is the standing
+ * contract, not a bug: NoAi means no AI, and goals, navigation, and
+ * abilities all stop together. An ability must therefore never rely on
+ * NoAi to hold the mob still (it would freeze itself); hold position
+ * through navigation stops and velocity control instead, the way Grave
+ * Eruption does. The alternative hook (Entity.tick) was rejected: it
+ * runs for client entities, passengers, and NoAi mobs alike, and would
+ * decouple abilities from the AI lifecycle every other system follows.
+ *
+ * TERMINATION: if the caster dies or is genuinely removed mid-activation,
+ * the framework calls end() exactly once through
+ * AbilitySystem.terminateActiveAbility and clears the activation (no
+ * cooldown). A plain chunk unload is NOT a termination: the activation
+ * persists and resumes on reload, per the lifecycle above. Abilities
+ * therefore do not need their own death backups for cleanup that end()
+ * already performs; world objects an ability creates should be discarded
+ * in end(), and end() must stay idempotent.
+ *
+ * TERRAIN RULE (Carter, Nov 21, 2026, binding on every ability): terrain
+ * changes from abilities are PERMANENT, and they are gated by the vanilla
+ * mobGriefing game rule. An ability that places or breaks blocks must
+ * check AbilityContext.mobGriefingAllowed() first: with mobGriefing on,
+ * the changed blocks stay changed (no restore machinery); with it off,
+ * the ability must not alter blocks at all, though its non-terrain
+ * effects (damage, debuffs, particles, movement) still run normally.
  */
 public interface MobAbility {
 
@@ -92,11 +124,16 @@ public interface MobAbility {
     boolean isFinished(AbilityContext ctx);
 
     /**
-     * Cleanup, called exactly once after isFinished() first returns true.
-     * Undo anything start() or tick() changed (attribute modifiers, summoned
-     * helpers that should not linger, tags) unless the design says the
-     * change is permanent. The framework starts the mob's cooldown right
-     * after end() returns.
+     * Cleanup, called exactly once per activation: after isFinished()
+     * first returns true, or early through terminateActiveAbility when
+     * the caster dies or is removed mid-activation. Undo anything start()
+     * or tick() changed (attribute modifiers, summoned helpers that should
+     * not linger, tags) unless the design says the change is permanent
+     * (terrain changes are permanent by the standing terrain rule, see
+     * the class comment). After a natural finish the framework starts the
+     * mob's cooldown right after end() returns; after a termination it
+     * does not. Must be idempotent and must work from the state tag
+     * alone, since a terminated activation may never have ticked.
      */
     void end(AbilityContext ctx);
 }

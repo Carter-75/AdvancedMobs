@@ -17,6 +17,9 @@ import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * AbilitySystem: the gating, granting, firing, and cooldown engine of the
@@ -37,7 +40,8 @@ import java.util.List;
  *
  * lifetimePointsEarned is MobWarData.skillPoints, which ScalingSystem
  * maintains as the mob's lifetime total of earned points (world-age day
- * points plus kill points; spending is tracked separately in spentPoints,
+ * points plus kill points plus, for bosses, combat points accrued while
+ * in a fight; spending is tracked separately in spentPoints,
  * and the spendable budget is total minus spent). FULL_POWER is the config
  * value ModConfig.abilityFullPowerPoints (default 3000): the summed cost of
  * every level of every upgrade track in the Zombie reference config
@@ -126,6 +130,23 @@ import java.util.List;
  * keys (eval count, has-abilities flag, accessible ids, active id, the
  * active ability's state tag, cooldown end). The legacy ability_ keys from
  * the removed ability set are inert and are not used here.
+ *
+ * ==========================================================================
+ * TERMINATION (death and removal)
+ * ==========================================================================
+ * When a mob dies or is genuinely removed from the world while an ability
+ * is active, terminateActiveAbility runs the active ability's end()
+ * exactly once and clears the activation, with NO cooldown (the mob is
+ * gone; a cooldown would be meaningless). Call sites: MobDeathTrackerMixin
+ * (LivingEntity.die HEAD) and the ENTITY_UNLOAD handler in AdvancedMobsMod
+ * (only when the entity is actually removed or dead at unload time).
+ * A plain CHUNK unload is deliberately NOT a termination: the activation
+ * state persists in MobWarData and the ability resumes ticking when the
+ * chunk reloads, per the MobAbility contract. Termination is idempotent:
+ * the death path clears the activation, so the later unload of the corpse
+ * finds nothing to end a second time. Termination intentionally ignores
+ * the abilitiesEnabled toggle: an ability that started must always get
+ * its cleanup, even if abilities were switched off mid-activation.
  */
 public final class AbilitySystem {
 
@@ -164,11 +185,7 @@ public final class AbilitySystem {
             return;
         }
 
-        JsonObject mobConfig = ScalingSystem.getConfigForMob(mob);
-        if (mobConfig == null || !mobConfig.has("mob_name")) {
-            return;
-        }
-        MobAbilityProvider provider = AbilityRegistry.getProvider(mobConfig.get("mob_name").getAsString());
+        MobAbilityProvider provider = resolveProvider(mob);
         if (provider == null) {
             return; // This mob type has no abilities implemented yet.
         }
@@ -187,7 +204,15 @@ public final class AbilitySystem {
             return;
         }
 
-        if (!data.hasAbilities() || data.getAbilityAccessibleIds().isEmpty()) {
+        if (!data.hasAbilities()) {
+            return;
+        }
+        // PERF: getAbilityAccessibleIds() returns a defensive copy, so it
+        // is fetched once here and reused for the empty check and the
+        // candidate loop below (this idle path previously copied it twice
+        // per tick for every mob with abilities).
+        List<String> accessibleIds = data.getAbilityAccessibleIds();
+        if (accessibleIds.isEmpty()) {
             return;
         }
         if (now < data.getAbilityCooldownEnd()) {
@@ -198,7 +223,7 @@ public final class AbilitySystem {
             return; // Firing requires combat.
         }
         List<MobAbility> candidates = new ArrayList<>();
-        for (String id : data.getAbilityAccessibleIds()) {
+        for (String id : accessibleIds) {
             MobAbility ability = findAbility(registered, id);
             if (ability != null && ability.canTrigger(ctx)) {
                 candidates.add(ability);
@@ -211,6 +236,75 @@ public final class AbilitySystem {
         data.setAbilityActiveId(chosen.id());
         data.getAbilityActiveState().putInt(AbilityContext.KEY_TICKS_ACTIVE, 0);
         chosen.start(new AbilityContext(mob, level, data, data.getAbilityActiveState()));
+    }
+
+    // ======================================================================
+    //                        PROVIDER RESOLUTION
+    // ======================================================================
+
+    /**
+     * Provider lookup cache, keyed by entity class. PERF: this tick used
+     * to resolve the mob's full scaling config through
+     * ScalingSystem.getConfigForMob on every tick for every mob (the
+     * third such resolution per tick, after monitorEquipmentState and
+     * processMobTick), just to read its mob_name. Config resolution is
+     * deterministic per entity class (ScalingSystem keys its own index
+     * by class name), and providers are registered once during mod init
+     * and never change afterwards (see AbilityRegistry), so the answer
+     * is cached per class: after the first tick of a class, this is one
+     * ConcurrentHashMap get, and for the 80 mob types with no provider
+     * the whole ability tick costs little more than that get.
+     */
+    private static final Map<Class<?>, Optional<MobAbilityProvider>> PROVIDER_BY_CLASS = new ConcurrentHashMap<>();
+
+    /** The provider for a mob's type, or null when none is registered. */
+    private static MobAbilityProvider resolveProvider(Mob mob) {
+        Optional<MobAbilityProvider> cached = PROVIDER_BY_CLASS.get(mob.getClass());
+        if (cached != null) {
+            return cached.orElse(null);
+        }
+        MobAbilityProvider provider = null;
+        JsonObject mobConfig = ScalingSystem.getConfigForMob(mob);
+        if (mobConfig != null && mobConfig.has("mob_name")) {
+            provider = AbilityRegistry.getProvider(mobConfig.get("mob_name").getAsString());
+        }
+        PROVIDER_BY_CLASS.put(mob.getClass(), Optional.ofNullable(provider));
+        return provider;
+    }
+
+    // ======================================================================
+    //                             TERMINATION
+    // ======================================================================
+
+    /**
+     * Ends the mob's active ability because the mob died or was removed
+     * from the world: calls the ability's end() exactly once and clears
+     * the activation, without starting a cooldown. See the TERMINATION
+     * section of the class comment for the full contract (including why a
+     * plain chunk unload does NOT come through here). Safe to call when
+     * nothing is active; safe to call twice (the second call finds the
+     * activation already cleared).
+     */
+    public static void terminateActiveAbility(Mob mob, Level level, MobWarData data) {
+        if (mob == null || data == null || level == null || level.isClientSide()) {
+            return;
+        }
+        String activeId = data.getAbilityActiveId();
+        if (activeId == null || activeId.isEmpty()) {
+            return;
+        }
+        MobAbilityProvider provider = resolveProvider(mob);
+        MobAbility ability = provider != null ? findAbility(provider.abilities(), activeId) : null;
+        try {
+            if (ability != null) {
+                ability.end(new AbilityContext(mob, level, data, data.getAbilityActiveState()));
+            }
+        } finally {
+            // The activation is cleared even when end() throws or the
+            // ability no longer resolves, so a stale active id can never
+            // wedge the mob (or be ended twice).
+            clearActivation(data);
+        }
     }
 
     // ======================================================================

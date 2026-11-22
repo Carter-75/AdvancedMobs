@@ -2,7 +2,6 @@ package mod.advancedmobs.ability.zombie;
 
 import mod.advancedmobs.ability.AbilityContext;
 import mod.advancedmobs.ability.MobAbility;
-import mod.advancedmobs.util.TickScheduler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.core.particles.BlockParticleOption;
@@ -81,10 +80,14 @@ import java.util.UUID;
  * CLEANUP: end() removes the invisibility effect when the eruption never
  * happened (the only path where it can still be active) and discards the
  * mound display if it still resolves, so the display never outlives the
- * ability. A TickScheduler backup at start + 72 ticks discards the
- * display by UUID if the caster dies mid-burrow (when end() never
- * runs); discarding an already-discarded entity is a no-op, so the two
- * paths are safely idempotent.
+ * ability. If the caster dies mid-burrow, the framework's termination
+ * path (AbilitySystem.terminateActiveAbility, called from the death and
+ * removal hooks) runs this same end(), so the display is discarded then
+ * too. This ability used to carry a TickScheduler backup for that case;
+ * the framework fix in the Nov 21, 2026 audit made it provably
+ * redundant (same end(), same discard, strictly earlier), so it was
+ * removed. Behavior is unchanged: the mound never outlives the ability
+ * or its caster.
  *
  * State tag keys: "target" (target UUID), "tx", "ty", "tz" (target
  * position snapshot), "display" (mound display UUID), "erupted"
@@ -163,12 +166,10 @@ public final class GraveEruptionAbility implements MobAbility {
             BlockPos feet = mob.blockPosition();
             display.snapTo(feet.getX(), feet.getY(), feet.getZ());
             level.addFreshEntity(display);
-            UUID displayId = display.getUUID();
-            state.store("display", UUIDUtil.CODEC, displayId);
-            // Death backup: discard the mound if the caster dies mid-burrow.
-            if (level.getServer() != null) {
-                TickScheduler.schedule(level.getServer(), END_TICK + 6, () -> discardDisplay(level, displayId));
-            }
+            state.store("display", UUIDUtil.CODEC, display.getUUID());
+            // No death backup is scheduled: if the caster dies, the
+            // framework termination path runs end(), which discards this
+            // display through discardDisplay(ctx). See CLEANUP above.
         }
     }
 
