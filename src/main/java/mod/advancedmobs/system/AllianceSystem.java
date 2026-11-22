@@ -5,8 +5,8 @@ import mod.advancedmobs.data.MobWarData;
 import mod.advancedmobs.util.OperationScheduler;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.border.WorldBorder;
 import net.minecraft.world.phys.AABB;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -293,23 +293,37 @@ public class AllianceSystem {
      * Cleans up dead mob UUIDs from alliance maps (prevents memory leak).
      */
     public static void cleanupDeadMobs(ServerLevel world) {
-        Set<UUID> aliveMobs = new HashSet<>();
-        // Construct a AABB covering the world border
-        WorldBorder border = world.getWorldBorder();
-        double centerX = border.getCenterX();
-        double centerZ = border.getCenterZ();
-        double size = border.getSize() / 2.0;
-        // Use the world's real vertical bounds. The old box started at y=0,
-        // so mobs below y=0 (down to -64 in the overworld) were treated as
-        // dead and had their alliance entries purged on every cleanup pass.
-        AABB borderBox = new AABB(
-            centerX - size, world.getMinY(), centerZ - size,
-            centerX + size, world.getMinY() + world.getHeight(), centerZ + size
-        );
-        for (Mob mob : world.getEntitiesOfClass(Mob.class, borderBox, m -> true)) {
-            aliveMobs.add(mob.getUUID());
+        // PERF + CORRECTNESS (Nov 21, 2026 audit): this used to build a
+        // world-border-sized AABB and scan every loaded Mob in the level
+        // to build the alive set, once per level per cleanup pass. Two
+        // problems: the scan cost scales with every mob in the world, and
+        // the alliance maps are global while the alive set was per level,
+        // so cleaning the first level purged entries belonging to mobs
+        // living in other dimensions. Now only the UUIDs that actually
+        // appear in the alliance maps are checked, by direct entity
+        // lookup across all of the server's levels: cost is proportional
+        // to alliance participants (normally a handful), and
+        // cross-dimension alliances survive as they should.
+        Set<UUID> candidates = new HashSet<>();
+        candidates.addAll(allianceTimestamps.keySet());
+        for (Map<UUID, Long> innerMap : allianceTimestamps.values()) {
+            candidates.addAll(innerMap.keySet());
         }
-        
+        candidates.addAll(strongAlliances.keySet());
+        for (Map<UUID, Boolean> innerMap : strongAlliances.values()) {
+            candidates.addAll(innerMap.keySet());
+        }
+        if (candidates.isEmpty()) {
+            return;
+        }
+        Set<UUID> aliveMobs = new HashSet<>();
+        MinecraftServer server = world.getServer();
+        for (UUID uuid : candidates) {
+            if (isMobLoadedSomewhere(server, world, uuid)) {
+                aliveMobs.add(uuid);
+            }
+        }
+
         // Clean allianceTimestamps
         allianceTimestamps.entrySet().removeIf(entry -> !aliveMobs.contains(entry.getKey()));
         for (Map<UUID, Long> innerMap : allianceTimestamps.values()) {
@@ -321,6 +335,19 @@ public class AllianceSystem {
         for (Map<UUID, Boolean> innerMap : strongAlliances.values()) {
             innerMap.entrySet().removeIf(entry -> !aliveMobs.contains(entry.getKey()));
         }
+    }
+
+    /** Whether a mob with this UUID is currently loaded in any level. */
+    private static boolean isMobLoadedSomewhere(MinecraftServer server, ServerLevel fallbackLevel, UUID uuid) {
+        if (server != null) {
+            for (ServerLevel level : server.getAllLevels()) {
+                if (level.getEntity(uuid) instanceof Mob) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return fallbackLevel.getEntity(uuid) instanceof Mob;
     }
     
     // ==========================================================================

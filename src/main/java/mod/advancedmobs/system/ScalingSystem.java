@@ -428,6 +428,34 @@ public class ScalingSystem {
         int modHash = snapshot != null ? snapshot.hashCode() : 0;
             return (((long) configHash) << 32) ^ (modHash & 0xffffffffL);
     }
+
+    // PERF (Nov 21, 2026 audit): the ModConfig half of the fingerprint is
+    // identical for every mob, but capture + hashCode ran once per mob per
+    // tick inside processMobTick. The snapshot hash is now computed at
+    // most once per game tick server-wide and reused by every mob ticked
+    // in that tick. Config edits land between ticks (commands and config
+    // reloads run on the server thread outside entity ticking), and the
+    // fingerprint exists to DETECT changes, so the worst case of this
+    // cache is detection one tick later than before.
+    private static long cachedModConfigHashTick = Long.MIN_VALUE;
+    private static int cachedModConfigHash = 0;
+
+    private static long computeEffectiveConfigFingerprint(JsonObject config, ModConfig modConfig, long currentTick) {
+        int configHash = resolveMobConfigHash(config);
+        if (modConfig == null) {
+            return ((long) configHash) << 32;
+        }
+        int modHash;
+        if (currentTick == cachedModConfigHashTick) {
+            modHash = cachedModConfigHash;
+        } else {
+            ModConfigSnapshot snapshot = ModConfigSnapshot.capture(modConfig);
+            modHash = snapshot != null ? snapshot.hashCode() : 0;
+            cachedModConfigHashTick = currentTick;
+            cachedModConfigHash = modHash;
+        }
+        return (((long) configHash) << 32) ^ (modHash & 0xffffffffL);
+    }
     
     /**
      * Get config for a mob entity
@@ -1048,7 +1076,7 @@ public class ScalingSystem {
             data.setSkillData(skillData);
         }
 
-        long configFingerprint = computeEffectiveConfigFingerprint(config, modConfig);
+        long configFingerprint = computeEffectiveConfigFingerprint(config, modConfig, world.getGameTime());
         if (skillData.contains(NBT_CONFIG_FINGERPRINT)) {
             long storedFingerprint = skillData.getLongOr(NBT_CONFIG_FINGERPRINT, 0L);
             if (storedFingerprint != configFingerprint) {
@@ -1161,14 +1189,15 @@ public class ScalingSystem {
         int currentTimeOfDay = getCurrentUpgradeMarker(world, upgradeIntervalTicks);
         UUID mobUuid = mob.getUUID();
 
+        // PERF (Nov 21, 2026 audit): the enchantment registry is read only
+        // by the affordability probes below, and most ticks run no probe
+        // at all (upgrade windows are a day apart and budget probes are
+        // throttled). It is resolved lazily on first probe use instead of
+        // paying a registry lookup for every mob on every tick. The
+        // upgrade execution paths (submitUpgradeJob, executeUpgradeNow)
+        // resolve their own registry when they actually run, unchanged.
         Registry<Enchantment> enchantRegistry = null;
-        if (world instanceof ServerLevel serverWorld) {
-            try {
-                enchantRegistry = serverWorld.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
-            } catch (Exception ignored) {
-                enchantRegistry = null;
-            }
-        }
+        boolean enchantRegistryResolved = false;
         handleUndeadHealingPulse(mob, skillData, currentTick);
         handleInvisibilityGlowFlicker(mob, currentTick);
 
@@ -1214,6 +1243,10 @@ public class ScalingSystem {
         boolean forceUpgradePass = forceImmediateUpgrade && shouldRequestUpgrade && !upgradePending;
         if (forceUpgradePass) {
             if (affordableUpgradeAvailable == null) {
+                if (!enchantRegistryResolved) {
+                    enchantRegistry = resolveEnchantmentRegistry(world);
+                    enchantRegistryResolved = true;
+                }
                 affordableUpgradeAvailable = hasAffordableUpgradeAvailable(mobUuid, config, mobType, enchantRegistry, skillData, budget);
             }
             if (affordableUpgradeAvailable) {
@@ -1232,6 +1265,10 @@ public class ScalingSystem {
         boolean scheduleWithAffordable = false;
         if (shouldScheduleNow) {
             if (affordableUpgradeAvailable == null) {
+                if (!enchantRegistryResolved) {
+                    enchantRegistry = resolveEnchantmentRegistry(world);
+                    enchantRegistryResolved = true;
+                }
                 affordableUpgradeAvailable = hasAffordableUpgradeAvailable(mobUuid, config, mobType, enchantRegistry, skillData, budget);
             }
             scheduleWithAffordable = affordableUpgradeAvailable;
@@ -1261,6 +1298,10 @@ public class ScalingSystem {
 
         if (upgradeScheduleReady) {
             if (affordableUpgradeAvailable == null) {
+                if (!enchantRegistryResolved) {
+                    enchantRegistry = resolveEnchantmentRegistry(world);
+                    enchantRegistryResolved = true;
+                }
                 affordableUpgradeAvailable = hasAffordableUpgradeAvailable(mobUuid, config, mobType, enchantRegistry, skillData, budget);
             }
             if (!affordableUpgradeAvailable) {
@@ -2456,6 +2497,18 @@ public class ScalingSystem {
             super.addAll(index, c);
             throw FOUND_AFFORDABLE_UPGRADE;
         }
+    }
+
+    /** The level's enchantment registry, or null when unavailable. Called lazily by probes only. */
+    private static Registry<Enchantment> resolveEnchantmentRegistry(Level world) {
+        if (world instanceof ServerLevel serverWorld) {
+            try {
+                return serverWorld.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private static boolean hasAffordableUpgradeAvailable(UUID mobUuid, JsonObject config, String mobType,
