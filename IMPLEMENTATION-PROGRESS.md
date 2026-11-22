@@ -10,7 +10,7 @@ mob and is not tracked here.
 
 - [x] Allay
 - [x] Armadillo
-- [ ] Axolotl
+- [x] Axolotl
 - [ ] Bat
 - [x] Bee
 - [x] Blaze

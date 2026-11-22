@@ -75,6 +75,7 @@ import mod.advancedmobs.ability.glowsquid.GlowSquidAbilities;
 import mod.advancedmobs.ability.villager.VillagerAbilities;
 import mod.advancedmobs.ability.wanderingtrader.WanderingTraderAbilities;
 import mod.advancedmobs.ability.allay.AllayAbilities;
+import mod.advancedmobs.ability.axolotl.AxolotlAbilities;
 import mod.advancedmobs.ability.squid.SquidAbilities;
 import mod.advancedmobs.ability.zoglin.ZoglinAbilities;
 import mod.advancedmobs.ability.zombie.ZombieAbilities;
@@ -178,5 +179,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Villager", new VillagerAbilities());
         AbilityRegistry.register("Wandering_Trader", new WanderingTraderAbilities());
         AbilityRegistry.register("Allay", new AllayAbilities());
+        AbilityRegistry.register("Axolotl", new AxolotlAbilities());
     }
 }
