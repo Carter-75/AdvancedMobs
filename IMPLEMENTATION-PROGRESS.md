@@ -60,7 +60,7 @@ mob and is not tracked here.
 - [ ] Rabbit
 - [x] Ravager
 - [ ] Salmon
-- [ ] Sheep
+- [x] Sheep
 - [x] Shulker
 - [x] Silverfish
 - [x] Skeleton
