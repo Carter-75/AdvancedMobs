@@ -81,7 +81,7 @@ mob and is not tracked here.
 - [ ] Villager
 - [x] Vindicator
 - [ ] Wandering_Trader
-- [ ] Warden
+- [x] Warden
 - [x] Witch
 - [x] Wither
 - [x] Wither_Skeleton
