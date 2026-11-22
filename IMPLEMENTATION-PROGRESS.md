@@ -63,7 +63,7 @@ mob and is not tracked here.
 - [ ] Sheep
 - [ ] Shulker
 - [ ] Silverfish
-- [ ] Skeleton
+- [x] Skeleton
 - [ ] Skeleton_Horse
 - [ ] Slime
 - [ ] Sniffer
