@@ -52,7 +52,7 @@ mob and is not tracked here.
 - [ ] Parrot
 - [ ] Phantom
 - [ ] Pig
-- [ ] Piglin
+- [x] Piglin
 - [ ] Piglin_Brute
 - [ ] Pillager
 - [ ] Polar_Bear
