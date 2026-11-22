@@ -38,7 +38,7 @@ mob and is not tracked here.
 - [ ] Glow_Squid
 - [ ] Goat
 - [x] Guardian
-- [ ] Hoglin
+- [x] Hoglin
 - [ ] Horse
 - [x] Husk
 - [ ] Illusioner

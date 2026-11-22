@@ -11,6 +11,7 @@ import mod.advancedmobs.ability.enderman.EndermanAbilities;
 import mod.advancedmobs.ability.endermite.EndermiteAbilities;
 import mod.advancedmobs.ability.ghast.GhastAbilities;
 import mod.advancedmobs.ability.guardian.GuardianAbilities;
+import mod.advancedmobs.ability.hoglin.HoglinAbilities;
 import mod.advancedmobs.ability.husk.HuskAbilities;
 import mod.advancedmobs.ability.magmacube.MagmaCubeAbilities;
 import mod.advancedmobs.ability.silverfish.SilverfishAbilities;
@@ -64,5 +65,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Ender_Dragon", new EnderDragonAbilities());
         AbilityRegistry.register("Guardian", new GuardianAbilities());
         AbilityRegistry.register("Elder_Guardian", new ElderGuardianAbilities());
+        AbilityRegistry.register("Hoglin", new HoglinAbilities());
     }
 }
