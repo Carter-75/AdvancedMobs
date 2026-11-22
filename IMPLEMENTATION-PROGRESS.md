@@ -71,7 +71,7 @@ mob and is not tracked here.
 - [x] Spider
 - [ ] Squid
 - [x] Stray
-- [ ] Strider
+- [x] Strider
 - [x] Sulfur_Cube
 - [ ] Tadpole
 - [x] Trader_Llama
