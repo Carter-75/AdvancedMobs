@@ -76,7 +76,7 @@ mob and is not tracked here.
 - [x] Tadpole
 - [x] Trader_Llama
 - [ ] Tropical_Fish
-- [ ] Turtle
+- [x] Turtle
 - [x] Vex
 - [ ] Villager
 - [x] Vindicator
