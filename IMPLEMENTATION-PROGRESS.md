@@ -20,7 +20,7 @@ mob and is not tracked here.
 - [x] Cat
 - [x] Cave_Spider
 - [x] Chicken
-- [ ] Cod
+- [x] Cod
 - [x] Cow
 - [x] Creeper
 - [x] Dolphin
