@@ -28,7 +28,7 @@ mob and is not tracked here.
 - [x] Drowned
 - [ ] Elder_Guardian
 - [ ] Ender_Dragon
-- [ ] Enderman
+- [x] Enderman
 - [ ] Endermite
 - [ ] Evoker
 - [ ] Fox

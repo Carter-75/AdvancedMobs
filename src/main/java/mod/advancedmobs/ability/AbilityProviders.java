@@ -4,6 +4,7 @@ import mod.advancedmobs.ability.bogged.BoggedAbilities;
 import mod.advancedmobs.ability.cavespider.CaveSpiderAbilities;
 import mod.advancedmobs.ability.creeper.CreeperAbilities;
 import mod.advancedmobs.ability.drowned.DrownedAbilities;
+import mod.advancedmobs.ability.enderman.EndermanAbilities;
 import mod.advancedmobs.ability.husk.HuskAbilities;
 import mod.advancedmobs.ability.skeleton.SkeletonAbilities;
 import mod.advancedmobs.ability.spider.SpiderAbilities;
@@ -42,5 +43,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Creeper", new CreeperAbilities());
         AbilityRegistry.register("Spider", new SpiderAbilities());
         AbilityRegistry.register("Cave_Spider", new CaveSpiderAbilities());
+        AbilityRegistry.register("Enderman", new EndermanAbilities());
     }
 }
