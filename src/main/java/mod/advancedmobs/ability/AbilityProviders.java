@@ -5,6 +5,7 @@ import mod.advancedmobs.ability.bogged.BoggedAbilities;
 import mod.advancedmobs.ability.cavespider.CaveSpiderAbilities;
 import mod.advancedmobs.ability.creeper.CreeperAbilities;
 import mod.advancedmobs.ability.drowned.DrownedAbilities;
+import mod.advancedmobs.ability.enderdragon.EnderDragonAbilities;
 import mod.advancedmobs.ability.enderman.EndermanAbilities;
 import mod.advancedmobs.ability.endermite.EndermiteAbilities;
 import mod.advancedmobs.ability.ghast.GhastAbilities;
@@ -58,5 +59,6 @@ public final class AbilityProviders {
         AbilityRegistry.register("Blaze", new BlazeAbilities());
         AbilityRegistry.register("Ghast", new GhastAbilities());
         AbilityRegistry.register("Wither", new WitherAbilities());
+        AbilityRegistry.register("Ender_Dragon", new EnderDragonAbilities());
     }
 }

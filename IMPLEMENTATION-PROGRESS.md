@@ -27,7 +27,7 @@ mob and is not tracked here.
 - [ ] Donkey
 - [x] Drowned
 - [ ] Elder_Guardian
-- [ ] Ender_Dragon
+- [x] Ender_Dragon
 - [x] Enderman
 - [x] Endermite
 - [ ] Evoker
