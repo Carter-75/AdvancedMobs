@@ -214,6 +214,7 @@ public class ScalingSystem {
     private static final Object SPAWN_UPGRADE_SCHEDULER_LOCK = new Object();
     private static long NEXT_UPGRADE_SLOT_TICK = 0L;
     private static long NEXT_SPAWN_UPGRADE_SLOT_TICK = 0L;
+    private static int spawnBurstsAtNextSlot = 0;
     private static final Map<UUID, EquipmentSnapshot> PENDING_EQUIPMENT_SNAPSHOTS = new ConcurrentHashMap<>();
     
     // List of all available mob config files (loaded dynamically)
@@ -1298,7 +1299,11 @@ public class ScalingSystem {
         // code paid the full scan cost every tick for a result nobody read.
         Boolean affordableUpgradeAvailable = null;
 
-        boolean forceUpgradePass = forceImmediateUpgrade && shouldRequestUpgrade && !upgradePending;
+        // A mob that has never upgraded burst-buys on its first tick no
+        // matter how it entered the world (spawn, chunk load, summon):
+        // without this, only finalizeSpawn bootstraps got the immediate
+        // pass and everyone else waited on the daily window/scheduler.
+        boolean forceUpgradePass = (forceImmediateUpgrade || firstUpgradeCycle) && shouldRequestUpgrade && !upgradePending;
         if (forceUpgradePass) {
             if (affordableUpgradeAvailable == null) {
                 if (!enchantRegistryResolved) {
@@ -1832,9 +1837,21 @@ public class ScalingSystem {
 
     private static long reserveSpawnUpgradeSlot(long currentTick) {
         synchronized (SPAWN_UPGRADE_SCHEDULER_LOCK) {
+            // Up to 8 spawn bursts share a tick. The old one-per-tick
+            // pacing made freshly spawned mobs visibly wait (100 spawns
+            // in a burst = 5+ seconds before the last one bought
+            // anything, worse in big spawn waves).
             long scheduled = Math.max(currentTick + 1L, NEXT_SPAWN_UPGRADE_SLOT_TICK);
-            // One spawn-burst upgrade per tick (100 mobs => ~5 seconds worst-case)
-            NEXT_SPAWN_UPGRADE_SLOT_TICK = scheduled + 1L;
+            if (scheduled == NEXT_SPAWN_UPGRADE_SLOT_TICK) {
+                spawnBurstsAtNextSlot++;
+                if (spawnBurstsAtNextSlot >= 8) {
+                    NEXT_SPAWN_UPGRADE_SLOT_TICK = scheduled + 1L;
+                    spawnBurstsAtNextSlot = 0;
+                }
+            } else {
+                NEXT_SPAWN_UPGRADE_SLOT_TICK = scheduled;
+                spawnBurstsAtNextSlot = 1;
+            }
             return scheduled;
         }
     }

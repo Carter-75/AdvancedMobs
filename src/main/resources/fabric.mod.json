@@ -23,7 +23,11 @@
 		]
 	},
 	"mixins": [
-		"advancedmobs.mixins.json"
+		"advancedmobs.mixins.json",
+		{
+			"config": "advancedmobs.client.mixins.json",
+			"environment": "client"
+		}
 	],
 	"depends": {
 		"fabricloader": ">=0.19.2",

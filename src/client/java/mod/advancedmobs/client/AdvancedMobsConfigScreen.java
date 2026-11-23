@@ -1,442 +1,440 @@
 package mod.advancedmobs.client;
 
 import mod.advancedmobs.config.ModConfig;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-import me.shedaniel.clothconfig2.api.ConfigBuilder;
-import me.shedaniel.clothconfig2.api.ConfigCategory;
-import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
+import java.util.function.DoubleConsumer;
+import java.util.function.DoubleSupplier;
+import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
+import java.util.function.Supplier;
 
 /**
- * Advanced Mobs settings screen, built on Cloth Config.
+ * Universal Mob War settings screen, rebuilt from scratch as a native
+ * Screen (the previous version delegated everything to Cloth Config;
+ * this one owns its layout so the menu is fully ours).
  *
- * This replaces the old hand-rolled Screen subclass, whose custom widget,
- * scrolling, and rendering code was the crash risk when opening the settings
- * from Mod Menu. Cloth Config owns the widgets, layout, scrolling, and
- * rendering here; this class only binds entries to the real ModConfig
- * fields, so every control on the screen reads and writes the live config
- * and nothing is decorative.
- *
- * Binding rules:
- * - Every entry's save consumer writes the ModConfig field of the same
- *   meaning, including the transient mirror fields the rest of the mod
- *   reads (for example rangeMultiplier mirrors rangeMultiplierPercent,
- *   allianceSystemEnabled mirrors allianceEnabled).
- * - Percent fields are edited as whole percents (100 = 1.0x), matching how
- *   ModConfig stores them.
- * - The screen's saving runnable is ModConfig.save(), which persists the
- *   AutoConfig holder to disk.
+ * Layout: category rail on the left (General, Targeting, Alliance,
+ * Scaling, Abilities, Warlord, Performance, Visuals, Debug), a
+ * scrolling list of settings on the right. Booleans are ON/OFF buttons;
+ * numbers are an edit box flanked by - / + steppers. Every control is
+ * bound to the same ModConfig fields (including the mirror fields other
+ * systems read, like rangeMultiplier mirroring rangeMultiplierPercent)
+ * and applies live; the config is persisted with ModConfig.save() when
+ * the screen closes. Percent fields are edited as whole percents
+ * (100 = 1.0x), matching how ModConfig stores them.
  */
-public final class AdvancedMobsConfigScreen {
+public class AdvancedMobsConfigScreen extends Screen {
 
-    private AdvancedMobsConfigScreen() {
+    private enum Kind { BOOL, INT, DOUBLE }
+
+    private record Setting(String label, String tooltip, Kind kind,
+                           Supplier<Object> getter, Consumer<Object> setter,
+                           double min, double max) {
+        static Setting bool(String label, String tooltip, BooleanSupplier get, Consumer<Boolean> set) {
+            return new Setting(label, tooltip, Kind.BOOL, get::getAsBoolean, v -> set.accept((Boolean) v), 0, 0);
+        }
+
+        static Setting integer(String label, String tooltip, IntSupplier get, IntConsumer set, int min, int max) {
+            return new Setting(label, tooltip, Kind.INT, get::getAsInt, v -> set.accept((Integer) v), min, max);
+        }
+
+        static Setting dbl(String label, String tooltip, DoubleSupplier get, DoubleConsumer set, double min, double max) {
+            return new Setting(label, tooltip, Kind.DOUBLE, get::getAsDouble, v -> set.accept((Double) v), min, max);
+        }
+    }
+
+    private record Category(String name, List<Setting> settings) {}
+
+    private static final int SIDEBAR_WIDTH = 116;
+    private static final int CONTENT_TOP = 44;
+    private static final int ROW_HEIGHT = 26;
+    private static final int FOOTER_HEIGHT = 36;
+
+    private final Screen parent;
+    private final List<Category> categories;
+    private int categoryIndex = 0;
+    private int scrollRow = 0;
+    private boolean building = false;
+
+    public AdvancedMobsConfigScreen(Screen parent) {
+        super(Component.literal("Universal Mob War Settings"));
+        this.parent = parent;
+        this.categories = buildCategories(ModConfig.getInstance());
     }
 
     public static Screen create(Screen parent) {
-        ModConfig config = ModConfig.getInstance();
+        return new AdvancedMobsConfigScreen(parent);
+    }
 
-        ConfigBuilder builder = ConfigBuilder.create()
-                .setParentScreen(parent)
-                .setTitle(Component.literal("Advanced Mobs Config"))
-                .setSavingRunnable(ModConfig::save);
-        ConfigEntryBuilder entries = builder.entryBuilder();
+    // ======================================================================
+    //                              SETTINGS
+    // ======================================================================
 
-        // ------------------------------------------------------------------
-        // General: the master switches for the big systems.
-        // ------------------------------------------------------------------
-        ConfigCategory general = builder.getOrCreateCategory(Component.literal("General"));
-        general.addEntry(entries.startBooleanToggle(Component.literal("Enable Mod"), config.modEnabled)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Master switch for every system in Advanced Mobs."))
-                .setSaveConsumer(v -> config.modEnabled = v)
-                .build());
-        general.addEntry(entries.startBooleanToggle(Component.literal("Targeting System"), config.targetingEnabled)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Controls mob-vs-mob combat behavior."))
-                .setSaveConsumer(v -> config.targetingEnabled = v)
-                .build());
-        general.addEntry(entries.startBooleanToggle(Component.literal("Alliance System"), config.allianceEnabled)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Let mobs form temporary alliances."))
-                .setSaveConsumer(v -> {
-                    config.allianceEnabled = v;
-                    config.allianceSystemEnabled = v;
-                })
-                .build());
-        general.addEntry(entries.startBooleanToggle(Component.literal("Scaling System"), config.scalingEnabled)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Allow mobs to earn and spend upgrade points."))
-                .setSaveConsumer(v -> {
-                    config.scalingEnabled = v;
-                    config.evolutionSystemEnabled = v;
-                })
-                .build());
-        general.addEntry(entries.startBooleanToggle(Component.literal("Warlord System"), config.warlordEnabled)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Enable the Mob Warlord raid boss feature."))
-                .setSaveConsumer(v -> {
-                    config.warlordEnabled = v;
-                    config.enableMobWarlord = v;
-                })
-                .build());
+    private static List<Category> buildCategories(ModConfig config) {
+        List<Category> categories = new ArrayList<>();
 
-        // ------------------------------------------------------------------
-        // Targeting: how mobs pick fights.
-        // ------------------------------------------------------------------
-        ConfigCategory targeting = builder.getOrCreateCategory(Component.literal("Targeting"));
-        targeting.addEntry(entries.startBooleanToggle(Component.literal("Target Players"), config.targetPlayers)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("If disabled, mobs focus entirely on other mobs."))
-                .setSaveConsumer(v -> config.targetPlayers = v)
-                .build());
-        targeting.addEntry(entries.startBooleanToggle(Component.literal("Ignore Same Species"), config.ignoreSameSpecies)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Prevents zombies from fighting other zombies, etc."))
-                .setSaveConsumer(v -> config.ignoreSameSpecies = v)
-                .build());
-        targeting.addEntry(entries.startBooleanToggle(Component.literal("Neutral Mobs Always Aggressive"), config.neutralMobsAlwaysAggressive)
-                .setDefaultValue(false)
-                .setTooltip(Component.literal("Forces golems, wolves, and other neutrals into the war."))
-                .setSaveConsumer(v -> config.neutralMobsAlwaysAggressive = v)
-                .build());
-        targeting.addEntry(entries.startBooleanToggle(Component.literal("Disable Natural Spawns"), config.disableNaturalMobSpawns)
-                .setDefaultValue(false)
-                .setTooltip(Component.literal("Completely blocks passive and hostile natural spawns."))
-                .setSaveConsumer(v -> config.disableNaturalMobSpawns = v)
-                .build());
-        targeting.addEntry(entries.startBooleanToggle(Component.literal("Limit Natural Spawns"), config.limitNaturalMobSpawns)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Caps natural spawns per simulation distance."))
-                .setSaveConsumer(v -> config.limitNaturalMobSpawns = v)
-                .build());
-        targeting.addEntry(entries.startIntSlider(Component.literal("Natural Spawn Cap (per sim. distance)"), config.naturalSpawnCapPerSimulationDistance, 0, 1000)
-                .setDefaultValue(5)
-                .setTooltip(Component.literal("Spawn cap = this value times the simulation distance."))
-                .setSaveConsumer(v -> config.naturalSpawnCapPerSimulationDistance = v)
-                .build());
-        targeting.addEntry(entries.startIntSlider(Component.literal("Detection Range %"), config.rangeMultiplierPercent, 10, 500)
-                .setDefaultValue(100)
-                .setTooltip(Component.literal("100 = normal detection range, 200 = double."))
-                .setSaveConsumer(v -> {
-                    config.rangeMultiplierPercent = v;
-                    config.rangeMultiplier = v / 100.0;
-                })
-                .build());
-        targeting.addEntry(entries.startIntSlider(Component.literal("Target Cache (ms)"), config.targetingCacheMs, 500, 5000)
-                .setDefaultValue(2000)
-                .setTooltip(Component.literal("How long a mob keeps a picked target before re-checking."))
-                .setSaveConsumer(v -> config.targetingCacheMs = v)
-                .build());
-        targeting.addEntry(entries.startIntSlider(Component.literal("Target Queries / Tick"), config.targetingMaxQueriesPerTick, 10, 200)
-                .setDefaultValue(30)
-                .setTooltip(Component.literal("Budget for target searches each tick."))
-                .setSaveConsumer(v -> config.targetingMaxQueriesPerTick = v)
-                .build());
+        categories.add(new Category("General", List.of(
+            Setting.bool("Enable Mod", "Master switch for every system in Universal Mob War.",
+                () -> config.modEnabled, v -> config.modEnabled = v),
+            Setting.bool("Targeting System", "Controls mob-vs-mob combat behavior.",
+                () -> config.targetingEnabled, v -> config.targetingEnabled = v),
+            Setting.bool("Alliance System", "Let mobs form temporary alliances.",
+                () -> config.allianceEnabled, v -> { config.allianceEnabled = v; config.allianceSystemEnabled = v; }),
+            Setting.bool("Scaling System", "Allow mobs to earn and spend upgrade points.",
+                () -> config.scalingEnabled, v -> { config.scalingEnabled = v; config.evolutionSystemEnabled = v; }),
+            Setting.bool("Warlord System", "Enable the Mob Warlord raid boss feature.",
+                () -> config.warlordEnabled, v -> { config.warlordEnabled = v; config.enableMobWarlord = v; })
+        )));
 
-        // ------------------------------------------------------------------
-        // Alliance: temporary truces between mobs.
-        // ------------------------------------------------------------------
-        ConfigCategory alliance = builder.getOrCreateCategory(Component.literal("Alliance"));
-        alliance.addEntry(entries.startBooleanToggle(Component.literal("Alliance System"), config.allianceEnabled)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Let mobs form temporary alliances."))
-                .setSaveConsumer(v -> {
-                    config.allianceEnabled = v;
-                    config.allianceSystemEnabled = v;
-                })
-                .build());
-        alliance.addEntry(entries.startIntSlider(Component.literal("Weak Alliance Duration (ms)"), config.weakAllianceDurationMs, 1000, 60000)
-                .setDefaultValue(5000)
-                .setTooltip(Component.literal("How long a cross-species alliance lasts."))
-                .setSaveConsumer(v -> config.weakAllianceDurationMs = v)
-                .build());
-        alliance.addEntry(entries.startIntSlider(Component.literal("Strong Alliance Duration (ms)"), config.strongAllianceDurationMs, 1000, 120000)
-                .setDefaultValue(20000)
-                .setTooltip(Component.literal("How long a same-species alliance lasts."))
-                .setSaveConsumer(v -> config.strongAllianceDurationMs = v)
-                .build());
-        alliance.addEntry(entries.startIntSlider(Component.literal("Weak Break Chance %"), config.allianceBreakChancePercent, 0, 100)
-                .setDefaultValue(30)
-                .setTooltip(Component.literal("Chance a weak alliance breaks early."))
-                .setSaveConsumer(v -> config.allianceBreakChancePercent = v)
-                .build());
-        alliance.addEntry(entries.startIntSlider(Component.literal("Strong Break Chance %"), config.strongAllianceBreakChancePercent, 0, 100)
-                .setDefaultValue(5)
-                .setTooltip(Component.literal("Chance a strong alliance breaks early."))
-                .setSaveConsumer(v -> config.strongAllianceBreakChancePercent = v)
-                .build());
+        categories.add(new Category("Targeting", List.of(
+            Setting.bool("Target Players", "If disabled, mobs focus entirely on other mobs.",
+                () -> config.targetPlayers, v -> config.targetPlayers = v),
+            Setting.bool("Ignore Same Species", "Prevents zombies from fighting other zombies, etc.",
+                () -> config.ignoreSameSpecies, v -> config.ignoreSameSpecies = v),
+            Setting.bool("Neutral Mobs Always Aggressive", "Forces golems, wolves, and other neutrals into the war.",
+                () -> config.neutralMobsAlwaysAggressive, v -> config.neutralMobsAlwaysAggressive = v),
+            Setting.bool("Disable Natural Spawns", "Completely blocks passive and hostile natural spawns.",
+                () -> config.disableNaturalMobSpawns, v -> config.disableNaturalMobSpawns = v),
+            Setting.bool("Limit Natural Spawns", "Caps natural spawns per simulation distance.",
+                () -> config.limitNaturalMobSpawns, v -> config.limitNaturalMobSpawns = v),
+            Setting.integer("Natural Spawn Cap", "Spawn cap = this value times the simulation distance.",
+                () -> config.naturalSpawnCapPerSimulationDistance, v -> config.naturalSpawnCapPerSimulationDistance = v, 0, 1000),
+            Setting.integer("Detection Range %", "100 = normal detection range, 200 = double.",
+                () -> config.rangeMultiplierPercent, v -> { config.rangeMultiplierPercent = v; config.rangeMultiplier = v / 100.0; }, 10, 500),
+            Setting.integer("Target Cache (ms)", "How long a mob keeps a picked target before re-checking.",
+                () -> config.targetingCacheMs, v -> config.targetingCacheMs = v, 500, 5000),
+            Setting.integer("Target Queries / Tick", "Budget for target searches each tick.",
+                () -> config.targetingMaxQueriesPerTick, v -> config.targetingMaxQueriesPerTick = v, 10, 200)
+        )));
 
-        // ------------------------------------------------------------------
-        // Scaling: points, upgrades, and world-age growth.
-        // ------------------------------------------------------------------
-        ConfigCategory scaling = builder.getOrCreateCategory(Component.literal("Scaling"));
-        scaling.addEntry(entries.startBooleanToggle(Component.literal("Scaling System"), config.scalingEnabled)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Allow mobs to earn and spend upgrade points."))
-                .setSaveConsumer(v -> {
-                    config.scalingEnabled = v;
-                    config.evolutionSystemEnabled = v;
-                })
-                .build());
-        scaling.addEntry(entries.startBooleanToggle(Component.literal("Allow Boss Scaling"), config.allowBossScaling)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Bosses obey the same progression rules."))
-                .setSaveConsumer(v -> config.allowBossScaling = v)
-                .build());
-        scaling.addEntry(entries.startIntSlider(Component.literal("Day Scaling %"), config.dayScalingMultiplierPercent, 0, 1000)
-                .setDefaultValue(100)
-                .setTooltip(Component.literal("Points from world age. 100 = normal rate."))
-                .setSaveConsumer(v -> {
-                    config.dayScalingMultiplierPercent = v;
-                    config.dayScalingMultiplier = v / 100.0;
-                })
-                .build());
-        scaling.addEntry(entries.startIntSlider(Component.literal("Kill Scaling %"), config.killScalingMultiplierPercent, 0, 1000)
-                .setDefaultValue(100)
-                .setTooltip(Component.literal("Points from kills. 100 = normal rate."))
-                .setSaveConsumer(v -> {
-                    config.killScalingMultiplierPercent = v;
-                    config.killScalingMultiplier = v / 100.0;
-                })
-                .build());
-        scaling.addEntry(entries.startIntSlider(Component.literal("Save Chance %"), config.saveChancePercent, 0, 100)
-                .setDefaultValue(20)
-                .setTooltip(Component.literal("Chance a mob banks its points instead of spending. Buy chance is the rest."))
-                .setSaveConsumer(v -> {
-                    config.saveChancePercent = v;
-                    config.buyChancePercent = 100 - v;
-                })
-                .build());
-        scaling.addEntry(entries.startIntSlider(Component.literal("Max Upgrades / Cycle"), config.maxUpgradeIterations, ModConfig.MIN_UPGRADE_ITERATIONS, ModConfig.MAX_UPGRADE_ITERATIONS)
-                .setDefaultValue(ModConfig.MAX_UPGRADE_ITERATIONS)
-                .setTooltip(Component.literal("Hard cap on purchases in one spending cycle."))
-                .setSaveConsumer(v -> config.maxUpgradeIterations = v)
-                .build());
-        scaling.addEntry(entries.startIntField(Component.literal("Manual Day Override"), config.manualWorldDayOverride)
-                .setDefaultValue(-1)
-                .setMin(-1)
-                .setMax(100000)
-                .setTooltip(Component.literal("Pretend the world has run for this many days. -1 uses the real count."))
-                .setSaveConsumer(v -> config.manualWorldDayOverride = v)
-                .build());
-        scaling.addEntry(entries.startIntField(Component.literal("Upgrade Interval (ticks)"), config.upgradeIntervalTicks)
-                .setDefaultValue(24000)
-                .setMin(200)
-                .setMax(720000)
-                .setTooltip(Component.literal("How often mobs run a spending cycle. 24000 ticks = one in-game day."))
-                .setSaveConsumer(v -> config.upgradeIntervalTicks = v)
-                .build());
-        scaling.addEntry(entries.startBooleanToggle(Component.literal("Scale XP Drops With Spent Points"), config.scaleMobXpDropsWithSpentPoints)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Mobs that spent more points drop more XP."))
-                .setSaveConsumer(v -> config.scaleMobXpDropsWithSpentPoints = v)
-                .build());
-        scaling.addEntry(entries.startBooleanToggle(Component.literal("Spend All Points On Spawn"), config.forceSpendAllOnSpawn)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("New mobs immediately spend their starting points."))
-                .setSaveConsumer(v -> config.forceSpendAllOnSpawn = v)
-                .build());
-        scaling.addEntry(entries.startBooleanToggle(Component.literal("Allow Modded Enchantments"), config.allowModdedEnchantments)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Let mob gear roll enchantments from other mods."))
-                .setSaveConsumer(v -> config.allowModdedEnchantments = v)
-                .build());
+        categories.add(new Category("Alliance", List.of(
+            Setting.bool("Alliance System", "Let mobs form temporary alliances.",
+                () -> config.allianceEnabled, v -> { config.allianceEnabled = v; config.allianceSystemEnabled = v; }),
+            Setting.integer("Weak Alliance Duration (ms)", "How long a cross-species alliance lasts.",
+                () -> config.weakAllianceDurationMs, v -> config.weakAllianceDurationMs = v, 1000, 60000),
+            Setting.integer("Strong Alliance Duration (ms)", "How long a same-species alliance lasts.",
+                () -> config.strongAllianceDurationMs, v -> config.strongAllianceDurationMs = v, 1000, 120000),
+            Setting.integer("Weak Break Chance %", "Chance a weak alliance breaks early.",
+                () -> config.allianceBreakChancePercent, v -> config.allianceBreakChancePercent = v, 0, 100),
+            Setting.integer("Strong Break Chance %", "Chance a strong alliance breaks early.",
+                () -> config.strongAllianceBreakChancePercent, v -> config.strongAllianceBreakChancePercent = v, 0, 100)
+        )));
 
-        // ------------------------------------------------------------------
-        // Abilities: the per-mob special ability system.
-        // ------------------------------------------------------------------
-        ConfigCategory abilities = builder.getOrCreateCategory(Component.literal("Abilities"));
-        abilities.addEntry(entries.startBooleanToggle(Component.literal("Enable Abilities"), config.abilitiesEnabled)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Master switch for the special abilities every mob can earn."))
-                .setSaveConsumer(v -> config.abilitiesEnabled = v)
-                .build());
-        abilities.addEntry(entries.startDoubleField(Component.literal("Full Power Points"), config.abilityFullPowerPoints)
-                .setDefaultValue(3000.0)
-                .setMin(1.0)
-                .setMax(1000000.0)
-                .setTooltip(Component.literal("Lifetime points at which a mob counts as full power for ability access. Lower unlocks abilities faster."))
-                .setSaveConsumer(v -> config.abilityFullPowerPoints = v)
-                .build());
-        abilities.addEntry(entries.startDoubleField(Component.literal("Boss Points / Second: Ender Dragon"), config.bossCombatPointsPerSecondDragon)
-                .setDefaultValue(25.0)
-                .setMin(0.0)
-                .setMax(1000.0)
-                .setTooltip(Component.literal("Points the Ender Dragon earns per second while in combat."))
-                .setSaveConsumer(v -> config.bossCombatPointsPerSecondDragon = v)
-                .build());
-        abilities.addEntry(entries.startDoubleField(Component.literal("Boss Points / Second: Wither"), config.bossCombatPointsPerSecondWither)
-                .setDefaultValue(15.0)
-                .setMin(0.0)
-                .setMax(1000.0)
-                .setTooltip(Component.literal("Points the Wither earns per second while in combat."))
-                .setSaveConsumer(v -> config.bossCombatPointsPerSecondWither = v)
-                .build());
-        abilities.addEntry(entries.startDoubleField(Component.literal("Boss Points / Second: Mob Warlord"), config.bossCombatPointsPerSecondWarlord)
-                .setDefaultValue(15.0)
-                .setMin(0.0)
-                .setMax(1000.0)
-                .setTooltip(Component.literal("Points the Mob Warlord earns per second while in combat."))
-                .setSaveConsumer(v -> config.bossCombatPointsPerSecondWarlord = v)
-                .build());
-        abilities.addEntry(entries.startDoubleField(Component.literal("Boss Points / Second: Warden"), config.bossCombatPointsPerSecondWarden)
-                .setDefaultValue(10.0)
-                .setMin(0.0)
-                .setMax(1000.0)
-                .setTooltip(Component.literal("Points the Warden earns per second while in combat."))
-                .setSaveConsumer(v -> config.bossCombatPointsPerSecondWarden = v)
-                .build());
-        abilities.addEntry(entries.startDoubleField(Component.literal("Boss Points / Second: Elder Guardian"), config.bossCombatPointsPerSecondElderGuardian)
-                .setDefaultValue(10.0)
-                .setMin(0.0)
-                .setMax(1000.0)
-                .setTooltip(Component.literal("Points the Elder Guardian earns per second while in combat."))
-                .setSaveConsumer(v -> config.bossCombatPointsPerSecondElderGuardian = v)
-                .build());
+        categories.add(new Category("Scaling", List.of(
+            Setting.bool("Scaling System", "Allow mobs to earn and spend upgrade points.",
+                () -> config.scalingEnabled, v -> { config.scalingEnabled = v; config.evolutionSystemEnabled = v; }),
+            Setting.bool("Allow Boss Scaling", "Bosses obey the same progression rules.",
+                () -> config.allowBossScaling, v -> config.allowBossScaling = v),
+            Setting.integer("Day Scaling %", "Points from world age. 100 = normal rate.",
+                () -> config.dayScalingMultiplierPercent, v -> { config.dayScalingMultiplierPercent = v; config.dayScalingMultiplier = v / 100.0; }, 0, 1000),
+            Setting.integer("Kill Scaling %", "Points from kills. 100 = normal rate.",
+                () -> config.killScalingMultiplierPercent, v -> { config.killScalingMultiplierPercent = v; config.killScalingMultiplier = v / 100.0; }, 0, 1000),
+            Setting.integer("Save Chance %", "Chance a mob banks its points instead of spending. Buy chance is the rest.",
+                () -> config.saveChancePercent, v -> { config.saveChancePercent = v; config.buyChancePercent = 100 - v; }, 0, 100),
+            Setting.integer("Max Upgrades / Cycle", "Hard cap on purchases in one spending cycle.",
+                () -> config.maxUpgradeIterations, v -> config.maxUpgradeIterations = v,
+                ModConfig.MIN_UPGRADE_ITERATIONS, ModConfig.MAX_UPGRADE_ITERATIONS),
+            Setting.integer("Manual Day Override", "Pretend the world has run for this many days. -1 uses the real count.",
+                () -> config.manualWorldDayOverride, v -> config.manualWorldDayOverride = v, -1, 100000),
+            Setting.integer("Upgrade Interval (ticks)", "How often mobs run a spending cycle. 24000 ticks = one in-game day.",
+                () -> config.upgradeIntervalTicks, v -> config.upgradeIntervalTicks = v, 200, 720000),
+            Setting.bool("Scale XP Drops With Spent Points", "Mobs that spent more points drop more XP.",
+                () -> config.scaleMobXpDropsWithSpentPoints, v -> config.scaleMobXpDropsWithSpentPoints = v),
+            Setting.bool("Spend All Points On Spawn", "New mobs immediately spend their starting points.",
+                () -> config.forceSpendAllOnSpawn, v -> config.forceSpendAllOnSpawn = v),
+            Setting.bool("Allow Modded Enchantments", "Let mob gear roll enchantments from other mods.",
+                () -> config.allowModdedEnchantments, v -> config.allowModdedEnchantments = v)
+        )));
 
-        // ------------------------------------------------------------------
-        // Warlord: the raid boss.
-        // ------------------------------------------------------------------
-        ConfigCategory warlord = builder.getOrCreateCategory(Component.literal("Warlord"));
-        warlord.addEntry(entries.startBooleanToggle(Component.literal("Warlord System"), config.warlordEnabled)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Enable the Mob Warlord raid boss feature."))
-                .setSaveConsumer(v -> {
-                    config.warlordEnabled = v;
-                    config.enableMobWarlord = v;
-                })
-                .build());
-        warlord.addEntry(entries.startBooleanToggle(Component.literal("Always Spawn On Final Wave"), config.alwaysSpawnWarlordOnFinalWave)
-                .setDefaultValue(false)
-                .setTooltip(Component.literal("Forces every final raid wave to include the Warlord."))
-                .setSaveConsumer(v -> config.alwaysSpawnWarlordOnFinalWave = v)
-                .build());
-        warlord.addEntry(entries.startIntSlider(Component.literal("Spawn Chance %"), config.warlordSpawnChance, 0, 100)
-                .setDefaultValue(25)
-                .setTooltip(Component.literal("Chance the Warlord joins a qualifying raid wave."))
-                .setSaveConsumer(v -> config.warlordSpawnChance = v)
-                .build());
-        warlord.addEntry(entries.startIntSlider(Component.literal("Min Raid Level"), config.warlordMinRaidLevel, 1, 20)
-                .setDefaultValue(3)
-                .setTooltip(Component.literal("Lowest raid level that can spawn the Warlord."))
-                .setSaveConsumer(v -> config.warlordMinRaidLevel = v)
-                .build());
-        warlord.addEntry(entries.startIntSlider(Component.literal("Minion Count"), config.warlordMinionCount, 5, 100)
-                .setDefaultValue(20)
-                .setTooltip(Component.literal("How many minions the Warlord brings."))
-                .setSaveConsumer(v -> config.warlordMinionCount = v)
-                .build());
-        warlord.addEntry(entries.startIntSlider(Component.literal("Health %"), config.warlordHealthMultiplierPercent, 100, 1000)
-                .setDefaultValue(300)
-                .setTooltip(Component.literal("Warlord health multiplier. 300 = 3x health."))
-                .setSaveConsumer(v -> {
-                    config.warlordHealthMultiplierPercent = v;
-                    config.warlordHealthMultiplier = v / 100.0;
-                })
-                .build());
-        warlord.addEntry(entries.startIntSlider(Component.literal("Damage %"), config.warlordDamageMultiplierPercent, 100, 1000)
-                .setDefaultValue(200)
-                .setTooltip(Component.literal("Warlord damage multiplier. 200 = 2x damage."))
-                .setSaveConsumer(v -> {
-                    config.warlordDamageMultiplierPercent = v;
-                    config.warlordDamageMultiplier = v / 100.0;
-                })
-                .build());
+        categories.add(new Category("Abilities", List.of(
+            Setting.bool("Enable Abilities", "Master switch for the special abilities every mob can earn.",
+                () -> config.abilitiesEnabled, v -> config.abilitiesEnabled = v),
+            Setting.dbl("Full Power Points", "Lifetime points at which a mob counts as full power for ability access. Lower unlocks abilities faster.",
+                () -> config.abilityFullPowerPoints, v -> config.abilityFullPowerPoints = v, 1.0, 1000000.0),
+            Setting.dbl("Boss Points / Sec: Ender Dragon", "Points the Ender Dragon earns per second while in combat.",
+                () -> config.bossCombatPointsPerSecondDragon, v -> config.bossCombatPointsPerSecondDragon = v, 0.0, 1000.0),
+            Setting.dbl("Boss Points / Sec: Wither", "Points the Wither earns per second while in combat.",
+                () -> config.bossCombatPointsPerSecondWither, v -> config.bossCombatPointsPerSecondWither = v, 0.0, 1000.0),
+            Setting.dbl("Boss Points / Sec: Mob Warlord", "Points the Mob Warlord earns per second while in combat.",
+                () -> config.bossCombatPointsPerSecondWarlord, v -> config.bossCombatPointsPerSecondWarlord = v, 0.0, 1000.0),
+            Setting.dbl("Boss Points / Sec: Warden", "Points the Warden earns per second while in combat.",
+                () -> config.bossCombatPointsPerSecondWarden, v -> config.bossCombatPointsPerSecondWarden = v, 0.0, 1000.0),
+            Setting.dbl("Boss Points / Sec: Elder Guardian", "Points the Elder Guardian earns per second while in combat.",
+                () -> config.bossCombatPointsPerSecondElderGuardian, v -> config.bossCombatPointsPerSecondElderGuardian = v, 0.0, 1000.0)
+        )));
 
-        // ------------------------------------------------------------------
-        // Performance: budgets and cleanup.
-        // ------------------------------------------------------------------
-        ConfigCategory performance = builder.getOrCreateCategory(Component.literal("Performance"));
-        performance.addEntry(entries.startBooleanToggle(Component.literal("Performance Mode"), config.performanceMode)
-                .setDefaultValue(false)
-                .setTooltip(Component.literal("Cuts visuals and batching for weaker machines."))
-                .setSaveConsumer(v -> config.performanceMode = v)
-                .build());
-        performance.addEntry(entries.startBooleanToggle(Component.literal("Enable Batching"), config.enableBatching)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Batch upgrade tasks to reduce tick spikes."))
-                .setSaveConsumer(v -> config.enableBatching = v)
-                .build());
-        performance.addEntry(entries.startBooleanToggle(Component.literal("Enable Async Tasks"), config.enableAsyncTasks)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Move heavy calculations off the main thread."))
-                .setSaveConsumer(v -> config.enableAsyncTasks = v)
-                .build());
-        performance.addEntry(entries.startIntSlider(Component.literal("Concurrent Upgrades"), config.maxConcurrentUpgradeJobs, 1, 256)
-                .setDefaultValue(32)
-                .setTooltip(Component.literal("How many upgrade jobs may run at once."))
-                .setSaveConsumer(v -> config.maxConcurrentUpgradeJobs = v)
-                .build());
-        performance.addEntry(entries.startIntSlider(Component.literal("Upgrade Window (ms)"), config.upgradeProcessingTimeMs, 1000, 30000)
-                .setDefaultValue(5000)
-                .setTooltip(Component.literal("Time budget for processing upgrades each cycle."))
-                .setSaveConsumer(v -> config.upgradeProcessingTimeMs = v)
-                .build());
-        // Note: there is deliberately no Mob Save Debounce entry. The
-        // config field exists but nothing consumes it (mob data persists
-        // through vanilla entity NBT saving, which has no debounce), and
-        // the screen must not promise a setting that does nothing.
-        performance.addEntry(entries.startBooleanToggle(Component.literal("Clean Up Stuck Projectiles"), config.cleanupNonPlayerGroundProjectiles)
-                .setDefaultValue(false)
-                .setTooltip(Component.literal("Periodically removes old arrows and tridents stuck in the ground."))
-                .setSaveConsumer(v -> config.cleanupNonPlayerGroundProjectiles = v)
-                .build());
-        performance.addEntry(entries.startIntSlider(Component.literal("Projectile Cleanup Interval (s)"), config.cleanupNonPlayerGroundProjectilesIntervalSeconds, 5, 120)
-                .setDefaultValue(5)
-                .setTooltip(Component.literal("How often the projectile cleanup runs."))
-                .setSaveConsumer(v -> config.cleanupNonPlayerGroundProjectilesIntervalSeconds = v)
-                .build());
+        categories.add(new Category("Warlord", List.of(
+            Setting.bool("Warlord System", "Enable the Mob Warlord raid boss feature.",
+                () -> config.warlordEnabled, v -> { config.warlordEnabled = v; config.enableMobWarlord = v; }),
+            Setting.bool("Always Spawn On Final Wave", "Forces every final raid wave to include the Warlord.",
+                () -> config.alwaysSpawnWarlordOnFinalWave, v -> config.alwaysSpawnWarlordOnFinalWave = v),
+            Setting.integer("Spawn Chance %", "Chance the Warlord joins a qualifying raid wave.",
+                () -> config.warlordSpawnChance, v -> config.warlordSpawnChance = v, 0, 100),
+            Setting.integer("Min Raid Level", "Lowest raid level that can spawn the Warlord.",
+                () -> config.warlordMinRaidLevel, v -> config.warlordMinRaidLevel = v, 1, 20),
+            Setting.integer("Minion Count", "How many minions the Warlord brings.",
+                () -> config.warlordMinionCount, v -> config.warlordMinionCount = v, 5, 100),
+            Setting.integer("Health %", "Warlord health multiplier. 300 = 3x health.",
+                () -> config.warlordHealthMultiplierPercent, v -> { config.warlordHealthMultiplierPercent = v; config.warlordHealthMultiplier = v / 100.0; }, 100, 1000),
+            Setting.integer("Damage %", "Warlord damage multiplier. 200 = 2x damage.",
+                () -> config.warlordDamageMultiplierPercent, v -> { config.warlordDamageMultiplierPercent = v; config.warlordDamageMultiplier = v / 100.0; }, 100, 1000)
+        )));
 
-        // ------------------------------------------------------------------
-        // Visuals: client overlays.
-        // ------------------------------------------------------------------
-        ConfigCategory visuals = builder.getOrCreateCategory(Component.literal("Visuals"));
-        visuals.addEntry(entries.startBooleanToggle(Component.literal("Disable Particles"), config.disableParticles)
-                .setDefaultValue(false)
-                .setTooltip(Component.literal("Removes most particles for better FPS."))
-                .setSaveConsumer(v -> config.disableParticles = v)
-                .build());
-        visuals.addEntry(entries.startBooleanToggle(Component.literal("Show Target Lines"), config.showTargetLines)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Draw lines between mobs and their targets."))
-                .setSaveConsumer(v -> config.showTargetLines = v)
-                .build());
-        visuals.addEntry(entries.startBooleanToggle(Component.literal("Level Up Particles"), config.showLevelParticles)
-                .setDefaultValue(true)
-                .setTooltip(Component.literal("Play particles when mobs level up."))
-                .setSaveConsumer(v -> config.showLevelParticles = v)
-                .build());
-        visuals.addEntry(entries.startIntSlider(Component.literal("Minimum FPS For Visuals"), config.minFpsForVisuals, 0, 144)
-                .setDefaultValue(30)
-                .setTooltip(Component.literal("Visuals pause below this frame rate."))
-                .setSaveConsumer(v -> config.minFpsForVisuals = v)
-                .build());
-        visuals.addEntry(entries.startIntSlider(Component.literal("Particles / Connection"), config.maxParticlesPerConnection, 1, 50)
-                .setDefaultValue(8)
-                .setTooltip(Component.literal("Particle budget per drawn connection."))
-                .setSaveConsumer(v -> config.maxParticlesPerConnection = v)
-                .build());
-        visuals.addEntry(entries.startIntSlider(Component.literal("Minion Connections Drawn"), config.maxDrawnMinionConnections, 1, 100)
-                .setDefaultValue(15)
-                .setTooltip(Component.literal("How many warlord minion links are drawn at once."))
-                .setSaveConsumer(v -> config.maxDrawnMinionConnections = v)
-                .build());
+        categories.add(new Category("Performance", List.of(
+            Setting.bool("Performance Mode", "Cuts visuals and batching for weaker machines.",
+                () -> config.performanceMode, v -> config.performanceMode = v),
+            Setting.bool("Enable Batching", "Batch upgrade tasks to reduce tick spikes.",
+                () -> config.enableBatching, v -> config.enableBatching = v),
+            Setting.bool("Enable Async Tasks", "Move heavy calculations off the main thread.",
+                () -> config.enableAsyncTasks, v -> config.enableAsyncTasks = v),
+            Setting.integer("Concurrent Upgrades", "How many upgrade jobs may run at once.",
+                () -> config.maxConcurrentUpgradeJobs, v -> config.maxConcurrentUpgradeJobs = v, 1, 256),
+            Setting.integer("Upgrade Window (ms)", "Time budget for processing upgrades each cycle.",
+                () -> config.upgradeProcessingTimeMs, v -> config.upgradeProcessingTimeMs = v, 1000, 30000),
+            Setting.bool("Clean Up Stuck Projectiles", "Periodically removes old arrows and tridents stuck in the ground.",
+                () -> config.cleanupNonPlayerGroundProjectiles, v -> config.cleanupNonPlayerGroundProjectiles = v),
+            Setting.integer("Projectile Cleanup Interval (s)", "How often the projectile cleanup runs.",
+                () -> config.cleanupNonPlayerGroundProjectilesIntervalSeconds, v -> config.cleanupNonPlayerGroundProjectilesIntervalSeconds = v, 5, 120)
+        )));
 
-        // ------------------------------------------------------------------
-        // Debug: logging for testing.
-        // ------------------------------------------------------------------
-        ConfigCategory debug = builder.getOrCreateCategory(Component.literal("Debug"));
-        debug.addEntry(entries.startBooleanToggle(Component.literal("Upgrade Chat Log"), config.debugUpgradeLog)
-                .setDefaultValue(false)
-                .setTooltip(Component.literal("Print every upgrade decision in chat while testing."))
-                .setSaveConsumer(v -> config.debugUpgradeLog = v)
-                .build());
-        debug.addEntry(entries.startBooleanToggle(Component.literal("Verbose Console Logging"), config.debugLogging)
-                .setDefaultValue(false)
-                .setTooltip(Component.literal("Spam-level logs for profiling and bug reports. Only toggle when needed."))
-                .setSaveConsumer(v -> config.debugLogging = v)
-                .build());
+        categories.add(new Category("Visuals", List.of(
+            Setting.bool("Show Health Plates", "Name, level and HP bar above mobs near you.",
+                () -> config.showHealthPlates, v -> config.showHealthPlates = v),
+            Setting.integer("Health Plate Range", "Blocks within which health plates are drawn.",
+                () -> config.healthPlateRange, v -> config.healthPlateRange = v, 4, 32),
+            Setting.bool("Disable Particles", "Removes most particles for better FPS.",
+                () -> config.disableParticles, v -> config.disableParticles = v),
+            Setting.bool("Show Target Lines", "Draw lines between mobs and their targets.",
+                () -> config.showTargetLines, v -> config.showTargetLines = v),
+            Setting.bool("Level Up Particles", "Play particles when mobs level up.",
+                () -> config.showLevelParticles, v -> config.showLevelParticles = v),
+            Setting.integer("Minimum FPS For Visuals", "Visuals pause below this frame rate.",
+                () -> config.minFpsForVisuals, v -> config.minFpsForVisuals = v, 0, 144),
+            Setting.integer("Particles / Connection", "Particle budget per drawn connection.",
+                () -> config.maxParticlesPerConnection, v -> config.maxParticlesPerConnection = v, 1, 50),
+            Setting.integer("Minion Connections Drawn", "How many warlord minion links are drawn at once.",
+                () -> config.maxDrawnMinionConnections, v -> config.maxDrawnMinionConnections = v, 1, 100)
+        )));
 
-        return builder.build();
+        categories.add(new Category("Debug", List.of(
+            Setting.bool("Upgrade Chat Log", "Print every upgrade decision in chat while testing.",
+                () -> config.debugUpgradeLog, v -> config.debugUpgradeLog = v),
+            Setting.bool("Verbose Console Logging", "Spam-level logs for profiling and bug reports. Only toggle when needed.",
+                () -> config.debugLogging, v -> config.debugLogging = v)
+        )));
+
+        return categories;
+    }
+
+    // ======================================================================
+    //                              LAYOUT
+    // ======================================================================
+
+    @Override
+    protected void init() {
+        rebuildWidgets();
+    }
+
+    private int contentLeft() {
+        return SIDEBAR_WIDTH + 16;
+    }
+
+    private int visibleRows() {
+        return Math.max(1, (this.height - CONTENT_TOP - FOOTER_HEIGHT) / ROW_HEIGHT);
+    }
+
+    @Override
+    protected void rebuildWidgets() {
+        building = true;
+        clearWidgets();
+
+        // Category rail.
+        for (int i = 0; i < categories.size(); i++) {
+            final int index = i;
+            Button button = Button.builder(Component.literal(categories.get(i).name()), b -> {
+                categoryIndex = index;
+                scrollRow = 0;
+                rebuildWidgets();
+            }).bounds(8, CONTENT_TOP + i * 24, SIDEBAR_WIDTH - 8, 20).build();
+            button.active = index != categoryIndex;
+            addRenderableWidget(button);
+        }
+
+        // Done button.
+        addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose())
+            .bounds(this.width - 108, this.height - 28, 100, 20)
+            .build());
+
+        // Settings rows for the current category.
+        List<Setting> settings = categories.get(categoryIndex).settings();
+        int rows = visibleRows();
+        for (int row = 0; row < rows; row++) {
+            int settingIndex = scrollRow + row;
+            if (settingIndex >= settings.size()) {
+                break;
+            }
+            buildRowWidgets(settings.get(settingIndex), CONTENT_TOP + row * ROW_HEIGHT);
+        }
+        building = false;
+    }
+
+    private void buildRowWidgets(Setting setting, int y) {
+        int right = this.width - 12;
+        switch (setting.kind()) {
+            case BOOL -> {
+                boolean current = (Boolean) setting.getter().get();
+                Button[] holder = new Button[1];
+                Button button = Button.builder(Component.literal(current ? "ON" : "OFF"), b -> {
+                    boolean newValue = !(Boolean) setting.getter().get();
+                    setting.setter().accept(newValue);
+                    holder[0].setMessage(Component.literal(newValue ? "ON" : "OFF"));
+                }).bounds(right - 70, y + 3, 70, 20).build();
+                holder[0] = button;
+                addRenderableWidget(button);
+            }
+            case INT, DOUBLE -> {
+                boolean isInt = setting.kind() == Kind.INT;
+                double step = isInt ? Math.max(1, (setting.max() - setting.min()) / 100.0) : 1.0;
+                EditBox box = new EditBox(this.font, right - 118, y + 3, 72, 20, Component.literal(setting.label()));
+                box.setMaxLength(18);
+                box.setValue(formatValue(setting));
+                box.setResponder(text -> {
+                    if (building) {
+                        return;
+                    }
+                    applyTextValue(setting, text);
+                });
+                addRenderableWidget(box);
+                addRenderableWidget(Button.builder(Component.literal("-"), b -> stepValue(setting, -step, box))
+                    .bounds(right - 142, y + 3, 20, 20).build());
+                addRenderableWidget(Button.builder(Component.literal("+"), b -> stepValue(setting, step, box))
+                    .bounds(right - 42, y + 3, 20, 20).build());
+            }
+        }
+    }
+
+    private String formatValue(Setting setting) {
+        Object value = setting.getter().get();
+        if (value instanceof Double d) {
+            return d == Math.floor(d) ? Long.toString(Math.round(d)) : Double.toString(d);
+        }
+        return String.valueOf(value);
+    }
+
+    private void applyTextValue(Setting setting, String text) {
+        try {
+            if (setting.kind() == Kind.INT) {
+                int parsed = Integer.parseInt(text.trim());
+                int clamped = (int) Math.max(setting.min(), Math.min(setting.max(), parsed));
+                setting.setter().accept(clamped);
+            } else if (setting.kind() == Kind.DOUBLE) {
+                double parsed = Double.parseDouble(text.trim());
+                if (Double.isFinite(parsed)) {
+                    double clamped = Math.max(setting.min(), Math.min(setting.max(), parsed));
+                    setting.setter().accept(clamped);
+                }
+            }
+        } catch (NumberFormatException ignored) {
+            // Mid-typing text (empty, "-", "1.") is not a value yet.
+        }
+    }
+
+    private void stepValue(Setting setting, double delta, EditBox box) {
+        if (setting.kind() == Kind.INT) {
+            int current = (Integer) setting.getter().get();
+            int next = (int) Math.max(setting.min(), Math.min(setting.max(), current + Math.round(delta)));
+            setting.setter().accept(next);
+        } else {
+            double current = (Double) setting.getter().get();
+            double next = Math.max(setting.min(), Math.min(setting.max(), current + delta));
+            setting.setter().accept(next);
+        }
+        building = true;
+        box.setValue(formatValue(setting));
+        building = false;
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        List<Setting> settings = categories.get(categoryIndex).settings();
+        int maxScroll = Math.max(0, settings.size() - visibleRows());
+        int newScroll = Math.max(0, Math.min(maxScroll, scrollRow - (int) Math.signum(scrollY) * 2));
+        if (newScroll != scrollRow) {
+            scrollRow = newScroll;
+            rebuildWidgets();
+        }
+        return true;
+    }
+
+    @Override
+    public void onClose() {
+        ModConfig.save();
+        this.minecraft.setScreenAndShow(parent);
+    }
+
+    @Override
+    public void removed() {
+        ModConfig.save();
+        super.removed();
+    }
+
+    // ======================================================================
+    //                              RENDER
+    // ======================================================================
+
+    @Override
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+        // Backdrop and chrome.
+        graphics.fill(0, 0, this.width, this.height, 0xE0080810);
+        graphics.fill(0, 0, SIDEBAR_WIDTH + 4, this.height, 0xFF0D0D16);
+        graphics.fill(SIDEBAR_WIDTH + 4, 0, SIDEBAR_WIDTH + 6, this.height, 0xFFB02A30);
+        graphics.text(this.font, "UNIVERSAL MOB WAR", 8, 10, 0xFFFF4B4B);
+        graphics.text(this.font, "Settings", 8, 22, 0xFF888888);
+        graphics.text(this.font, categories.get(categoryIndex).name(), contentLeft(), 12, 0xFFFFFFFF);
+        graphics.text(this.font, "Changes apply live and save when this screen closes.",
+            contentLeft(), 24, 0xFF888888);
+
+        // Row labels and hover tooltip.
+        List<Setting> settings = categories.get(categoryIndex).settings();
+        String hoveredTooltip = null;
+        int rows = visibleRows();
+        for (int row = 0; row < rows; row++) {
+            int settingIndex = scrollRow + row;
+            if (settingIndex >= settings.size()) {
+                break;
+            }
+            Setting setting = settings.get(settingIndex);
+            int y = CONTENT_TOP + row * ROW_HEIGHT;
+            if (row % 2 == 0) {
+                graphics.fill(contentLeft() - 4, y, this.width - 8, y + ROW_HEIGHT, 0x22FFFFFF);
+            }
+            String label = this.font.plainSubstrByWidth(setting.label(), this.width - contentLeft() - 160);
+            graphics.text(this.font, label, contentLeft(), y + 8, 0xFFD8D8D8);
+            if (mouseX >= contentLeft() && mouseX < this.width - 8 && mouseY >= y && mouseY < y + ROW_HEIGHT) {
+                hoveredTooltip = setting.tooltip();
+            }
+        }
+
+        graphics.fill(0, this.height - FOOTER_HEIGHT + 8, this.width, this.height, 0xFF0D0D16);
+        if (hoveredTooltip != null) {
+            String tip = this.font.plainSubstrByWidth(hoveredTooltip, this.width - 16);
+            graphics.text(this.font, tip, 8, this.height - FOOTER_HEIGHT + 14, 0xFFFFC857);
+        }
+        List<Setting> current = categories.get(categoryIndex).settings();
+        int maxScroll = Math.max(0, current.size() - rows);
+        if (maxScroll > 0) {
+            graphics.text(this.font, "scroll " + scrollRow + "/" + maxScroll, contentLeft(), this.height - FOOTER_HEIGHT + 14, 0xFF666666);
+        }
+
+        super.extractRenderState(graphics, mouseX, mouseY, partialTick);
     }
 }

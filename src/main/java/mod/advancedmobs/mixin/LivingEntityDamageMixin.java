@@ -34,6 +34,19 @@ public abstract class LivingEntityDamageMixin {
 
             MobWarData data = ((IMobWarDataHolder) mobEntity).getMobWarData();
 
+            // Combat stats for the inspect panel. These adders existed
+            // on MobWarData but nothing ever called them, so damage
+            // dealt/taken displayed as 0 forever.
+            if (data != null) {
+                data.addDamageTaken(amount);
+            }
+            if (source.getEntity() instanceof Mob attacker && attacker != mobEntity) {
+                MobWarData attackerData = ((IMobWarDataHolder) attacker).getMobWarData();
+                if (attackerData != null) {
+                    attackerData.addDamageDealt(amount);
+                }
+            }
+
             ScalingSystem.handleCriticalGlow(mobEntity, source);
 
             if (data == null) {

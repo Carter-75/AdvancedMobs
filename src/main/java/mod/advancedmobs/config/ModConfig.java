@@ -335,6 +335,15 @@ public class ModConfig implements ConfigData {
     @ConfigEntry.Gui.Tooltip(count = 1)
     public int maxDrawnMinionConnections = 15;
 
+    // Health plates (name + HP bar + level) above nearby mobs, and the
+    // right-click inspect panel / spectator info overlay.
+    @ConfigEntry.Category("visuals")
+    public boolean showHealthPlates = true;
+
+    @ConfigEntry.Category("visuals")
+    @ConfigEntry.BoundedDiscrete(min = 4, max = 32)
+    public int healthPlateRange = 10;
+
     // ==========================================================================
     //                               DEBUG
     // ==========================================================================
@@ -661,6 +670,7 @@ public class ModConfig implements ConfigData {
         targetingMaxQueriesPerTick = clampInt(targetingMaxQueriesPerTick, 1, 10000);
         mobDataSaveDebounceMs = clampInt(mobDataSaveDebounceMs, 0, 60000);
         minFpsForVisuals = clampInt(minFpsForVisuals, 0, 240);
+        healthPlateRange = clampInt(healthPlateRange, 4, 32);
         maxParticlesPerConnection = clampInt(maxParticlesPerConnection, 0, 1000);
         maxDrawnMinionConnections = clampInt(maxDrawnMinionConnections, 0, 256);
         cleanupNonPlayerGroundProjectilesIntervalSeconds = clampInt(cleanupNonPlayerGroundProjectilesIntervalSeconds, 1, 3600);

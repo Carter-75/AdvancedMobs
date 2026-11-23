@@ -57,11 +57,11 @@
         { "level": 3, "cost": 12, "speed_level": 3 }
       ],
       "invisibility_on_hit": [
-        { "level": 1, "cost": 8, "chance": 0.05, "duration": 5, "cooldown": 60 },
-        { "level": 2, "cost": 12, "chance": 0.2, "duration": 8, "cooldown": 60 },
-        { "level": 3, "cost": 16, "chance": 0.4, "duration": 12, "cooldown": 60 },
-        { "level": 4, "cost": 20, "chance": 0.6, "duration": 16, "cooldown": 60 },
-        { "level": 5, "cost": 25, "chance": 0.8, "duration": 20, "cooldown": 60 }
+        { "level": 1, "cost": 30, "chance": 0.01, "duration": 4, "cooldown": 180 },
+        { "level": 2, "cost": 45, "chance": 0.02, "duration": 5, "cooldown": 180 },
+        { "level": 3, "cost": 60, "chance": 0.03, "duration": 6, "cooldown": 180 },
+        { "level": 4, "cost": 80, "chance": 0.04, "duration": 8, "cooldown": 180 },
+        { "level": 5, "cost": 100, "chance": 0.05, "duration": 10, "cooldown": 180 }
       ]
     },
     "weapon": [],

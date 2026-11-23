@@ -138,6 +138,16 @@ public class AdvancedMobsMod implements ModInitializer {
 			// Tolerate double-init in dev / hot reload scenarios.
 		}
 
+		// Inspect system payloads (health plates, inspect panel, spectator overlay)
+		try {
+			PayloadTypeRegistry.clientboundPlay().register(mod.advancedmobs.net.MobInspectSyncPayload.ID, mod.advancedmobs.net.MobInspectSyncPayload.CODEC);
+			PayloadTypeRegistry.clientboundPlay().register(mod.advancedmobs.net.MobPlateSyncPayload.ID, mod.advancedmobs.net.MobPlateSyncPayload.CODEC);
+			PayloadTypeRegistry.serverboundPlay().register(mod.advancedmobs.net.MobInspectRequestPayload.ID, mod.advancedmobs.net.MobInspectRequestPayload.CODEC);
+		} catch (IllegalArgumentException alreadyRegistered) {
+			// Tolerate double-init in dev / hot reload scenarios.
+		}
+		mod.advancedmobs.system.MobInspectService.registerServer();
+
 		// SAFETY NET: Register a global handler for unknown or malformed payloads to prevent hard disconnects
 		ServerPlayNetworking.registerGlobalReceiver(UMW_SAFETYNET_ID, (payload, context) -> {
 			runSafely("SAFETY_NET_PAYLOAD", () -> {
