@@ -288,7 +288,17 @@ public class AdvancedMobsMod implements ModInitializer {
 						// callers before this.
 						UUID mobUuid = mob.getUUID();
 						ScalingSystem.cleanupMobState(mobUuid);
-						SummonerTracker.unregisterSummoned(mobUuid);
+						// The summoner record is the exception: it is NOT
+						// self-healing. Nothing re-registers a summoned mob
+						// on chunk reload (finalizeSpawn does not fire), so
+						// unregistering on a plain chunk unload permanently
+						// erases the "do not attack your summoner" record
+						// for a mob that is still alive. Only drop it on a
+						// genuine removal, the same gate as ability
+						// termination above.
+						if (mob.isRemoved() || !mob.isAlive()) {
+							SummonerTracker.unregisterSummoned(mobUuid);
+						}
 						TargetingSystem.clearMobData(mobUuid);
 					}
 				}
@@ -296,6 +306,7 @@ public class AdvancedMobsMod implements ModInitializer {
 		});
 
 		ServerLifecycleEvents.SERVER_STOPPED.register(server -> TickScheduler.clear());
+		ServerLifecycleEvents.SERVER_STOPPED.register(server -> NaturalSpawnLimiter.clearAll());
 
 		// OPTIMIZATION: Register cache cleanup for entity query system (every 5 seconds)
 		ServerTickEvents.END_SERVER_TICK.register(server -> {

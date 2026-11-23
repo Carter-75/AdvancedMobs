@@ -331,9 +331,21 @@ public class OperationScheduler {
             );
         }
         
-        // Clean up old attempt counters (prevent memory leak) - only if map is large
+        // Clean up old attempt counters (prevent memory leak) - only if map is large.
+        // Attempts are normally cleared on successful execution; the old rule
+        // (remove only above 100 attempts) left one permanent entry per
+        // operation that ever contended a few times. Now also age out
+        // counters whose operation has gone quiet: no recent timestamp in
+        // lastOperationTime means nothing is actively contending, and losing
+        // a stale counter only resets starvation priority.
         if (operationAttempts.size() > 50) {
-            operationAttempts.entrySet().removeIf(entry -> entry.getValue() > 100); // Remove if >100 failed attempts
+            operationAttempts.entrySet().removeIf(entry -> {
+                if (entry.getValue() > 100) return true; // Remove if >100 failed attempts
+                Long last = lastOperationTime.get(entry.getKey());
+                Long first = lastOperationTime.get(entry.getKey() + "_first_attempt");
+                long lastActivity = Math.max(last != null ? last : 0L, first != null ? first : 0L);
+                return lastActivity == 0L || (currentTime - lastActivity) > 60000L;
+            });
         }
         
         // Reset queue depths if they're negative (shouldn't happen but safety check)

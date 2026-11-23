@@ -280,11 +280,11 @@ public class ModConfig implements ConfigData {
     
     @ConfigEntry.BoundedDiscrete(min = 100, max = 5000)
     @ConfigEntry.Gui.Tooltip(count = 2)
-    public int targetingCacheMs = 1500;
+    public int targetingCacheMs = 2000;
     
     @ConfigEntry.BoundedDiscrete(min = 10, max = 200)
     @ConfigEntry.Gui.Tooltip(count = 2)
-    public int targetingMaxQueriesPerTick = 50;
+    public int targetingMaxQueriesPerTick = 30;
     
     @ConfigEntry.BoundedDiscrete(min = 50, max = 1000)
     @ConfigEntry.Gui.Tooltip(count = 2)
@@ -456,10 +456,22 @@ public class ModConfig implements ConfigData {
     // ==========================================================================
     
     private static ConfigHolder<ModConfig> holder;
+    private static ModConfig fallbackInstance;
 
     public static ModConfig getInstance() {
         if (holder == null) {
-            holder = AutoConfig.getConfigHolder(ModConfig.class);
+            try {
+                holder = AutoConfig.getConfigHolder(ModConfig.class);
+            } catch (RuntimeException notRegistered) {
+                // AutoConfig.getConfigHolder throws when the config has not
+                // been registered yet. Serve a defaults instance instead of
+                // crashing the caller; the real config takes over as soon as
+                // AdvancedMobsMod.onInitialize registers it.
+                if (fallbackInstance == null) {
+                    fallbackInstance = new ModConfig();
+                }
+                return fallbackInstance;
+            }
         }
         return holder.getConfig();
     }
@@ -469,13 +481,14 @@ public class ModConfig implements ConfigData {
      * Useful for applying settings like manualWorldDayOverride without restarting.
      */
     public static ModConfig reload() {
-        if (holder == null) {
-            holder = AutoConfig.getConfigHolder(ModConfig.class);
-        }
         try {
+            if (holder == null) {
+                holder = AutoConfig.getConfigHolder(ModConfig.class);
+            }
             holder.load();
         } catch (Exception ignored) {
             // Best-effort: keep current config instance if reload fails.
+            return getInstance();
         }
         return holder.getConfig();
     }
@@ -596,9 +609,81 @@ public class ModConfig implements ConfigData {
     @ConfigEntry.Gui.Excluded
     public transient double warlordDamageMultiplier = 2.0;
     
-    // Sync legacy fields on load
+    private static int clampInt(int value, int min, int max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private static double sanitizeRate(double value, double fallback) {
+        return (Double.isFinite(value) && value >= 0.0) ? value : fallback;
+    }
+
+    // Sanitize, then sync legacy fields on load
     @Override
     public void validatePostLoad() throws ValidationException {
+        // Values come from a JSON file users can hand edit, and several
+        // systems trust them raw. A NaN abilityFullPowerPoints makes Gson
+        // throw on the next save and poisons the ability math; negative
+        // alliance durations expire every alliance instantly; percents
+        // outside 0-100 skew the spending lottery. Clamp everything to its
+        // documented range here, the one place every load passes through.
+        if (!Double.isFinite(abilityFullPowerPoints) || abilityFullPowerPoints < 1.0) {
+            abilityFullPowerPoints = 3000.0;
+        }
+        bossCombatPointsPerSecondDragon = sanitizeRate(bossCombatPointsPerSecondDragon, 25.0);
+        bossCombatPointsPerSecondWither = sanitizeRate(bossCombatPointsPerSecondWither, 15.0);
+        bossCombatPointsPerSecondWarlord = sanitizeRate(bossCombatPointsPerSecondWarlord, 15.0);
+        bossCombatPointsPerSecondWarden = sanitizeRate(bossCombatPointsPerSecondWarden, 10.0);
+        bossCombatPointsPerSecondElderGuardian = sanitizeRate(bossCombatPointsPerSecondElderGuardian, 10.0);
+
+        buyChancePercent = clampInt(buyChancePercent, 0, 100);
+        saveChancePercent = clampInt(saveChancePercent, 0, 100);
+        allianceBreakChancePercent = clampInt(allianceBreakChancePercent, 0, 100);
+        strongAllianceBreakChancePercent = clampInt(strongAllianceBreakChancePercent, 0, 100);
+        warlordSpawnChance = clampInt(warlordSpawnChance, 0, 100);
+        xpBonusPercentPerStep = clampInt(xpBonusPercentPerStep, 0, 1000);
+        rangeMultiplierPercent = clampInt(rangeMultiplierPercent, 0, 1000);
+        dayScalingMultiplierPercent = clampInt(dayScalingMultiplierPercent, 0, 1000);
+        killScalingMultiplierPercent = clampInt(killScalingMultiplierPercent, 0, 1000);
+        warlordHealthMultiplierPercent = clampInt(warlordHealthMultiplierPercent, 1, 10000);
+        warlordDamageMultiplierPercent = clampInt(warlordDamageMultiplierPercent, 1, 10000);
+
+        weakAllianceDurationMs = Math.max(0, weakAllianceDurationMs);
+        strongAllianceDurationMs = Math.max(0, strongAllianceDurationMs);
+        spentPointsPerXpBonusStep = Math.max(1, spentPointsPerXpBonusStep);
+        upgradeIntervalTicks = clampInt(upgradeIntervalTicks, 20, 480000);
+        maxSpawnUpgradeIterations = clampInt(maxSpawnUpgradeIterations, 0, 20000);
+        naturalSpawnCapPerSimulationDistance = Math.max(0, naturalSpawnCapPerSimulationDistance);
+        warlordMinRaidLevel = clampInt(warlordMinRaidLevel, 1, 10);
+        warlordMinionCount = clampInt(warlordMinionCount, 0, 64);
+        maxConcurrentUpgradeJobs = clampInt(maxConcurrentUpgradeJobs, 1, 256);
+        upgradeProcessingTimeMs = clampInt(upgradeProcessingTimeMs, 100, 60000);
+        targetingCacheMs = clampInt(targetingCacheMs, 0, 60000);
+        targetingMaxQueriesPerTick = clampInt(targetingMaxQueriesPerTick, 1, 10000);
+        mobDataSaveDebounceMs = clampInt(mobDataSaveDebounceMs, 0, 60000);
+        minFpsForVisuals = clampInt(minFpsForVisuals, 0, 240);
+        maxParticlesPerConnection = clampInt(maxParticlesPerConnection, 0, 1000);
+        maxDrawnMinionConnections = clampInt(maxDrawnMinionConnections, 0, 256);
+        cleanupNonPlayerGroundProjectilesIntervalSeconds = clampInt(cleanupNonPlayerGroundProjectilesIntervalSeconds, 1, 3600);
+        cleanupNonPlayerGroundProjectilesMinAgeTicks = clampInt(cleanupNonPlayerGroundProjectilesMinAgeTicks, 0, 72000);
+        cleanupNonPlayerGroundProjectilesMaxPerWorldPerRun = clampInt(cleanupNonPlayerGroundProjectilesMaxPerWorldPerRun, 1, 10000);
+
+        // A JSON null in any list field would NPE its consumers (for
+        // example isMobExcluded inside the ENTITY_LOAD handler). Normalize.
+        if (excludedMobs == null) excludedMobs = new ArrayList<>();
+        if (specialMobs == null) specialMobs = new ArrayList<>();
+        if (swordTiers == null) swordTiers = new ArrayList<>();
+        if (goldSwordTiers == null) goldSwordTiers = new ArrayList<>();
+        if (axeTiers == null) axeTiers = new ArrayList<>();
+        if (goldAxeTiers == null) goldAxeTiers = new ArrayList<>();
+        if (helmetTiers == null) helmetTiers = new ArrayList<>();
+        if (chestTiers == null) chestTiers = new ArrayList<>();
+        if (legsTiers == null) legsTiers = new ArrayList<>();
+        if (bootsTiers == null) bootsTiers = new ArrayList<>();
+        if (goldHelmetTiers == null) goldHelmetTiers = new ArrayList<>();
+        if (goldChestTiers == null) goldChestTiers = new ArrayList<>();
+        if (goldLegsTiers == null) goldLegsTiers = new ArrayList<>();
+        if (goldBootsTiers == null) goldBootsTiers = new ArrayList<>();
+
         evolutionSystemEnabled = scalingEnabled;
         allianceSystemEnabled = allianceEnabled;
         enableMobWarlord = warlordEnabled;

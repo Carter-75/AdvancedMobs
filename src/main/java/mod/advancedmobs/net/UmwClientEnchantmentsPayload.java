@@ -19,7 +19,15 @@ public record UmwClientEnchantmentsPayload(List<Identifier> enchantmentIds) impl
 
     public static UmwClientEnchantmentsPayload read(RegistryFriendlyByteBuf buf) {
         int count = buf.readVarInt();
-        List<Identifier> ids = new ArrayList<>(Math.max(0, count));
+        // The count comes straight off the wire. Without a cap, a hostile
+        // client can claim billions of entries and force a giant list
+        // allocation before a single identifier is read. The real
+        // enchantment registry is far smaller than this cap.
+        if (count < 0 || count > 10000) {
+            throw new io.netty.handler.codec.DecoderException(
+                    "Client enchantments payload count out of range: " + count);
+        }
+        List<Identifier> ids = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             ids.add(buf.readIdentifier());
         }

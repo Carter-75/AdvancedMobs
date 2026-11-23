@@ -1,6 +1,7 @@
 package mod.advancedmobs.mixin;
 
 import mod.advancedmobs.AdvancedMobsMod;
+import mod.advancedmobs.util.RawIdMethodCache;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.core.Registry;
 import net.minecraft.core.Holder;
@@ -32,8 +33,9 @@ import java.util.Optional;
 @Mixin(IdMap.class)
 public interface IndexedIterableRawIdFixMixin {
 
-    // The method cache lives in RawIdMethodCache. Interface mixins cannot
-    // declare their own fields.
+    // The method cache lives in util/RawIdMethodCache. Interface mixins
+    // cannot declare their own fields, and helper classes do not belong in
+    // the mixin package.
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     @Inject(method = "getIdOrThrow(Ljava/lang/Object;)I", at = @At("HEAD"), cancellable = true)
@@ -185,15 +187,5 @@ public interface IndexedIterableRawIdFixMixin {
             return null;
         }
         return null;
-    }
-}
-
-/**
- * Holds the reflected raw-id lookup, outside the interface mixin.
- */
-final class RawIdMethodCache {
-    static final java.util.Map<Class<?>, Method> METHODS = new java.util.concurrent.ConcurrentHashMap<>();
-
-    private RawIdMethodCache() {
     }
 }

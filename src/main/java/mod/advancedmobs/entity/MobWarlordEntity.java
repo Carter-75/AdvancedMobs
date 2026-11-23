@@ -90,6 +90,25 @@ public class MobWarlordEntity extends Monster {
     public MobWarlordEntity(EntityType<? extends Monster> entityType, Level world) {
         super(entityType, world);
         this.xpReward = 500; // Massive XP drop
+        // Apply the config health and damage multipliers, which previously
+        // did nothing at all. The attribute supplier values (1500 HP, 12
+        // damage) are the values AT the default percents (300 and 200), so
+        // scale relative to those defaults: default config changes nothing,
+        // and the settings scale the boss proportionally from there. Done
+        // in the constructor so every spawn path gets it. Warlords loaded
+        // from a save overwrite these base values with their saved
+        // attributes immediately after construction, so a loaded boss is
+        // never double-scaled.
+        ModConfig warlordConfig = ModConfig.getInstance();
+        var healthAttribute = this.getAttribute(Attributes.MAX_HEALTH);
+        if (healthAttribute != null) {
+            healthAttribute.setBaseValue(1500.0 * warlordConfig.getWarlordHealthMultiplier() / 3.0);
+            this.setHealth(this.getMaxHealth());
+        }
+        var damageAttribute = this.getAttribute(Attributes.ATTACK_DAMAGE);
+        if (damageAttribute != null) {
+            damageAttribute.setBaseValue(12.0 * warlordConfig.getWarlordDamageMultiplier() / 2.0);
+        }
         this.bossBar = new ServerBossEvent(
             this.getUUID(),
             Component.literal("🔮 Mob Warlord 🔮").withStyle(style -> style.withColor(ChatFormatting.DARK_PURPLE).withBold(true)),

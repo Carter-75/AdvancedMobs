@@ -2751,6 +2751,13 @@ public class ScalingSystem {
         }
         ABILITY_COOLDOWNS.remove(mobUuid);
         PENDING_EQUIPMENT_SNAPSHOTS.remove(mobUuid);
+        // Also cancel any in-flight or completed async upgrade job for this
+        // mob. Results are only ever removed by pollResult in
+        // processMobTick, which a dead or unloaded mob never runs again, so
+        // without this the scheduler's result map leaks one entry per mob.
+        // A chunk-unloaded mob simply reschedules on reload: its skillData
+        // keeps the pending flags.
+        UpgradeJobScheduler.getInstance().cancel(mobUuid);
     }
 
     private static void handleUndeadHealingPulse(Mob mob, CompoundTag skillData, long currentTick) {

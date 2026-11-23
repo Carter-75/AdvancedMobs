@@ -34,4 +34,14 @@ public final class NaturalSpawnLimiter {
         AtomicInteger counter = NATURAL_MOB_COUNTS.get(world);
         return counter != null ? Math.max(0, counter.get()) : 0;
     }
+
+    /**
+     * Drops every per-level counter. The map is keyed by Level object, and
+     * every singleplayer session creates fresh ServerLevel objects, so
+     * without a reset the entries (and the levels they pin) accumulate
+     * across menu exits. Registered on SERVER_STOPPED in AdvancedMobsMod.
+     */
+    public static void clearAll() {
+        NATURAL_MOB_COUNTS.clear();
+    }
 }

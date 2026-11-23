@@ -77,7 +77,7 @@ public class MobWarData {
     public double getSpentPoints() { return spentPoints; }
     public void setSpentPoints(double points) { this.spentPoints = points; }
     public CompoundTag getSkillData() { return skillData; }
-    public void setSkillData(CompoundTag data) { this.skillData = data; }
+    public void setSkillData(CompoundTag data) { this.skillData = data != null ? data : new CompoundTag(); }
 
     // Boss combat progression accessors (see ScalingSystem Part B comment)
     public double getBossCombatPoints() { return bossCombatPoints; }
@@ -295,14 +295,18 @@ public class MobWarData {
         bossCombatPoints = nbt.getDoubleOr("am_boss_combat_points", 0.0);
         lastHurtTick = nbt.getLongOr("am_last_hurt_tick", -1L);
         
+        // Cleared unconditionally first: if this instance is ever reused
+        // across two reads, an absent key must mean "no target, no allies",
+        // not "keep whatever the previous read left behind".
+        currentTarget = null;
         if (nbt.contains("currentTarget")) {
             currentTarget = nbt.read("currentTarget", net.minecraft.core.UUIDUtil.CODEC).orElse(null);
             lastTargetChangeTime = nbt.getLongOr("lastTargetChangeTime", 0L);
         }
-        
+
+        allies.clear();
         if (nbt.contains("allies")) {
             long[] allyArray = nbt.getLongArray("allies").orElse(new long[0]);
-            allies.clear();
             // The i + 1 bound guards against a corrupt odd-length array.
             for (int i = 0; i + 1 < allyArray.length; i += 2) {
                 UUID uuid = new UUID(allyArray[i], allyArray[i + 1]);
@@ -319,7 +323,12 @@ public class MobWarData {
             return holder.getMobWarData();
         }
         
-        // Fallback (Should not happen with Mixin)
+        // Fallback (Should not happen with Mixin). If this ever runs, the
+        // data holder mixin is broken and progression will not persist;
+        // say so loudly instead of failing silently.
+        mod.advancedmobs.AdvancedMobsMod.LOGGER.warn(
+            "MobWarData.get fell back to an NBT copy for {}: IMobWarDataHolder mixin is not applied, progression will not persist",
+            mob.getName().getString());
         net.minecraft.world.level.storage.TagValueOutput output =
             net.minecraft.world.level.storage.TagValueOutput.createWithoutContext(net.minecraft.util.ProblemReporter.DISCARDING);
         mob.saveWithoutId(output);
@@ -339,7 +348,10 @@ public class MobWarData {
             return;
         }
         
-        // Fallback
+        // Fallback (see the warning in get(): the holder mixin is broken)
+        mod.advancedmobs.AdvancedMobsMod.LOGGER.warn(
+            "MobWarData.save fell back to an NBT round trip for {}: IMobWarDataHolder mixin is not applied",
+            mob.getName().getString());
         net.minecraft.world.level.storage.TagValueOutput output =
             net.minecraft.world.level.storage.TagValueOutput.createWithoutContext(net.minecraft.util.ProblemReporter.DISCARDING);
         mob.saveWithoutId(output);

@@ -31,7 +31,13 @@ public class AllianceSystem {
     //                              CONFIGURATION
     // ==========================================================================
     
-    private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor();
+    private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor(r -> {
+        // Daemon, like the upgrade scheduler: a non-daemon thread here
+        // would keep the JVM alive on shutdown paths that skip exit.
+        Thread thread = new Thread(r, "AdvancedMobs-AllianceScheduler");
+        thread.setDaemon(true);
+        return thread;
+    });
     
     // Tracks when alliances were formed (for expiration)
     private static final Map<UUID, Map<UUID, Long>> allianceTimestamps = new HashMap<>();
@@ -108,17 +114,34 @@ public class AllianceSystem {
             }
             // Operation on cooldown - queue for later, 300ms in the future (non-blocking)
             OperationScheduler.incrementAllianceQueue(); // Track queue depth
-            SCHEDULER.schedule(() -> {
-                world.getServer().execute(() -> {
+            try {
+                SCHEDULER.schedule(() -> {
                     try {
-                        if (isEnabled(world)) { // Re-check before executing
-                            updateAlliancesInternal(mob, world);
+                        var server = world.getServer();
+                        if (server == null) {
+                            // No server to re-post to (stopping): free the
+                            // slot here or the queue counter leaks and, after
+                            // 10 losses, alliance updates stop for the session.
+                            OperationScheduler.decrementAllianceQueue();
+                            return;
                         }
-                    } finally {
-                        OperationScheduler.decrementAllianceQueue(); // Done - free queue slot
+                        server.execute(() -> {
+                            try {
+                                if (isEnabled(world)) { // Re-check before executing
+                                    updateAlliancesInternal(mob, world);
+                                }
+                            } finally {
+                                OperationScheduler.decrementAllianceQueue(); // Done - free queue slot
+                            }
+                        });
+                    } catch (RuntimeException e) {
+                        OperationScheduler.decrementAllianceQueue();
                     }
-                });
-            }, 300, TimeUnit.MILLISECONDS);
+                }, 300, TimeUnit.MILLISECONDS);
+            } catch (RuntimeException e) {
+                // Scheduling itself failed (executor already shut down).
+                OperationScheduler.decrementAllianceQueue();
+            }
             return;
         }
         
@@ -131,6 +154,11 @@ public class AllianceSystem {
      * Internal alliance update processing.
      */
     private static void updateAlliancesInternal(Mob mob, ServerLevel world) {
+        // Deferred updates re-run up to 300 ms after they were queued; the
+        // mob may have died or been removed in the interval.
+        if (mob.isRemoved() || !mob.isAlive()) {
+            return;
+        }
         LivingEntity target = mob.getTarget();
         MobWarData mobData = MobWarData.get(mob);
         UUID mobUuid = mob.getUUID();

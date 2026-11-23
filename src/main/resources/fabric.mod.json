@@ -3,17 +3,24 @@
 	"id": "advancedmobs",
 	"version": "1.0.0",
 	"name": "Advanced Mobs",
-	"description": "Mobs attack each other and evolve with 100% progressive costs! Features: alliance system, mob leveling (0→8000 pts), equipment progression (Wood→Netherite), 47 progressive skills, 22 mixins. Total chaos with TRUE RPG progression!",
-	"authors": ["Carter"],
-	"contact": {
-	},
+	"description": "Mobs attack each other and evolve with 100% progressive costs! Features: alliance system, mob leveling, equipment progression (Wood to Netherite), 405 special abilities (5 per mob), 19 mixins. Total chaos with TRUE RPG progression!",
+	"authors": [
+		"Carter"
+	],
+	"contact": {},
 	"license": "All Rights Reserved",
 	"icon": "icon.png",
 	"environment": "*",
 	"entrypoints": {
-		"main": ["mod.advancedmobs.AdvancedMobsMod"],
-		"client": ["mod.advancedmobs.client.AdvancedMobsModClient"],
-		"modmenu": ["mod.advancedmobs.client.AdvancedMobsModMenu"]
+		"main": [
+			"mod.advancedmobs.AdvancedMobsMod"
+		],
+		"client": [
+			"mod.advancedmobs.client.AdvancedMobsModClient"
+		],
+		"modmenu": [
+			"mod.advancedmobs.client.AdvancedMobsModMenu"
+		]
 	},
 	"mixins": [
 		"advancedmobs.mixins.json"
@@ -22,10 +29,10 @@
 		"fabricloader": ">=0.19.2",
 		"minecraft": ">=26.2",
 		"java": ">=25",
-		"fabric-api": "*"
+		"fabric-api": "*",
+		"cloth-config2": "*"
 	},
 	"suggests": {
 		"modmenu": ">=20.0.0"
 	}
 }
-

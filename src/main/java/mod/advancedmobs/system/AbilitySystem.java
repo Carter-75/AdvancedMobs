@@ -1,6 +1,7 @@
 package mod.advancedmobs.system;
 
 import com.google.gson.JsonObject;
+import mod.advancedmobs.AdvancedMobsMod;
 import mod.advancedmobs.ability.AbilityContext;
 import mod.advancedmobs.ability.AbilityRegistry;
 import mod.advancedmobs.ability.MobAbility;
@@ -235,7 +236,16 @@ public final class AbilitySystem {
         MobAbility chosen = candidates.get(mob.getRandom().nextInt(candidates.size()));
         data.setAbilityActiveId(chosen.id());
         data.getAbilityActiveState().putInt(AbilityContext.KEY_TICKS_ACTIVE, 0);
-        chosen.start(new AbilityContext(mob, level, data, data.getAbilityActiveState()));
+        try {
+            chosen.start(new AbilityContext(mob, level, data, data.getAbilityActiveState()));
+        } catch (Throwable t) {
+            // A broken ability must not wedge the mob: drop the activation
+            // and cool down as if it had ended.
+            AdvancedMobsMod.LOGGER.error("Ability {} failed to start on {}; dropping activation",
+                    chosen.id(), mob.getName().getString(), t);
+            clearActivation(data);
+            data.setAbilityCooldownEnd(now + rollCooldownTicks(frac, mob.getRandom()));
+        }
     }
 
     // ======================================================================
@@ -389,9 +399,24 @@ public final class AbilitySystem {
         }
         AbilityContext ctx = new AbilityContext(mob, level, data, data.getAbilityActiveState());
         data.getAbilityActiveState().putInt(AbilityContext.KEY_TICKS_ACTIVE, ctx.ticksActive() + 1);
-        ability.tick(ctx);
-        if (ability.isFinished(ctx)) {
-            ability.end(ctx);
+        try {
+            ability.tick(ctx);
+            if (ability.isFinished(ctx)) {
+                ability.end(ctx);
+                clearActivation(data);
+                data.setAbilityCooldownEnd(now + rollCooldownTicks(frac, mob.getRandom()));
+            }
+        } catch (Throwable t) {
+            // Without this guard a throwing ability re-throws every tick
+            // forever: the activation is never cleared, end() never runs
+            // (so its effects are never reversed), and the log fills.
+            AdvancedMobsMod.LOGGER.error("Ability {} threw while active on {}; forcing cleanup",
+                    activeId, mob.getName().getString(), t);
+            try {
+                ability.end(ctx);
+            } catch (Throwable ignored) {
+                // end() is best-effort during forced cleanup.
+            }
             clearActivation(data);
             data.setAbilityCooldownEnd(now + rollCooldownTicks(frac, mob.getRandom()));
         }
@@ -425,6 +450,9 @@ public final class AbilitySystem {
     public static double powerFraction(MobWarData data, ModConfig config) {
         double fullPower = Math.max(1.0, config.abilityFullPowerPoints);
         double frac = data.getSkillPoints() / fullPower;
+        // Math.max above does not stop NaN: a NaN divisor or points value
+        // would otherwise flow into every comparison downstream.
+        if (!Double.isFinite(frac)) return 0.0;
         if (frac < 0.0) return 0.0;
         if (frac > 1.0) return 1.0;
         return frac;

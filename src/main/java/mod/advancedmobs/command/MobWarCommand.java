@@ -138,28 +138,13 @@ public class MobWarCommand {
             Component.literal("Game Rules:").withStyle(style -> style.withColor(ChatFormatting.AQUA).withBold(true)), false);
         
         source.sendSuccess(() -> 
-            Component.literal("  • /gamerule advancedMobsEnabled <true|false>")
+            Component.literal("  • /gamerule advancedmobs:universalmobwar_ignore_same_species <true|false>")
                 .withStyle(style -> style.withColor(ChatFormatting.YELLOW)), false);
         source.sendSuccess(() -> 
-            Component.literal("  • /gamerule advancedMobsIgnoreSame <true|false>")
+            Component.literal("  • /gamerule advancedmobs:universalmobwar_neutral_mobs_aggressive <true|false>")
                 .withStyle(style -> style.withColor(ChatFormatting.YELLOW)), false);
         source.sendSuccess(() -> 
-            Component.literal("  • /gamerule advancedMobsTargetPlayers <true|false>")
-                .withStyle(style -> style.withColor(ChatFormatting.YELLOW)), false);
-        source.sendSuccess(() -> 
-            Component.literal("  • /gamerule advancedMobsNeutralAggressive <true|false>")
-                .withStyle(style -> style.withColor(ChatFormatting.YELLOW)), false);
-        source.sendSuccess(() -> 
-            Component.literal("  • /gamerule advancedMobsAlliances <true|false>")
-                .withStyle(style -> style.withColor(ChatFormatting.YELLOW)), false);
-        source.sendSuccess(() -> 
-            Component.literal("  • /gamerule advancedMobsEvolution <true|false>")
-                .withStyle(style -> style.withColor(ChatFormatting.YELLOW)), false);
-        source.sendSuccess(() -> 
-            Component.literal("  • /gamerule advancedMobsRangeMultiplier <1-10000>")
-                .withStyle(style -> style.withColor(ChatFormatting.YELLOW)), false);
-        source.sendSuccess(() -> 
-            Component.literal("    (1=0.01x, 100=1.0x, 10000=100.0x range)")
+            Component.literal("    (Everything else lives in the Mod Menu config screen.)")
                 .withStyle(style -> style.withColor(ChatFormatting.DARK_GRAY)), false);
         
         source.sendSuccess(() -> 
@@ -174,10 +159,16 @@ public class MobWarCommand {
         ServerLevel world = source.getLevel();
         // Removed unused variable: BlockPos pos = BlockPos.containing(source.getPosition());
         
-        // Find mobs within 50 blocks
+        // Find mobs within 50 blocks of the command source. Built from the
+        // source position, not getPlayer(): stats has no player-only guard,
+        // and getPlayer() is null from the console or a command block.
+        net.minecraft.world.phys.Vec3 srcPos = source.getPosition();
+        net.minecraft.world.phys.AABB searchBox = new net.minecraft.world.phys.AABB(
+            srcPos.x - 50, srcPos.y - 50, srcPos.z - 50,
+            srcPos.x + 50, srcPos.y + 50, srcPos.z + 50);
         List<Mob> nearbyMobs = world.getEntitiesOfClass(
             Mob.class,
-            source.getPlayer().getBoundingBox().inflate(50),
+            searchBox,
             mob -> mob.isAlive()
         );
         

@@ -81,13 +81,21 @@ public final class TargetingUtil {
 	private static final ChunkCacheKey UNKNOWN_CACHE_KEY = new ChunkCacheKey(null, 0, 0);
 
 	private static final Map<ChunkCacheKey, ChunkEntityCache> ENTITY_CACHE = new ConcurrentHashMap<>();
-	private static final long CACHE_DURATION_MS = 2000; // Increased to 2 seconds for better performance
+	// Cache lifetime and per-tick query budget come from the config
+	// (targetingCacheMs / targetingMaxQueriesPerTick). Their defaults
+	// (2000 ms, 30) preserve the previously hardcoded tuned values.
+	private static long cacheDurationMs() {
+		return ModConfig.getInstance().targetingCacheMs;
+	}
+
+	private static int maxQueriesPerTick() {
+		return Math.max(1, ModConfig.getInstance().targetingMaxQueriesPerTick);
+	}
 	private static long lastCacheCleanup = 0;
 	
 	// Query rate limiting - max queries per tick across ALL mobs
 	private static int queriesThisTick = 0;
 	private static long currentTickTime = 0;
-	private static final int MAX_QUERIES_PER_TICK = 30; // Reduced from 50 to 30
 
 	/**
 	 * OPTIMIZED: Finds nearest valid target using cached entity queries.
@@ -96,7 +104,7 @@ public final class TargetingUtil {
 	public static LivingEntity findNearestValidTarget(Mob self, double range, boolean ignoreSameSpecies, boolean targetPlayers) {
 		// Performance mode check: allow faster targeting when few mobs are requesting it
 		if (ModConfig.getInstance().performanceMode) {
-			boolean lowLoad = queriesThisTick < (MAX_QUERIES_PER_TICK / 4);
+			boolean lowLoad = queriesThisTick < (maxQueriesPerTick() / 4);
 			if (!lowLoad && self.tickCount % 2 != 0 && self.getTarget() == null) {
 				return null;
 			}
@@ -111,7 +119,7 @@ public final class TargetingUtil {
 		}
 		
 		// Rate limiting: if too many queries this tick, return current target
-		if (queriesThisTick >= MAX_QUERIES_PER_TICK) {
+		if (queriesThisTick >= maxQueriesPerTick()) {
 			LivingEntity currentTarget = self.getTarget();
 			if (currentTarget != null && currentTarget.isAlive() && 
 			    isValidTarget(self, currentTarget, ignoreSameSpecies, targetPlayers)) {
@@ -125,7 +133,7 @@ public final class TargetingUtil {
 		ChunkEntityCache cache = ENTITY_CACHE.get(cacheKey);
 		
 		List<LivingEntity> cachedEntities;
-		if (cache != null && !cache.isExpired(currentTime, CACHE_DURATION_MS)) {
+		if (cache != null && !cache.isExpired(currentTime, cacheDurationMs())) {
 			// Cache hit - no world query needed!
 			cachedEntities = cache.entities;
 		} else {
@@ -228,7 +236,7 @@ public final class TargetingUtil {
 		
 		// Remove expired entries (older than 3 seconds)
 		ENTITY_CACHE.entrySet().removeIf(entry -> 
-			entry.getValue().isExpired(currentTime, CACHE_DURATION_MS * 2)
+			entry.getValue().isExpired(currentTime, cacheDurationMs() * 2)
 		);
 	}
 
