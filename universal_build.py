@@ -151,7 +151,13 @@ class UniversalBuildSystem:
         if targeting_goal_file.exists():
             goal_content = targeting_goal_file.read_text(encoding='utf-8', errors='ignore')
             uses_system = "TargetingSystem" in goal_content
-            has_goal_logic = "canStart()" in goal_content and "shouldContinue()" in goal_content
+            # Goal lifecycle names differ by mapping set: Yarn (pre-port)
+            # canStart()/shouldContinue(), official 26.2 mappings
+            # canUse()/canContinueToUse(). Accept either.
+            has_goal_logic = (
+                ("canStart()" in goal_content and "shouldContinue()" in goal_content)
+                or ("canUse()" in goal_content and "canContinueToUse()" in goal_content)
+            )
             
             if uses_system:
                 targeting_status.append("UniversalTargetGoal uses TargetingSystem")
@@ -351,7 +357,9 @@ class UniversalBuildSystem:
             entity_content = warlord_entity_file.read_text(encoding='utf-8', errors='ignore')
             
             uses_system = "WarlordSystem" in entity_content
-            has_boss_logic = "ServerBossBar" in entity_content
+            # Boss bar class was renamed in the 26.2 port:
+            # Yarn ServerBossBar -> official ServerBossEvent.
+            has_boss_logic = "ServerBossBar" in entity_content or "ServerBossEvent" in entity_content
             has_minion_logic = "summonMinions" in entity_content or "minionUuids" in entity_content
             
             if uses_system:
@@ -729,14 +737,29 @@ class UniversalBuildSystem:
                 
                 lines = full_output.split('\n')
                 error_lines = []
-                capture = False
+                # Prefer Gradle's "* What went wrong:" block: it holds the
+                # actual cause. The old heuristic matched '.java:' anywhere,
+                # which also matches Gradle stack frames (e.g.
+                # DefaultScriptRunnerFactory.java:93) and buried the cause
+                # under a useless stack trace.
+                in_what_went_wrong = False
                 for line in lines:
-                    if 'error:' in line.lower() or '.java:' in line:
-                        capture = True
-                    if capture:
-                        error_lines.append(line)
-                        if len(error_lines) > 50:
+                    stripped = line.strip()
+                    if stripped.startswith("* What went wrong:"):
+                        in_what_went_wrong = True
+                        continue
+                    if in_what_went_wrong:
+                        if stripped.startswith("* Try:") or stripped.startswith("* Exception is:"):
                             break
+                        if stripped:
+                            error_lines.append(line)
+                        continue
+                    # javac errors look like "path\File.java:42: error: ..."
+                    # Stack frames start with "at " and are excluded.
+                    if re.search(r"\.java:\d+: error:", line) and not stripped.startswith("at "):
+                        error_lines.append(line)
+                    if len(error_lines) > 50:
+                        break
                 
                 if error_lines:
                     print("\n" + "=" * 80)

@@ -15,10 +15,14 @@ repositories {
 
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
-    modImplementation "net.fabricmc:fabric-loader:${loader_version}"
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
-    modImplementation "com.terraformersmc:modmenu:20.0.3"
-    modImplementation "me.shedaniel.cloth:cloth-config-fabric:26.2.155"
+    // MC 26.x is unobfuscated (fabric.loom.disableObfuscation=true in
+    // gradle.properties), so Loom runs in no-remap mode and never creates
+    // the mod* configurations. Do NOT "restore" modImplementation here:
+    // it fails evaluation with "Could not find method modImplementation()".
+    implementation "net.fabricmc:fabric-loader:${loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+    implementation "com.terraformersmc:modmenu:20.0.3"
+    implementation "me.shedaniel.cloth:cloth-config-fabric:26.2.155"
 }
 
 java {

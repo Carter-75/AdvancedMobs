@@ -96,7 +96,8 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
         });
     }
 
-    // Strip ALL equipment from every mob immediately on spawn (AFTER vanilla equipment)
+    // Strip progression-owned equipment from every mob immediately on spawn (AFTER vanilla equipment).
+    // Guaranteed vanilla weapons (skeleton bow, pillager crossbow, ...) are exempt: see below.
     // Using @At("RETURN") ensures we strip equipment AFTER Minecraft adds it in initEquipment()
     @Inject(method = "finalizeSpawn", at = @At("RETURN"))
     private void advancedmobs$stripAllEquipmentOnSpawn(
@@ -132,8 +133,13 @@ public abstract class MobDataMixin extends LivingEntity implements IMobWarDataHo
             self.setItemSlot(net.minecraft.world.entity.EquipmentSlot.CHEST, net.minecraft.world.item.ItemStack.EMPTY);
             self.setItemSlot(net.minecraft.world.entity.EquipmentSlot.LEGS, net.minecraft.world.item.ItemStack.EMPTY);
             self.setItemSlot(net.minecraft.world.entity.EquipmentSlot.FEET, net.minecraft.world.item.ItemStack.EMPTY);
-            // Remove weapons/tools
-            self.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, net.minecraft.world.item.ItemStack.EMPTY);
+            // Remove weapons/tools. Exception: mobs that vanilla always
+            // spawns with a weapon (skeletons, pillagers, ...) keep their
+            // default weapon - it is granted free by ScalingSystem and
+            // progression upgrades from it, so it is never stripped.
+            if (!ScalingSystem.hasGuaranteedNaturalWeapon(self)) {
+                self.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, net.minecraft.world.item.ItemStack.EMPTY);
+            }
             self.setItemSlot(net.minecraft.world.entity.EquipmentSlot.OFFHAND, net.minecraft.world.item.ItemStack.EMPTY);
 
             ScalingSystem.handleSpawnBootstrap(self, spawnReason, advancedMobsData);

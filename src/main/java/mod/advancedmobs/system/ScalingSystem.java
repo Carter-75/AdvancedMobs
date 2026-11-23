@@ -5,6 +5,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import mod.advancedmobs.AdvancedMobsMod;
+import mod.advancedmobs.ability.AbilityRegistry;
+import mod.advancedmobs.ability.MobAbilityProvider;
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.data.MobWarData;
 import mod.advancedmobs.entity.MobWarlordEntity;
@@ -137,6 +139,45 @@ public class ScalingSystem {
         "minecraft:warden",
         "minecraft:elder_guardian"
     );
+
+    // Mobs that vanilla ALWAYS spawns holding a weapon (100% of spawns).
+    // Their default weapon is part of the mob, not an upgrade: it is never
+    // stripped on spawn, its base tier is granted free (no points spent),
+    // and progression upgrades continue from that default tier as normal.
+    // Mobs with only a CHANCE of a vanilla weapon (zombies with a shovel,
+    // trident drowned, ...) are deliberately NOT listed: they buy in.
+    private static final Set<String> GUARANTEED_WEAPON_CLASSES = Set.of(
+        "net.minecraft.world.entity.monster.skeleton.Skeleton",
+        "net.minecraft.world.entity.monster.skeleton.Stray",
+        "net.minecraft.world.entity.monster.skeleton.Bogged",
+        "net.minecraft.world.entity.monster.skeleton.WitherSkeleton",
+        "net.minecraft.world.entity.monster.illager.Pillager",
+        "net.minecraft.world.entity.monster.illager.Vindicator",
+        "net.minecraft.world.entity.monster.illager.Illusioner",
+        "net.minecraft.world.entity.monster.piglin.Piglin",
+        "net.minecraft.world.entity.monster.piglin.PiglinBrute",
+        "net.minecraft.world.entity.monster.Vex"
+    );
+
+    // Vanilla weapon material for the guaranteed-weapon mobs whose config
+    // weapon has material tiers (ranged weapons have no tiers and always
+    // map to tier level 1). The granted tier level is the position of this
+    // material in the config's tiers list, so upgrades continue from the
+    // vanilla default instead of restarting below it.
+    private static final Map<String, String> GUARANTEED_WEAPON_TIERS = Map.of(
+        "net.minecraft.world.entity.monster.skeleton.WitherSkeleton", "stone",
+        "net.minecraft.world.entity.monster.piglin.Piglin", "gold",
+        "net.minecraft.world.entity.monster.piglin.PiglinBrute", "gold",
+        "net.minecraft.world.entity.monster.illager.Vindicator", "iron",
+        "net.minecraft.world.entity.monster.Vex", "iron"
+    );
+
+    // Ability slots are bought with the same points and through the same
+    // spending pass as gear (see collectAffordableUpgrades). Slot N costs
+    // ABILITY_SLOT_COSTS[N-1]; AbilitySystem unlocks a random ability per
+    // purchased slot, still capped by its power-fraction bracket.
+    public static final String ABILITY_SLOTS_KEY = "ability_slots";
+    private static final int[] ABILITY_SLOT_COSTS = {30, 60, 120, 240, 480};
     private record DayRange(int minDay, int maxDay, double pointsPerDay, int order) {}
     private static final String NBT_WEAPON_ACTIVE_KEY = "weapon_active_key";
     private static final String NBT_WEAPON_ACTIVE_SCOPED = "weapon_active_scoped";
@@ -884,7 +925,17 @@ public class ScalingSystem {
         if (skillData == null || skillData.getBooleanOr(NBT_INITIAL_DISARMED, false)) {
             return false;
         }
-        clearMobEquipment(mob);
+        if (hasGuaranteedNaturalWeapon(mob)) {
+            // The vanilla weapon of a guaranteed-weapon mob is never
+            // stripped; only the gear progression actually owns is cleared.
+            mob.setItemSlot(EquipmentSlot.OFFHAND, ItemStack.EMPTY);
+            mob.setItemSlot(EquipmentSlot.HEAD, ItemStack.EMPTY);
+            mob.setItemSlot(EquipmentSlot.CHEST, ItemStack.EMPTY);
+            mob.setItemSlot(EquipmentSlot.LEGS, ItemStack.EMPTY);
+            mob.setItemSlot(EquipmentSlot.FEET, ItemStack.EMPTY);
+        } else {
+            clearMobEquipment(mob);
+        }
         resetEquippedFlags(skillData);
         skillData.putBoolean(NBT_INITIAL_DISARMED, true);
         skillData.putBoolean(NBT_EQUIPMENT_PRIMED, false);
@@ -1106,6 +1157,13 @@ public class ScalingSystem {
         }
 
         String mobType = config.has("mob_type") ? config.get("mob_type").getAsString() : "hostile";
+
+        // Guaranteed-weapon mobs own their vanilla default weapon for
+        // free: grant its tier level before any point accounting so the
+        // spending pass never charges for it (and never sells a tier below
+        // the vanilla default). Upgrades then continue from that tier.
+        grantGuaranteedNaturalWeapon(mob, skillData, config);
+
         refreshMissingEffects(mob, skillData, config, mobType);
 
         int killCount = data.getKillCount();
@@ -2340,6 +2398,23 @@ public class ScalingSystem {
         JsonObject tree = config.getAsJsonObject("tree");
         JsonElement weaponElement = tree.has("weapon") ? tree.get("weapon") : null;
         JsonObject lockedWeapon = weaponElement != null ? getLockedWeaponForMob(weaponElement, mobUuid) : null;
+
+        // Ability slots: bought like any other upgrade, capped at the
+        // provider's ability count. AbilitySystem performs the unlock
+        // (still capped by its power-fraction bracket per slot).
+        if (config.has("mob_name")) {
+            MobAbilityProvider abilityProvider = AbilityRegistry.getProvider(config.get("mob_name").getAsString());
+            if (abilityProvider != null && abilityProvider.abilities() != null) {
+                int purchasedSlots = skillData.getIntOr(ABILITY_SLOTS_KEY, 0);
+                int maxSlots = Math.min(ABILITY_SLOT_COSTS.length, abilityProvider.abilities().size());
+                if (purchasedSlots < maxSlots) {
+                    int cost = ABILITY_SLOT_COSTS[purchasedSlots];
+                    if (cost <= budget) {
+                        affordable.add(new UpgradeOption(ABILITY_SLOTS_KEY, purchasedSlots + 1, cost));
+                    }
+                }
+            }
+        }
 
         // Check potion effects based on mob type
         String effectsKey = mobType.equals("passive") ? "passive_potion_effects" : "hostile_neutral_potion_effects";
@@ -4605,6 +4680,72 @@ public class ScalingSystem {
         int index = mobUuid != null ? Math.abs(mobUuid.hashCode()) : 0;
         index = index % weapons.size();
         return weapons.get(index).getAsJsonObject();
+    }
+
+    /** True when vanilla always (100% of spawns) gives this mob a weapon. */
+    public static boolean hasGuaranteedNaturalWeapon(Mob mob) {
+        return mob != null && GUARANTEED_WEAPON_CLASSES.contains(mob.getClass().getName());
+    }
+
+    /**
+     * The free tier level of a guaranteed-weapon mob's vanilla default
+     * weapon, expressed in its locked config weapon's tier numbering:
+     * 1 for ranged weapons (no material tiers), otherwise the position of
+     * the vanilla material in the config's tiers list (1 when the material
+     * is not listed, so the mob at least owns the first tier).
+     * Returns 0 when the mob has no guaranteed weapon or no config weapon.
+     */
+    public static int getGuaranteedWeaponTierLevel(Mob mob, JsonObject lockedWeapon) {
+        if (!hasGuaranteedNaturalWeapon(mob) || lockedWeapon == null) {
+            return 0;
+        }
+        String weaponType = lockedWeapon.has("weapon_type") ? lockedWeapon.get("weapon_type").getAsString() : "sword";
+        if (isRangedWeaponType(weaponType) || !lockedWeapon.has("tiers")) {
+            return 1;
+        }
+        String naturalTier = GUARANTEED_WEAPON_TIERS.get(mob.getClass().getName());
+        if (naturalTier == null) {
+            return 1;
+        }
+        JsonArray tiers = lockedWeapon.getAsJsonArray("tiers");
+        for (int i = 0; i < tiers.size(); i++) {
+            JsonObject tierData = tiers.get(i).getAsJsonObject();
+            if (tierData.has("tier")) {
+                String tierName = tierData.get("tier").getAsString().toLowerCase(Locale.ROOT);
+                if (tierName.equals("golden")) {
+                    tierName = "gold";
+                }
+                if (tierName.equals(naturalTier)) {
+                    return i + 1;
+                }
+            }
+        }
+        return 1;
+    }
+
+    /**
+     * Grants a guaranteed-weapon mob its vanilla default weapon tier for
+     * free (weapon_tier is set directly; spentPoints is never charged).
+     * No-ops when the mob already owns that tier or a higher one, so
+     * purchased upgrades past the default are never rolled back.
+     *
+     * @return true when the tier was raised
+     */
+    public static boolean grantGuaranteedNaturalWeapon(Mob mob, CompoundTag skillData, JsonObject config) {
+        if (!hasGuaranteedNaturalWeapon(mob) || skillData == null || config == null || !config.has("tree")) {
+            return false;
+        }
+        JsonObject tree = config.getAsJsonObject("tree");
+        if (!tree.has("weapon")) {
+            return false;
+        }
+        JsonObject lockedWeapon = getLockedWeaponForMob(tree.get("weapon"), mob);
+        int guaranteedLevel = getGuaranteedWeaponTierLevel(mob, lockedWeapon);
+        if (guaranteedLevel <= 0 || skillData.getIntOr("weapon_tier", 0) >= guaranteedLevel) {
+            return false;
+        }
+        skillData.putInt("weapon_tier", guaranteedLevel);
+        return true;
     }
 
     private static boolean hasMultipleWeaponOptions(JsonElement weaponElement) {

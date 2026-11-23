@@ -88,15 +88,32 @@ import java.util.concurrent.ConcurrentHashMap;
  * taken away, and when its bracket count later rises, its set is extended
  * with random picks from its remaining abilities up to the new count.
  *
+ * ABILITY SLOTS ARE BOUGHT: the number of abilities a mob may hold is
+ * also limited by the ability slots it has purchased with progression
+ * points through ScalingSystem (skillData key ScalingSystem
+ * .ABILITY_SLOTS_KEY, costs 30/60/120/240/480 for slots 1-5; the option
+ * competes with gear in the same spending pass). The effective unlock
+ * target is min(bracket count, unlocked slots), where slots a mob
+ * already holds abilities in count as unlocked (mobs granted abilities
+ * under the earlier free-grant rules keep them and are never charged
+ * retroactively). Buying a first slot also guarantees access: a mob that
+ * paid for a slot does not additionally have to win the access roll.
+ * The access roll and the Ender Dragon exception still govern mobs that
+ * have purchased nothing.
+ *
  * EVALUATION: a mob is evaluated when its current bracket count is higher
  * than the count stored at its last evaluation (MobWarData
  * am_ability_eval_count, 0 before the first evaluation). Concretely:
  *   - First tick in the war system (with a provider registered for its
  *     mob): evaluate at the current bracket.
  *   - On evaluation, a mob without abilities rolls its access chance once
- *     (dragon excepted). Success grants the full bracket count at once.
- *   - On evaluation, a mob with abilities extends its set to the bracket
- *     count if it is below it.
+ *     (dragon excepted; a purchased ability slot also always grants
+ *     access). Success grants access; how many abilities actually unlock
+ *     is capped by purchased slots (see ABILITY SLOTS ARE BOUGHT above).
+ *   - On evaluation, a mob with abilities extends its set toward its
+ *     bracket count, up to its unlocked (purchased/held) slot count. A
+ *     new purchase also triggers evaluation, so a bought slot unlocks
+ *     promptly instead of waiting for the next bracket.
  *   - A failed roll is NOT retried until the mob crosses into a higher
  *     count bracket, which triggers a fresh evaluation and a fresh roll.
  * Mobs whose type has no registered provider are never evaluated: their
@@ -328,7 +345,22 @@ public final class AbilitySystem {
      */
     private static void evaluateAccess(Mob mob, MobWarData data, List<MobAbility> registered, double frac) {
         int bracketCount = accessibleCountFor(frac);
-        if (bracketCount <= data.getAbilityEvalCount()) {
+        // Ability slots bought through ScalingSystem cap how many
+        // abilities this mob may hold; abilities it already holds count
+        // as unlocked slots, so pre-purchase grants are grandfathered.
+        int purchasedSlots = data.getSkillData() != null
+            ? data.getSkillData().getIntOr(ScalingSystem.ABILITY_SLOTS_KEY, 0)
+            : 0;
+        int currentCount = data.hasAbilities() ? data.getAbilityAccessibleIds().size() : 0;
+        int unlockedCount = Math.max(purchasedSlots, currentCount);
+        // The Ender Dragon's guarantee is unconditional: its unlocked
+        // count is always its full bracket, purchased or not.
+        if (isEnderDragon(mob)) {
+            unlockedCount = bracketCount;
+        }
+        int targetCount = Math.min(bracketCount, unlockedCount);
+        boolean bracketRose = bracketCount > data.getAbilityEvalCount();
+        if (!bracketRose && targetCount <= currentCount) {
             return;
         }
         RandomSource random = mob.getRandom();
@@ -337,6 +369,8 @@ public final class AbilitySystem {
             boolean granted;
             if (isEnderDragon(mob)) {
                 granted = true; // The dragon never rolls for access.
+            } else if (purchasedSlots > 0) {
+                granted = true; // A paid-for slot always grants access.
             } else {
                 double chance = accessChance(frac, isBoss(mob));
                 granted = random.nextDouble() < chance;
@@ -347,9 +381,11 @@ public final class AbilitySystem {
         }
 
         if (data.hasAbilities()) {
-            extendAccessibleSet(data, registered, bracketCount, random);
+            extendAccessibleSet(data, registered, targetCount, random);
         }
-        data.setAbilityEvalCount(bracketCount);
+        if (bracketRose) {
+            data.setAbilityEvalCount(bracketCount);
+        }
     }
 
     /**
