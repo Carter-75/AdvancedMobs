@@ -587,10 +587,12 @@ class UniversalBuildSystem:
         
         with open(gradle_props, 'r') as f:
             content = f.read()
-            if "minecraft_version=1.21.1" in content:
-                success("Minecraft version: 1.21.1 ✓")
+            version_match = re.search(r"^minecraft_version=(\S+)", content, re.MULTILINE)
+            minecraft_version = version_match.group(1) if version_match else None
+            if minecraft_version in ("26.2", "26.3"):
+                success(f"Minecraft version: {minecraft_version} (supports 26.2 and 26.3)")
             else:
-                error("Minecraft version mismatch!")
+                error("Minecraft version mismatch! Expected minecraft_version=26.2 or 26.3")
                 self.errors.append("Wrong Minecraft version")
     
     def build_project(self, clean: bool = False):
@@ -835,7 +837,9 @@ class UniversalBuildSystem:
             f.write("ADVANCED MOBS - BUILD LOG\n")
             f.write("=" * 80 + "\n\n")
             f.write(f"Timestamp: {self.timestamp}\n")
-            f.write(f"Minecraft Version: 1.21.1\n")
+            gradle_text = (self.root / "gradle.properties").read_text(encoding="utf-8", errors="ignore") if (self.root / "gradle.properties").exists() else ""
+            reported_version = re.search(r"^minecraft_version=(\S+)", gradle_text, re.MULTILINE)
+            f.write(f"Minecraft Version: {reported_version.group(1) if reported_version else 'unknown'} (26.2 and 26.3)\n")
             f.write(f"Mob Configs: {json_count}/80\n")
             f.write(f"Mixins: {mixin_count} total\n")
             f.write(f"ScalingSystem: {'Present' if scaling_system_exists else 'Missing'}\n\n")

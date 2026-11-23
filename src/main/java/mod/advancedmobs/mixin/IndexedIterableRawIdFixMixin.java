@@ -12,9 +12,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Global compatibility fix for registry-entry serialization.
@@ -34,11 +32,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Mixin(IdMap.class)
 public interface IndexedIterableRawIdFixMixin {
 
-    // getRawIdOrThrow sits on the packet encoding path, so the reflective
-    // method lookup in tryGetRawId below ran for every registry entry being
-    // encoded. The resolved method only depends on the iterable's class, so
-    // it is resolved once per class and then cached here.
-    Map<Class<?>, Method> RAW_ID_METHOD_CACHE = new ConcurrentHashMap<>();
+    // The method cache lives in RawIdMethodCache. Interface mixins cannot
+    // declare their own fields.
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     @Inject(method = "getIdOrThrow(Ljava/lang/Object;)I", at = @At("HEAD"), cancellable = true)
@@ -86,7 +81,7 @@ public interface IndexedIterableRawIdFixMixin {
         }
 
         // Fast path: reuse the method resolved for this class on an earlier call.
-        Method cached = RAW_ID_METHOD_CACHE.get(self.getClass());
+        Method cached = RawIdMethodCache.METHODS.get(self.getClass());
         if (cached != null) {
             try {
                 Object result = cached.invoke(self, value);
@@ -101,7 +96,7 @@ public interface IndexedIterableRawIdFixMixin {
         try {
             // IdMap has a getRawId(T) method; use reflection to avoid signature churn.
             Method method = self.getClass().getMethod("getId", Object.class);
-            RAW_ID_METHOD_CACHE.put(self.getClass(), method);
+            RawIdMethodCache.METHODS.put(self.getClass(), method);
             Object result = method.invoke(self, value);
             if (result instanceof Integer i) {
                 return i;
@@ -122,7 +117,7 @@ public interface IndexedIterableRawIdFixMixin {
                 if (m.getParameterCount() != 1 || m.getReturnType() != int.class) {
                     continue;
                 }
-                RAW_ID_METHOD_CACHE.put(self.getClass(), m);
+                RawIdMethodCache.METHODS.put(self.getClass(), m);
                 Object result = m.invoke(self, value);
                 return (Integer) result;
             }
@@ -190,5 +185,15 @@ public interface IndexedIterableRawIdFixMixin {
             return null;
         }
         return null;
+    }
+}
+
+/**
+ * Holds the reflected raw-id lookup, outside the interface mixin.
+ */
+final class RawIdMethodCache {
+    static final java.util.Map<Class<?>, Method> METHODS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private RawIdMethodCache() {
     }
 }
