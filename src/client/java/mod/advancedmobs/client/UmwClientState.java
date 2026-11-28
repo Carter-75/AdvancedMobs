@@ -1,5 +1,6 @@
 package mod.advancedmobs.client;
 
+import mod.advancedmobs.net.MobGodModePayload;
 import mod.advancedmobs.net.MobInspectRequestPayload;
 import mod.advancedmobs.net.MobInspectSyncPayload;
 import mod.advancedmobs.net.MobPlateSyncPayload;
@@ -56,6 +57,16 @@ public final class UmwClientState {
         }
         if (ClientPlayNetworking.canSend(MobInspectRequestPayload.ID)) {
             ClientPlayNetworking.send(new MobInspectRequestPayload(entityId));
+        }
+    }
+
+    /** Asks the server to max this mob's upgrades, level, and ability power. */
+    public static void requestGodMode(int entityId) {
+        if (Minecraft.getInstance().getConnection() == null) {
+            return;
+        }
+        if (ClientPlayNetworking.canSend(MobGodModePayload.ID)) {
+            ClientPlayNetworking.send(new MobGodModePayload(entityId));
         }
     }
 

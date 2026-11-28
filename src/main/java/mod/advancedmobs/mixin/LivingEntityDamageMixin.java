@@ -9,8 +9,10 @@ import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.server.level.ServerLevel;
 import org.spongepowered.asm.mixin.Mixin;
+import mod.advancedmobs.system.CombatRageSystem;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
@@ -20,6 +22,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  */
 @Mixin(LivingEntity.class)
 public abstract class LivingEntityDamageMixin {
+
+    @ModifyVariable(method = "hurtServer", at = @At("HEAD"), argsOnly = true, ordinal = 0)
+    private float advancedmobs$rageDamage(float amount, ServerLevel level, DamageSource source) {
+        if (amount <= 0.0f || !(source.getEntity() instanceof Mob attacker)) {
+            return amount;
+        }
+        float multiplier = CombatRageSystem.damageMultiplier(attacker);
+        if (multiplier == 1.0f) {
+            return amount;
+        }
+        return amount * multiplier;
+    }
 
     @Inject(method = "hurtServer", at = @At("TAIL"))
     private void advancedmobs$handleDamageAbilities(ServerLevel level, DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {

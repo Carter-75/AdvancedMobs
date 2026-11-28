@@ -7,6 +7,7 @@ import mod.advancedmobs.ability.MobAbilityProvider;
 import mod.advancedmobs.config.ModConfig;
 import mod.advancedmobs.data.MobWarData;
 import mod.advancedmobs.entity.MobWarlordEntity;
+import mod.advancedmobs.net.MobGodModePayload;
 import mod.advancedmobs.net.MobInspectRequestPayload;
 import mod.advancedmobs.net.MobInspectSyncPayload;
 import mod.advancedmobs.net.MobPlateSyncPayload;
@@ -70,6 +71,9 @@ public final class MobInspectService {
     public static void registerServer() {
         ServerPlayNetworking.registerGlobalReceiver(MobInspectRequestPayload.ID, (payload, context) -> {
             ServerPlayer player = context.player();
+            if (!player.isCreative() && !player.isSpectator()) {
+                return;
+            }
             long now = player.level().getGameTime();
             Long last = LAST_REQUEST_TICK.get(player.getUUID());
             if (last != null && now - last < REQUEST_COOLDOWN_TICKS) {
@@ -85,6 +89,24 @@ public final class MobInspectService {
             if (!spectatingThis && player.distanceToSqr(mob) > MAX_INSPECT_DISTANCE * MAX_INSPECT_DISTANCE) {
                 return;
             }
+            ServerPlayNetworking.send(player, new MobInspectSyncPayload(mob.getId(), buildSnapshot(player, mob)));
+        });
+
+        ServerPlayNetworking.registerGlobalReceiver(MobGodModePayload.ID, (payload, context) -> {
+            ServerPlayer player = context.player();
+            if (!player.isCreative() && !player.isSpectator()) {
+                return;
+            }
+            Entity entity = player.level().getEntity(payload.entityId());
+            if (!(entity instanceof Mob mob) || !mob.isAlive()) {
+                return;
+            }
+            boolean spectatingThis = player.getCamera() == mob;
+            if (!spectatingThis && player.distanceToSqr(mob) > MAX_INSPECT_DISTANCE * MAX_INSPECT_DISTANCE) {
+                return;
+            }
+            MobWarData data = MobWarData.get(mob);
+            ScalingSystem.applyGodMode(mob, data);
             ServerPlayNetworking.send(player, new MobInspectSyncPayload(mob.getId(), buildSnapshot(player, mob)));
         });
 
@@ -149,6 +171,7 @@ public final class MobInspectService {
         root.putInt("armor", mob.getArmorValue());
         root.putDouble("attackDamage", mob.getAttributeValue(Attributes.ATTACK_DAMAGE));
         root.putDouble("speed", mob.getAttributeValue(Attributes.MOVEMENT_SPEED));
+        root.putBoolean("godMode", data.isGodMode());
 
         ListTag sections = new ListTag();
 
@@ -164,6 +187,8 @@ public final class MobInspectService {
             + (int) Math.round(AbilitySystem.powerFraction(data, config) * 100.0) + "%"));
         progression.add(StringTag.valueOf("Damage dealt: " + formatPoints(data.getDamageDealt())));
         progression.add(StringTag.valueOf("Damage taken: " + formatPoints(data.getDamageTaken())));
+        progression.add(StringTag.valueOf(CombatRageSystem.describe(mob, data)));
+        progression.add(StringTag.valueOf(data.isGodMode() ? "God mode: on" : "God mode: off"));
         sections.add(section("Progression", progression));
 
         // --- Purchased upgrades (tiers and effect levels from skill data) ---

@@ -1,5 +1,6 @@
 package mod.advancedmobs.client;
 
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
@@ -43,12 +44,23 @@ public class MobInspectScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("X"), button -> onClose())
             .bounds(this.width - PANEL_MARGIN - 20, PANEL_MARGIN + 4, 18, 18)
             .build());
+        addRenderableWidget(Button.builder(Component.literal("God Mode"), button -> {
+                UmwClientState.requestGodMode(entityId);
+                UmwClientState.requestInspect(entityId);
+            })
+            .bounds(panelLeft() + 10, PANEL_MARGIN + 42, 88, 16)
+            .build());
         UmwClientState.requestInspect(entityId);
         refreshCounter = 0;
     }
 
     @Override
     public void tick() {
+        var player = Minecraft.getInstance().player;
+        if (player == null || (!player.isCreative() && !player.isSpectator())) {
+            onClose();
+            return;
+        }
         if (++refreshCounter >= REFRESH_TICKS) {
             refreshCounter = 0;
             UmwClientState.requestInspect(entityId);
@@ -107,7 +119,7 @@ public class MobInspectScreen extends Screen {
 
         // Sections, scrolled.
         List<String[]> sections = flattenSections(snapshot);
-        int contentTop = top + 46;
+        int contentTop = top + 64;
         int y = contentTop - scrollOffset * LINE_HEIGHT;
         int totalLines = 0;
         for (String[] section : sections) {

@@ -42,5 +42,6 @@ public final class ProgressionTicker {
         // Ability system ticks after scaling so the lifetime points
         // behind its power fraction are fresh for this tick.
         AbilitySystem.tick(mob, mob.level(), data);
+        CombatRageSystem.tick(mob, data);
     }
 }

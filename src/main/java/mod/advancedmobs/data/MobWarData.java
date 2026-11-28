@@ -48,6 +48,15 @@ public class MobWarData {
     // it momentarily has no target. -1 means never hurt.
     private long lastHurtTick = -1L;
 
+    // Temporary fight rage. Not written to NBT: leaving combat clears it.
+    private long rageAnchorTick = -1L;
+    private long rageLastCombatTick = -1L;
+    private long rageLastWaveTick = -1L;
+    private int rageWaveIndex = 0;
+
+    /** Persisted. The inspect panel's God Mode button bought this mob out. */
+    private boolean godMode = false;
+
     // New ability system state (AbilitySystem). Persisted under am_ability_
     // keys; the legacy ability_ keys from the removed ability set are inert
     // and intentionally not reused.
@@ -86,6 +95,44 @@ public class MobWarData {
     }
     public long getLastHurtTick() { return lastHurtTick; }
     public void setLastHurtTick(long gameTime) { this.lastHurtTick = gameTime; }
+
+    public long getRageAnchorTick() { return rageAnchorTick; }
+    public long getRageLastCombatTick() { return rageLastCombatTick; }
+    public long getRageLastWaveTick() { return rageLastWaveTick; }
+    public int getRageWaveIndex() { return rageWaveIndex; }
+
+    /** Starts a rage streak, or keeps the one already running. */
+    public void touchRage(long gameTime) {
+        if (rageAnchorTick < 0L) {
+            rageAnchorTick = gameTime;
+            rageWaveIndex = 0;
+            rageLastWaveTick = -1L;
+        }
+        rageLastCombatTick = gameTime;
+    }
+
+    public void markRageWave(long gameTime) {
+        rageLastWaveTick = gameTime;
+        rageWaveIndex++;
+    }
+
+    public void clearRage() {
+        rageAnchorTick = -1L;
+        rageLastCombatTick = -1L;
+        rageLastWaveTick = -1L;
+        rageWaveIndex = 0;
+    }
+
+    public boolean isGodMode() { return godMode; }
+    public void setGodMode(boolean godMode) { this.godMode = godMode; }
+
+    /** Raises the kill count (and the level derived from it) without going backwards. */
+    public void raiseKillCount(int count) {
+        if (count > killCount) {
+            killCount = count;
+            updateLevel();
+        }
+    }
 
     // New ability system accessors (see AbilitySystem for the rules)
     public int getAbilityEvalCount() { return abilityEvalCount; }
@@ -242,6 +289,7 @@ public class MobWarData {
         // Boss combat progression persistence (am_ keys, added Nov 21, 2026)
         nbt.putDouble("am_boss_combat_points", bossCombatPoints);
         nbt.putLong("am_last_hurt_tick", lastHurtTick);
+        nbt.putBoolean("am_god_mode", godMode);
         
         if (currentTarget != null) {
             nbt.store("currentTarget", net.minecraft.core.UUIDUtil.CODEC, currentTarget);
@@ -294,6 +342,7 @@ public class MobWarData {
         // defaults (0 points, never hurt) are the correct fresh state.
         bossCombatPoints = nbt.getDoubleOr("am_boss_combat_points", 0.0);
         lastHurtTick = nbt.getLongOr("am_last_hurt_tick", -1L);
+        godMode = nbt.getBooleanOr("am_god_mode", false);
         
         // Cleared unconditionally first: if this instance is ever reused
         // across two reads, an absent key must mean "no target, no allies",

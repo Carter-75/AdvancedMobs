@@ -1165,6 +1165,13 @@ public class ScalingSystem {
         // the vanilla default). Upgrades then continue from that tier.
         grantGuaranteedNaturalWeapon(mob, skillData, config);
 
+        // God mode buys the whole tree once. A config-fingerprint reset
+        // wipes skill data, so the flag on MobWarData reapplies it.
+        if (data.isGodMode() && !skillData.getBooleanOr("umw_god_applied", false)) {
+            applyGodMode(mob, data);
+            return;
+        }
+
         refreshMissingEffects(mob, skillData, config, mobType);
 
         int killCount = data.getKillCount();
@@ -4748,6 +4755,74 @@ public class ScalingSystem {
      *
      * @return true when the tier was raised
      */
+    /**
+     * Buys every upgrade this mob's config still offers, raises it to
+     * full ability power, level 100, and full health. The same formula
+     * the spending lottery uses, with the save roll forced off and a
+     * budget that cannot run out, repeated until nothing is left to buy.
+     * Safe to call again; already-owned tiers are not sold back.
+     */
+    public static void applyGodMode(Mob mob, MobWarData data) {
+        if (mob == null || data == null || !(mob.level() instanceof ServerLevel serverWorld)) {
+            return;
+        }
+        JsonObject config = getConfigForMob(mob);
+        if (config == null) {
+            return;
+        }
+        data.setGodMode(true);
+        data.raiseKillCount(MAX_LEVEL_KILLS);
+        double fullPower = Math.max(1.0, ModConfig.getInstance().abilityFullPowerPoints);
+        if (data.getBossCombatPoints() < fullPower) {
+            data.addBossCombatPoints(fullPower - data.getBossCombatPoints());
+        }
+        data.setSkillPoints(Math.max(data.getSkillPoints(), fullPower));
+
+        CompoundTag skillData = data.getSkillData();
+        if (skillData == null) {
+            skillData = new CompoundTag();
+            data.setSkillData(skillData);
+        }
+        String mobType = config.has("mob_type") ? config.get("mob_type").getAsString() : "hostile";
+        Registry<Enchantment> enchantRegistry = null;
+        try {
+            enchantRegistry = serverWorld.registryAccess().lookupOrThrow(Registries.ENCHANTMENT);
+        } catch (Exception ignored) {
+            enchantRegistry = null;
+        }
+        Random random = new Random(mob.getUUID().getLeastSignificantBits());
+        int budget = Integer.MAX_VALUE / 4;
+        double spent = data.getSpentPoints();
+        for (int i = 0; i < 20000; i++) {
+            List<UpgradeOption> affordable = getAffordableUpgrades(
+                mob.getUUID(), config, mobType, enchantRegistry, skillData, budget);
+            if (affordable.isEmpty()) {
+                break;
+            }
+            UpgradeOption chosen = chooseWeightedUpgrade(affordable, random);
+            if (chosen == null) {
+                break;
+            }
+            int previousLevel = skillData.getIntOr(chosen.key, 0);
+            skillData.putInt(chosen.key, chosen.newLevel);
+            handleTierPromotion(skillData, chosen.key, previousLevel, chosen.newLevel);
+            maybeBumpEnchantCost(skillData, chosen.key, random, null);
+            if (chosen.cost > 0) {
+                spent += chosen.cost;
+                budget -= chosen.cost;
+            }
+        }
+        data.setSpentPoints(spent);
+        skillData.putBoolean("umw_god_applied", true);
+        long now = serverWorld.getGameTime();
+        applyEquipment(mob, data, config, serverWorld, EquipmentSnapshot.capture(mob, skillData), true);
+        applyEffects(mob, data, config, mobType, now);
+        mob.setHealth(mob.getMaxHealth());
+        MobWarData.save(mob, data);
+    }
+
+    private static final int MAX_LEVEL_KILLS = 300;
+
     public static boolean grantGuaranteedNaturalWeapon(Mob mob, CompoundTag skillData, JsonObject config) {
         if (!hasGuaranteedNaturalWeapon(mob) || skillData == null || config == null || !config.has("tree")) {
             return false;

@@ -13,6 +13,21 @@ repositories {
     maven { url = "https://maven.shedaniel.me/" }
 }
 
+// Loom exclusively resolves org.lwjgl from Maven Central. Minecraft 26.2
+// asks for the Mojang fork of lwjgl-freetype, which Central does not have.
+// The upstream 3.4.1 artifact is the same module and is on Central.
+configurations.configureEach {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == "org.lwjgl"
+                && details.requested.name == "lwjgl-freetype"
+                && details.requested.version != null
+                && details.requested.version.contains("mojang")) {
+            details.useVersion("3.4.1")
+            details.because("Loom forces LWJGL from Maven Central")
+        }
+    }
+}
+
 dependencies {
     minecraft "com.mojang:minecraft:${minecraft_version}"
     // MC 26.x is unobfuscated (fabric.loom.disableObfuscation=true in

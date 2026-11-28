@@ -143,6 +143,7 @@ public class AdvancedMobsMod implements ModInitializer {
 			PayloadTypeRegistry.clientboundPlay().register(mod.advancedmobs.net.MobInspectSyncPayload.ID, mod.advancedmobs.net.MobInspectSyncPayload.CODEC);
 			PayloadTypeRegistry.clientboundPlay().register(mod.advancedmobs.net.MobPlateSyncPayload.ID, mod.advancedmobs.net.MobPlateSyncPayload.CODEC);
 			PayloadTypeRegistry.serverboundPlay().register(mod.advancedmobs.net.MobInspectRequestPayload.ID, mod.advancedmobs.net.MobInspectRequestPayload.CODEC);
+			PayloadTypeRegistry.serverboundPlay().register(mod.advancedmobs.net.MobGodModePayload.ID, mod.advancedmobs.net.MobGodModePayload.CODEC);
 		} catch (IllegalArgumentException alreadyRegistered) {
 			// Tolerate double-init in dev / hot reload scenarios.
 		}

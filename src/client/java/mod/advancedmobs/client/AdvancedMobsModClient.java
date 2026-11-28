@@ -53,7 +53,8 @@ public class AdvancedMobsModClient implements ClientModInitializer {
         UseEntityCallback.EVENT.register((player, world, hand, entity, hitResult) -> {
             if (world.isClientSide()
                 && hand == net.minecraft.world.InteractionHand.MAIN_HAND
-                && entity instanceof Mob mob) {
+                && entity instanceof Mob mob
+                && (player.isCreative() || player.isSpectator())) {
                 Minecraft.getInstance().setScreenAndShow(new MobInspectScreen(mob.getId()));
             }
             return InteractionResult.PASS;

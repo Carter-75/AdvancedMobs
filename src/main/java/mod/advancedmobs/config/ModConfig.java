@@ -223,6 +223,59 @@ public class ModConfig implements ConfigData {
     @ConfigEntry.Gui.Tooltip(count = 2)
     public double bossCombatPointsPerSecondElderGuardian = 10.0;
 
+    // Temporary fight rage. Same formula for every mob, read from config,
+    // dropped when the fight ends. The damage multiplier makes a live fight
+    // snowball; the end waves are a percent of that mob's own max health so
+    // equal fighters bleed out together and a stalemate cannot sit past a
+    // few minutes. Nothing here is stored as lifetime points.
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 3)
+    public boolean combatRageEnabled = true;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double combatRageGraceSeconds = 20.0;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double combatRageRampSeconds = 70.0;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double combatRageMaxDamageMultiplier = 3.0;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double combatRageMaxSpeedBonus = 0.35;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double combatRageWaveStartSeconds = 90.0;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double combatRageWaveIntervalSeconds = 12.0;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double combatRageWaveBaseFraction = 0.05;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double combatRageWaveGrowthFraction = 0.012;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double combatRageWaveFractionCap = 0.25;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double combatRageWaveJitter = 0.15;
+
+    @ConfigEntry.Category("scaling")
+    @ConfigEntry.Gui.Tooltip(count = 2)
+    public double combatRageDecaySeconds = 8.0;
+
     // ==========================================================================
     //                       SECTION 4: MOB WARLORD SYSTEM
     // Controls the raid boss feature
@@ -626,6 +679,11 @@ public class ModConfig implements ConfigData {
         return (Double.isFinite(value) && value >= 0.0) ? value : fallback;
     }
 
+    private static double clampFraction(double value, double fallback) {
+        if (!Double.isFinite(value) || value < 0.0) return fallback;
+        return Math.min(1.0, value);
+    }
+
     // Sanitize, then sync legacy fields on load
     @Override
     public void validatePostLoad() throws ValidationException {
@@ -643,6 +701,21 @@ public class ModConfig implements ConfigData {
         bossCombatPointsPerSecondWarlord = sanitizeRate(bossCombatPointsPerSecondWarlord, 15.0);
         bossCombatPointsPerSecondWarden = sanitizeRate(bossCombatPointsPerSecondWarden, 10.0);
         bossCombatPointsPerSecondElderGuardian = sanitizeRate(bossCombatPointsPerSecondElderGuardian, 10.0);
+        combatRageGraceSeconds = sanitizeRate(combatRageGraceSeconds, 20.0);
+        combatRageRampSeconds = sanitizeRate(combatRageRampSeconds, 70.0);
+        if (!Double.isFinite(combatRageMaxDamageMultiplier) || combatRageMaxDamageMultiplier < 1.0) {
+            combatRageMaxDamageMultiplier = 3.0;
+        }
+        combatRageMaxSpeedBonus = sanitizeRate(combatRageMaxSpeedBonus, 0.35);
+        combatRageWaveStartSeconds = sanitizeRate(combatRageWaveStartSeconds, 90.0);
+        if (!Double.isFinite(combatRageWaveIntervalSeconds) || combatRageWaveIntervalSeconds < 1.0) {
+            combatRageWaveIntervalSeconds = 12.0;
+        }
+        combatRageWaveBaseFraction = clampFraction(combatRageWaveBaseFraction, 0.05);
+        combatRageWaveGrowthFraction = sanitizeRate(combatRageWaveGrowthFraction, 0.012);
+        combatRageWaveFractionCap = clampFraction(combatRageWaveFractionCap, 0.25);
+        combatRageWaveJitter = clampFraction(combatRageWaveJitter, 0.15);
+        combatRageDecaySeconds = sanitizeRate(combatRageDecaySeconds, 8.0);
 
         buyChancePercent = clampInt(buyChancePercent, 0, 100);
         saveChancePercent = clampInt(saveChancePercent, 0, 100);

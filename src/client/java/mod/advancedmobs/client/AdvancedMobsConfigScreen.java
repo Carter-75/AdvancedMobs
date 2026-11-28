@@ -152,7 +152,31 @@ public class AdvancedMobsConfigScreen extends Screen {
             Setting.bool("Spend All Points On Spawn", "New mobs immediately spend their starting points.",
                 () -> config.forceSpendAllOnSpawn, v -> config.forceSpendAllOnSpawn = v),
             Setting.bool("Allow Modded Enchantments", "Let mob gear roll enchantments from other mods.",
-                () -> config.allowModdedEnchantments, v -> config.allowModdedEnchantments = v)
+                () -> config.allowModdedEnchantments, v -> config.allowModdedEnchantments = v),
+            Setting.bool("Fight Rage", "While a fight lasts, every mob ramps the same temporary damage and speed bonus, then takes growing end waves of its own max health. It fades when the fight stops.",
+                () -> config.combatRageEnabled, v -> config.combatRageEnabled = v),
+            Setting.dbl("Rage Grace (seconds)", "How long a fight runs before the ramp starts.",
+                () -> config.combatRageGraceSeconds, v -> config.combatRageGraceSeconds = v, 0.0, 600.0),
+            Setting.dbl("Rage Ramp (seconds)", "How long the ramp takes to reach full damage and speed.",
+                () -> config.combatRageRampSeconds, v -> config.combatRageRampSeconds = v, 1.0, 600.0),
+            Setting.dbl("Rage Max Damage", "Damage multiplier at full rage. 3 means triple damage.",
+                () -> config.combatRageMaxDamageMultiplier, v -> config.combatRageMaxDamageMultiplier = v, 1.0, 20.0),
+            Setting.dbl("Rage Max Speed", "Movement speed bonus at full rage. 0.35 is +35%.",
+                () -> config.combatRageMaxSpeedBonus, v -> config.combatRageMaxSpeedBonus = v, 0.0, 3.0),
+            Setting.dbl("End Wave Start (seconds)", "When the finishing waves begin.",
+                () -> config.combatRageWaveStartSeconds, v -> config.combatRageWaveStartSeconds = v, 0.0, 600.0),
+            Setting.dbl("End Wave Interval (seconds)", "Time between finishing waves.",
+                () -> config.combatRageWaveIntervalSeconds, v -> config.combatRageWaveIntervalSeconds = v, 1.0, 120.0),
+            Setting.dbl("End Wave Base", "First wave, as a fraction of that mob's max health.",
+                () -> config.combatRageWaveBaseFraction, v -> config.combatRageWaveBaseFraction = v, 0.0, 1.0),
+            Setting.dbl("End Wave Growth", "Extra max-health fraction added for each wave after the first.",
+                () -> config.combatRageWaveGrowthFraction, v -> config.combatRageWaveGrowthFraction = v, 0.0, 1.0),
+            Setting.dbl("End Wave Cap", "Most a single wave can take, as a fraction of max health.",
+                () -> config.combatRageWaveFractionCap, v -> config.combatRageWaveFractionCap = v, 0.0, 1.0),
+            Setting.dbl("End Wave Randomness", "How far each wave can swing around that fraction. 0.15 is plus or minus 15%.",
+                () -> config.combatRageWaveJitter, v -> config.combatRageWaveJitter = v, 0.0, 1.0),
+            Setting.dbl("Rage Fade (seconds)", "How long after combat the temporary rage lasts.",
+                () -> config.combatRageDecaySeconds, v -> config.combatRageDecaySeconds = v, 0.0, 120.0)
         )));
 
         categories.add(new Category("Abilities", List.of(
